@@ -21,14 +21,14 @@ import {
   type PayrollHistoryItem,
   type LeaveHistoryItem,
 } from "@/lib/employeeHub";
+import { canManageTeam } from "@/lib/permissions";
 
 type Tab = "directory" | "broadcast" | "profile";
 
 export default function EmployeeHubPage() {
   const { organization, membership, installedEngines } = useEngine();
 
-  const isHRAdmin = membership.isFounder || membership.role === "owner" || membership.role === "admin";
-  const canEditEmployees = isHRAdmin || !!membership.hrPermissions.edit_employees;
+const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin || !!membership.hrPermissions.edit_employees;
   const canApproveLeave = isHRAdmin || !!membership.hrPermissions.approve_leave;
   const canViewSalary = isHRAdmin || !!membership.hrPermissions.view_salary;
   const canBroadcast = isHRAdmin || !!membership.hrPermissions.broadcast;

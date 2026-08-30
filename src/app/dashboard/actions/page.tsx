@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { getOrganizations, createOrganization, type Organization } from "@/lib/organizations";
-import { PACKAGE_ENGINES } from "@/lib/packageEngines";
 import { getBlueprintOptions, type BlueprintOption } from "@/lib/blueprintsList";
 import { getPackages, createPackage, type Package } from "@/lib/packages";
 import { logActivity } from "@/lib/activity";
 import { createNotification } from "@/lib/notifications";
-import { createClient } from "@/lib/supabase";
 import { getPlatformAlerts, type PlatformAlert } from "@/lib/platformAlerts";
 import { formatError } from "@/lib/errorFormat";
 import { logError } from "@/lib/errorLog";
+import { getEngines, getBlueprintEngines, activateEngine, type Engine } from "@/lib/engines";
 import s from "@/styles/layout.module.css";
 
 type Section = "create" | "broadcast" | "alerts";
@@ -22,6 +21,8 @@ export default function ActionsPage() {
   const [packageList, setPackageList] = useState<Package[]>([]);
   const [blueprintOptions, setBlueprintOptions] = useState<BlueprintOption[]>([]);
   const [alertList, setAlertList] = useState<PlatformAlert[]>([]);
+  const [enginesList, setEnginesList] = useState<Engine[]>([]);
+  const [selectedEngineIds, setSelectedEngineIds] = useState<Set<string>>(new Set());
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [createTab, setCreateTab] = useState<"org" | "package" | "offer">("org");
@@ -40,16 +41,18 @@ export default function ActionsPage() {
   async function load() {
     setLoadError(null);
     try {
-      const [orgs, packages, blueprints, alerts] = await Promise.all([
+      const [orgs, packages, blueprints, alerts, engines] = await Promise.all([
         getOrganizations(),
         getPackages(),
         getBlueprintOptions(),
         getPlatformAlerts(),
+        getEngines(),
       ]);
       setOrgList(orgs);
       setPackageList(packages);
       setBlueprintOptions(blueprints);
       setAlertList(alerts);
+      setEnginesList(engines);
     } catch (err) {
       const message = formatError(err);
       setLoadError(message);
@@ -57,14 +60,21 @@ export default function ActionsPage() {
     }
   }
 
+  useEffect(() => {
+    if (!newOrg.blueprintId) { setSelectedEngineIds(new Set()); return; }
+    getBlueprintEngines(newOrg.blueprintId).then(ids => setSelectedEngineIds(new Set(ids)));
+  }, [newOrg.blueprintId]);
+
   const createOrg = async () => {
     if (!newOrg.name.trim() || !newOrg.packageSlug || !newOrg.blueprintId) {
       setCreateError("Please fill in the organization name, package, and industry blueprint.");
       return;
     }
+
     setCreateError(null);
     try {
       const selectedPackage = packageList.find((p) => p.slug === newOrg.packageSlug);
+
       const created = await createOrganization({
         name: newOrg.name,
         location: newOrg.location,
@@ -74,33 +84,25 @@ export default function ActionsPage() {
         blueprint_id: newOrg.blueprintId,
       } as any);
 
-      const slugs = PACKAGE_ENGINES[newOrg.packageSlug] ?? [];
-      if (slugs.length > 0) {
-        const supabase = createClient();
-        const { data: engines, error: enginesError } = await supabase
-          .from("engines")
-          .select("id, slug")
-          .in("slug", slugs);
-        if (enginesError) throw enginesError;
-
-        if (engines?.length) {
-          const engineRows = engines.map((engine) => ({
-            org_id: created.id,
-            engine_id: engine.id,
-            engine_slug: engine.slug,
-            enabled: true,
-            subscription_tier: newOrg.packageSlug,
-          }));
-          const { error: insertError } = await supabase.from("organization_engines").insert(engineRows);
-          if (insertError) throw insertError;
-        }
+      for (const engineId of selectedEngineIds) {
+        await activateEngine(created.id, engineId, newOrg.packageSlug);
       }
 
-      await logActivity({ icon: "🏢", title: "New organization registered", sub: created.name });
-      await createNotification("new_org", "New organization registered", `${created.name} was added via quick-create`);
+      await logActivity({
+        icon: "🏢",
+        title: "New organization registered",
+        sub: created.name,
+      });
+
+      await createNotification(
+        "new_org",
+        "New organization registered",
+        `${created.name} was added via quick-create`
+      );
 
       setOrgList(prev => [...prev, created]);
       setNewOrg({ name: "", location: "", packageSlug: "", blueprintId: "" });
+      setSelectedEngineIds(new Set());
     } catch (err) {
       const message = formatError(err);
       setCreateError(message);
@@ -118,7 +120,11 @@ export default function ActionsPage() {
         features: newPackage.features,
         orgs: 0,
       });
-      await logActivity({ icon: "📦", title: "New package created", sub: created.name });
+      await logActivity({
+        icon: "📦",
+        title: "New package created",
+        sub: created.name,
+      });
       setPackageList(prev => [...prev, created]);
       setNewPackage({ name: "", price: "", features: "" });
     } catch (err) {
@@ -212,6 +218,38 @@ export default function ActionsPage() {
                       <option value="">Select industry...</option>
                       {blueprintOptions.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.industry})</option>)}
                     </select>
+
+                    {newOrg.blueprintId && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                          Engines this org actually needs — adjust freely, this overrides the package default
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "220px", overflowY: "auto", background: "var(--bg-base)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px" }}>
+                          {enginesList.map(engine => {
+                            const checked = selectedEngineIds.has(engine.id);
+                            return (
+                              <label key={engine.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setSelectedEngineIds(prev => {
+                                      const next = new Set(prev);
+                                      if (checked) next.delete(engine.id); else next.add(engine.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                                <span>{engine.icon}</span>
+                                <span>{engine.name}</span>
+                                <span style={{ color: "var(--text-muted)", fontSize: "10px", marginLeft: "auto" }}>{engine.category}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <button onClick={createOrg} className={s.btnGold} style={{ marginTop: "4px" }}>Create Organization</button>
                     {createError && <div style={{ fontSize: 11, color: "#ef4444" }}>{createError}</div>}
                   </div>

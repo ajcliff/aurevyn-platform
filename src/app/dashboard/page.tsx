@@ -14,6 +14,7 @@ import { getPlatformPaymentsSince } from "@/lib/payments";
 import { formatError } from "@/lib/errorFormat";
 import { createClient } from "@/lib/supabase";
 import s from "@/styles/layout.module.css";
+import { logError } from "@/lib/errorLog";
 
 type Range = "7d" | "30d";
 
@@ -96,9 +97,11 @@ export default function Home() {
       const [orgsData, packagesData] = await Promise.all([getOrganizations(), getPackages()]);
       setOrgs(orgsData);
       setPackages(packagesData);
-    } catch (err) {
-      setError(formatError(err));
-    } finally {
+   } catch (err) {
+  const message = formatError(err);
+  setError(message);
+  logError({ source: "dashboard/overview", message });
+} finally {
       setLoading(false);
     }
   }

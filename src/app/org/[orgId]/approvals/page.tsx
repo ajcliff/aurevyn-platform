@@ -16,13 +16,13 @@ import { getOrgSettings, getOrgLogoUrl } from "@/lib/orgSettings";
 import jsPDF from "jspdf";
 import EmptyState from "@/components/EmptyState";
 import Drawer from "@/components/Drawer";
+import { canApproveRequests } from "@/lib/permissions";
 
 export default function ApprovalsPage() {
   const { organization, membership } = useEngine();
 
   const canApprove =
-    membership.isFounder || membership.role === "owner" || membership.role === "admin" || membership.role === "manager";
-
+canApproveRequests(membership);
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);

@@ -17,6 +17,10 @@ import { createClient } from "@/lib/supabase";
 import { getOrgSettings, getOrgLogoUrl } from "@/lib/orgSettings";
 import { getMyOrganizations, type MyOrgMembership } from "@/lib/runtime/getMyOrganizations";
 import AskOrgBrain from "@/components/AskOrgBrain";
+import { applyThemeColors, clearCustomThemeColors } from "@/lib/themeColors";
+import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
+import { getThemePresets } from "@/lib/themePresets";
+import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
 
 const ENGINE_ICONS: Record<string, string> = {
   inventory: "📦",
@@ -31,7 +35,6 @@ const ENGINE_ICONS: Record<string, string> = {
   "business-ops": "🧭",
 };
 
-// Labels for fixed (non-engine) nav items, also used to auto-derive the page header title.
 const NAV_LABELS: Record<string, string> = {
   activity: "Activity",
   approvals: "Approvals",
@@ -43,7 +46,8 @@ const NAV_LABELS: Record<string, string> = {
   me: "My Profile",
   warehouses: "Warehouses",
   pricelists: "Pricelists",
-  me: "My Profile",
+  user: "My Profile",
+  automation: "Automation",
 };
 
 const UNGATED_SEGMENTS = new Set([
@@ -60,7 +64,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function getDefaultTitle(pathname: string, engines: InstalledEngine[]): string {
-  const segments = pathname.split("/").filter(Boolean); // ["org", orgId, slug, ...]
+  const segments = pathname.split("/").filter(Boolean);
   const slug = segments[2];
   if (!slug) return "Overview";
   if (NAV_LABELS[slug]) return NAV_LABELS[slug];
@@ -105,11 +109,31 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
       const settings = await getOrgSettings(orgId);
       if (active) {
         setLogoUrl(getOrgLogoUrl(settings.logo_path));
-        document.documentElement.setAttribute("data-theme", settings.theme);
+
+        if (settings.theme === "custom") {
+          document.documentElement.removeAttribute("data-theme");
+          const custom = await getOrgCustomTheme(orgId);
+          if (custom && active) {
+            applyThemeColors(custom);
+            localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: custom }));
+          }
+        } else if (settings.theme_preset_id) {
+          document.documentElement.removeAttribute("data-theme");
+          const presets = await getThemePresets();
+          const preset = presets.find(p => p.id === settings.theme_preset_id);
+          if (preset && active) {
+            applyThemeColors(preset);
+            localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
+          }
+        } else {
+          clearCustomThemeColors();
+          document.documentElement.setAttribute("data-theme", settings.theme);
+          localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: settings.theme }));
+        }
       }
 
       if (myMembership) {
-        const canManageTeam = myMembership.role === "owner" || myMembership.role === "admin";
+        const canManageTeamAccess = canManageTeam(myMembership);
         const hasInventory = runtime.engines.some((e) => e.engines?.slug === "inventory");
         const hasHR = runtime.engines.some((e) => e.engines?.slug === "hr-payroll");
 
@@ -121,8 +145,8 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
           orgId,
           hasInventory,
           hasHR,
-          canManageTeam,
-          canApprove: canManageTeam,
+          canManageTeam: canManageTeamAccess,
+          canApprove: canManageTeamAccess,
           employeeId: myEmployeeRecord?.id ?? null,
           department: myEmployeeRecord?.department ?? null,
         });
@@ -134,6 +158,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
     return () => {
       active = false;
       document.documentElement.removeAttribute("data-theme");
+      clearCustomThemeColors();
     };
   }, [orgId]);
 
@@ -158,21 +183,18 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  // Filter engines this specific person can see (owners/admins/managers see all org engines;
-  // staff only see what's explicitly allowed, if restricted)
   const visibleEngines =
     membership.allowedEngines === null
       ? engines
       : engines.filter((e) => membership.allowedEngines!.includes(e.engines?.slug ?? ""));
 
-  const canManageTeam = membership.role === "owner" || membership.role === "admin";
-
-  const segments = pathname.split("/").filter(Boolean);
+const canManageTeamAccess = canManageTeam(membership);
+const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segments = pathname.split("/").filter(Boolean);
   const engineSlug = segments[2];
   const isGatedRoute = !UNGATED_SEGMENTS.has(engineSlug);
   const hasEngine = visibleEngines.some((e) => e.engines?.slug === engineSlug);
 
-  if (engineSlug === "team" && !canManageTeam) {
+  if (engineSlug === "team" && !canManageTeamAccess) {
     return (
       <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
         <PageHeaderProvider>
@@ -195,6 +217,30 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
       </EngineProvider>
     );
   }
+
+   if (engineSlug === "settings" && !canManageOrgSettingsAccess) {
+  return (
+    <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
+      <PageHeaderProvider>
+        <OrgShell
+          orgId={orgId}
+          organization={organization}
+          engines={visibleEngines}
+          membership={membership}
+          pathname={pathname}
+          notifications={notifications}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          showBrain={showBrain}
+          setShowBrain={setShowBrain}
+          logoUrl={logoUrl}
+        >
+          <EmptyState icon="🚫" message="Only owners and admins can manage organization settings." />
+        </OrgShell>
+      </PageHeaderProvider>
+    </EngineProvider>
+  );
+}
 
   if (isGatedRoute && engineSlug !== "team" && !hasEngine) {
     return (
@@ -236,6 +282,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
     { id: "activity", label: "Activity", icon: "🕐", path: `/org/${orgId}/activity` },
     { id: "approvals", label: "Approvals", icon: "✅", path: `/org/${orgId}/approvals` },
     { id: "documents", label: "Documents", icon: "📄", path: `/org/${orgId}/documents` },
+    { id: "automation", label: "Automation", icon: "🔁", path: `/org/${orgId}/automation` },
     { id: "employees", label: "Employee Hub", icon: "🪪", path: `/org/${orgId}/employees` },
     { id: "me", label: "My Profile", icon: "🪪", path: `/org/${orgId}/me` },
   ];
@@ -297,8 +344,9 @@ function OrgShell({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const canManageTeam = membership.role === "owner" || membership.role === "admin";
-  const { header } = usePageHeader();
+const canManageTeamAccess = canManageTeam(membership);
+const canManageOrgSettingsAccess = canManageOrgSettings(membership);
+const { header } = usePageHeader();  
 
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -308,7 +356,6 @@ function OrgShell({
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [myOrgs, setMyOrgs] = useState<MyOrgMembership[] | null>(null);
 
-  // Detect mobile viewport
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     check();
@@ -316,21 +363,18 @@ function OrgShell({
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Close mobile sidebar / notifications / switcher on route change
   useEffect(() => {
     setMobileOpen(false);
     setShowNotifications(false);
     setShowSwitcher(false);
   }, [pathname, setShowNotifications]);
 
-  // Lazy-load the org list only when the switcher is first opened
   useEffect(() => {
     if (showSwitcher && myOrgs === null) {
       getMyOrganizations().then(setMyOrgs);
     }
   }, [showSwitcher, myOrgs]);
 
-  // Click-outside to close the org switcher
   useEffect(() => {
     if (!showSwitcher) return;
     function handleClick(e: MouseEvent) {
@@ -342,7 +386,6 @@ function OrgShell({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showSwitcher]);
 
-  // Click-outside to close notifications
   useEffect(() => {
     if (!showNotifications) return;
     function handleClick(e: MouseEvent) {
@@ -667,7 +710,7 @@ function OrgShell({
             showLabel={showLabels}
           />
 
-          {canManageTeam && (
+          {canManageTeamAccess && (
             <SidebarLink
               href={`/org/${orgId}/team`}
               label="Team"
@@ -677,9 +720,9 @@ function OrgShell({
             />
           )}
 
-          {canManageTeam && (
-            <SidebarLink
-              href={`/org/${orgId}/settings`}
+          {canManageOrgSettingsAccess && (
+  <SidebarLink
+    href={`/org/${orgId}/settings`}
               label="Settings"
               icon="⚙️"
               active={pathname.startsWith(`/org/${orgId}/settings`)}

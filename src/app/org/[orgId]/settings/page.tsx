@@ -9,6 +9,9 @@ import {
   getOrgLogoUrl,
   type OrgSettings,
 } from "@/lib/orgSettings";
+import { getThemePresets, type ThemePreset } from "@/lib/themePresets";
+import { getOrgCustomTheme, saveOrgCustomTheme } from "@/lib/orgCustomTheme";
+import { applyThemeColors, THEME_COLOR_FIELDS, DEFAULT_THEME_COLORS, type ThemeColors } from "@/lib/themeColors";
 
 const THEMES: { id: OrgSettings["theme"]; name: string; description: string; base: string; accent: string }[] = [
   { id: "rift-valley", name: "Rift Valley", description: "Aubergine and gold", base: "#1A0F14", accent: "#C9A227" },
@@ -35,6 +38,11 @@ export default function SettingsPage() {
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [presets, setPresets] = useState<ThemePreset[]>([]);
+const [showCustomEditor, setShowCustomEditor] = useState(false);
+const [customColors, setCustomColors] = useState<ThemeColors>(DEFAULT_THEME_COLORS);
+const [savingCustom, setSavingCustom] = useState(false);
 
   useEffect(() => {
     load();
@@ -76,13 +84,36 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleThemeChange(theme: OrgSettings["theme"]) {
-    setSavingTheme(true);
-    document.documentElement.setAttribute("data-theme", theme); // instant preview
-    await updateOrgSettings(organization.id, { theme });
-    setSavingTheme(false);
-    load();
-  }
+  async function handleBuiltInThemeChange(theme: OrgSettings["theme"]) {
+  setSavingTheme(true);
+  document.documentElement.style.cssText = ""; // clear any inline custom/preset overrides
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: theme }));
+  await updateOrgSettings(organization.id, { theme, theme_preset_id: null });
+  setSettings(prev => prev ? { ...prev, theme, theme_preset_id: null } : prev);
+  setSavingTheme(false);
+}
+
+async function handlePresetThemeChange(preset: ThemePreset) {
+  setSavingTheme(true);
+  document.documentElement.removeAttribute("data-theme");
+  applyThemeColors(preset);
+  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
+  await updateOrgSettings(organization.id, { theme_preset_id: preset.id });
+  setSettings(prev => prev ? { ...prev, theme_preset_id: preset.id } : prev);
+  setSavingTheme(false);
+}
+
+async function handleSaveCustomTheme() {
+  setSavingCustom(true);
+  document.documentElement.removeAttribute("data-theme");
+  applyThemeColors(customColors);
+  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: customColors }));
+  await saveOrgCustomTheme(organization.id, customColors);
+  await updateOrgSettings(organization.id, { theme: "custom", theme_preset_id: null });
+  setSettings(prev => prev ? { ...prev, theme: "custom", theme_preset_id: null } : prev);
+  setSavingCustom(false);
+}
 
   async function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -142,43 +173,135 @@ export default function SettingsPage() {
       </div>
 
       <div className="card" style={{ ...cardStyle, marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 4 }}>Theme</h3>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-          Applies across your whole organization space. Changes for everyone, not just you.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-          {THEMES.map((t) => {
-            const active = settings?.theme === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => handleThemeChange(t.id)}
-                disabled={savingTheme}
-                style={{
-                  textAlign: "left",
-                  background: t.base,
-                  border: active ? `2px solid ${t.accent}` : "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: 12,
-                  cursor: savingTheme ? "default" : "pointer",
-                  opacity: savingTheme && !active ? 0.6 : 1,
-                }}
-              >
-                <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
-                  <div style={{ width: 14, height: 14, borderRadius: 4, background: t.accent }} />
-                  <div style={{ width: 14, height: 14, borderRadius: 4, background: t.base, border: "1px solid rgba(255,255,255,0.15)" }} />
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: t.id === "zanzibar-spice" ? "#2B1D14" : "#F0E6D8" }}>
-                  {t.name}{active && " ✓"}
-                </div>
-                <div style={{ fontSize: 10.5, color: t.id === "zanzibar-spice" ? "#6B5745" : "#A08B94" }}>
-                  {t.description}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+  <h3 style={{ marginBottom: 4 }}>Theme</h3>
+  <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+    Applies across your whole organization space. Changes for everyone, not just you.
+  </p>
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: presets.length > 0 ? 20 : 0 }}>
+    {THEMES.map((t) => {
+      const active = settings?.theme === t.id && !settings?.theme_preset_id;
+      return (
+        <button
+          key={t.id}
+          onClick={() => handleBuiltInThemeChange(t.id)}
+          disabled={savingTheme}
+          style={{
+            textAlign: "left", background: t.base,
+            border: active ? `2px solid ${t.accent}` : "1px solid var(--border)",
+            borderRadius: 12, padding: 12,
+            cursor: savingTheme ? "default" : "pointer",
+            opacity: savingTheme && !active ? 0.6 : 1,
+          }}
+        >
+          <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 4, background: t.accent }} />
+            <div style={{ width: 14, height: 14, borderRadius: 4, background: t.base, border: "1px solid rgba(255,255,255,0.15)" }} />
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.id === "zanzibar-spice" ? "#2B1D14" : "#F0E6D8" }}>
+            {t.name}{active && " ✓"}
+          </div>
+          <div style={{ fontSize: 10.5, color: t.id === "zanzibar-spice" ? "#6B5745" : "#A08B94" }}>
+            {t.description}
+          </div>
+        </button>
+      );
+    })}
+  </div>
+
+  {presets.length > 0 && (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10, letterSpacing: "0.05em" }}>
+        FOUNDER PRESETS
       </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {presets.map((p) => {
+          const active = settings?.theme_preset_id === p.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => handlePresetThemeChange(p)}
+              disabled={savingTheme}
+              style={{
+                textAlign: "left", background: p.bg_base,
+                border: active ? `2px solid ${p.gold}` : "1px solid var(--border)",
+                borderRadius: 12, padding: 12,
+                cursor: savingTheme ? "default" : "pointer",
+                opacity: savingTheme && !active ? 0.6 : 1,
+              }}
+            >
+              <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 4, background: p.gold }} />
+                <div style={{ width: 14, height: 14, borderRadius: 4, background: p.bg_base, border: "1px solid rgba(255,255,255,0.15)" }} />
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: p.text_primary }}>
+                {p.name}{active && " ✓"}
+              </div>
+              {p.description && (
+                <div style={{ fontSize: 10.5, color: p.text_secondary }}>{p.description}</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  )}
+
+  <button
+    onClick={() => setShowCustomEditor(prev => !prev)}
+    style={{
+      width: "100%", padding: "10px", borderRadius: 10,
+      border: settings?.theme === "custom" ? "2px solid var(--gold)" : "1px dashed var(--border)",
+      background: "transparent", color: "var(--text-secondary)",
+      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+    }}
+  >
+    🎨 {settings?.theme === "custom" ? "Editing Custom Theme ✓" : "Build a Custom Theme"}
+  </button>
+
+  {showCustomEditor && (
+    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+      {Object.entries(
+        THEME_COLOR_FIELDS.reduce((groups, field) => {
+          (groups[field.group] ??= []).push(field);
+          return groups;
+        }, {} as Record<string, typeof THEME_COLOR_FIELDS>)
+      ).map(([group, fields]) => (
+        <div key={group}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 8, letterSpacing: "0.05em" }}>
+            {group.toUpperCase()}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+            {fields.map(f => (
+              <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="color"
+                  value={customColors[f.key]}
+                  onChange={e => setCustomColors(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border)", cursor: "pointer", flexShrink: 0, padding: 0 }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{f.label}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>{customColors[f.key]}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button
+        onClick={handleSaveCustomTheme}
+        disabled={savingCustom}
+        style={{
+          padding: "10px", borderRadius: 10, border: "none",
+          background: "var(--gold)", color: "var(--gold-contrast)",
+          fontSize: 12, fontWeight: 700, cursor: savingCustom ? "default" : "pointer", fontFamily: "inherit",
+        }}
+      >
+        {savingCustom ? "Saving..." : "Save & Apply Custom Theme"}
+      </button>
+    </div>
+  )}
+</div>
 
       <div className="card" style={cardStyle}>
         <h3 style={{ marginBottom: 16 }}>Business Profile</h3>

@@ -11,6 +11,7 @@ import s from "@/styles/layout.module.css";
 import DashboardDrawer, { DrawerFieldList } from "@/components/DashboardDrawer";
 import PageHeader from "@/components/PageHeader";
 import { useSearchParams } from "next/navigation";
+import { getEngines, getOrgEngines, activateEngine, deactivateEngine, type Engine, type OrgEngine } from "@/lib/engines";
 
 const dotColor: Record<string, string> = {
   operational: "#3dd68c",
@@ -30,6 +31,9 @@ export default function OrganizationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [allEngines, setAllEngines] = useState<Engine[]>([]);
+const [orgEngines, setOrgEngines] = useState<OrgEngine[]>([]);
+const [engineBusy, setEngineBusy] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -47,9 +51,10 @@ export default function OrganizationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [orgsData, packagesData] = await Promise.all([getOrganizations(), getPackages()]);
-      setOrgs(orgsData);
-      setPackages(packagesData);
+      const [orgsData, packagesData, enginesData] = await Promise.all([getOrganizations(), getPackages(), getEngines()]);
+setOrgs(orgsData);
+setPackages(packagesData);
+setAllEngines(enginesData);
     } catch (err) {
       setError(formatError(err));
     } finally {
@@ -76,6 +81,32 @@ useEffect(() => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  useEffect(() => {
+  if (!selectedOrg) { setOrgEngines([]); return; }
+  getOrgEngines(selectedOrg.id).then(setOrgEngines).catch(err => setActionError(formatError(err)));
+}, [selectedOrg?.id]);
+
+const handleToggleEngine = async (engine: Engine) => {
+  if (!selectedOrg) return;
+  setEngineBusy(engine.id);
+  setActionError(null);
+  const current = orgEngines.find(oe => oe.engine_id === engine.id);
+  const isEnabled = current?.enabled ?? false;
+  try {
+    if (isEnabled) {
+      await deactivateEngine(selectedOrg.id, engine.id);
+    } else {
+      await activateEngine(selectedOrg.id, engine.id, selectedOrg.package);
+    }
+    const refreshed = await getOrgEngines(selectedOrg.id);
+    setOrgEngines(refreshed);
+  } catch (err) {
+    setActionError(formatError(err));
+  } finally {
+    setEngineBusy(null);
+  }
+};
 
   const handleUpdate = async () => {
     if (!selectedOrg) return;
@@ -187,7 +218,7 @@ useEffect(() => {
     title={selectedOrg.name}
     statusColor={dotColor[selectedOrg.status]}
     onClose={() => setSelectedOrg(null)}
-    tabs={[{ id: "overview", label: "overview" }, { id: "edit", label: "edit" }, { id: "danger", label: "danger" }]}
+    tabs={[{ id: "overview", label: "overview" }, { id: "edit", label: "edit" }, { id: "engines", label: "engines" },{ id: "danger", label: "danger" }]}
     activeTab={drawerTab}
     onTabChange={setDrawerTab}
   >
@@ -239,6 +270,46 @@ useEffect(() => {
         )}
       </div>
     )}
+
+    {drawerTab === "engines" && (
+  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>
+      Manual override — independent of {selectedOrg.package}'s normal engine set. No payment involved.
+    </div>
+    {allEngines.map(engine => {
+      const enabled = orgEngines.find(oe => oe.engine_id === engine.id)?.enabled ?? false;
+      const busy = engineBusy === engine.id;
+      return (
+        <div key={engine.id} style={{
+          display: "flex", alignItems: "center", gap: "10px",
+          background: "var(--bg-elevated)", border: "1px solid var(--border)",
+          borderRadius: "8px", padding: "10px 12px",
+        }}>
+          <span style={{ fontSize: "16px" }}>{engine.icon}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "12px", fontWeight: 600 }}>{engine.name}</div>
+            <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{engine.category}</div>
+          </div>
+          <div
+            onClick={() => !busy && handleToggleEngine(engine)}
+            style={{
+              width: 34, height: 19, borderRadius: 10,
+              background: enabled ? "var(--gold)" : "var(--bg-card)",
+              border: "1px solid var(--border)", cursor: busy ? "default" : "pointer",
+              position: "relative", transition: "background 0.2s ease", flexShrink: 0,
+              opacity: busy ? 0.5 : 1,
+            }}
+          >
+            <div style={{ position: "absolute", top: 2, left: enabled ? 16 : 2, width: 13, height: 13, borderRadius: "50%", background: "#fff", transition: "left 0.2s ease" }} />
+          </div>
+        </div>
+      );
+    })}
+    {actionError && (
+      <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{actionError}</div>
+    )}
+  </div>
+)}
 
     {drawerTab === "danger" && (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

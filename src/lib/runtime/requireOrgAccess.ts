@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { TeamRole } from "@/lib/team";
+import { canManageTeam } from "@/lib/permissions";
 
 export type OrgAccess = {
   userId: string;
@@ -78,5 +79,4 @@ export async function requireOrgAccess(orgId: string): Promise<OrgAccess | null>
  * any org member (e.g. initiating a payment at checkout).
  */
 export function isAdminAccess(access: OrgAccess): boolean {
-  return access.isFounder || access.role === "owner" || access.role === "admin";
-}
+return canManageTeam(access as any);}

@@ -21,8 +21,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "overview", label: "Overview", icon: "⊞", path: "/dashboard" },
       { id: "organizations", label: "Organizations", icon: "🏢", path: "/dashboard/organizations" },
-      { id: "company", label: "Company", icon: "🏢", path: "/dashboard/company" },
-      { id: "actions", label: "Quick Actions", icon: "✦", path: "/dashboard/actions" },
+{ id: "company", label: "Company", icon: "🏛", path: "/dashboard/company" },      { id: "actions", label: "Quick Actions", icon: "✦", path: "/dashboard/actions" },
     ],
   },
 {
@@ -44,7 +43,9 @@ const navGroups: NavGroup[] = [
       { id: "error-logs", label: "Error Logs", icon: "🧯", path: "/dashboard/error-logs" },
       { id: "control", label: "Control Center", icon: "🎛", path: "/dashboard/control" },
       { id: "settings", label: "Settings", icon: "⚙", path: "/dashboard/settings" },
+      { id: "themes", label: "Theme Presets", icon: "🎨", path: "/dashboard/themes" },
     ],
+  
   },
 ];
 

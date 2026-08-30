@@ -11,6 +11,8 @@ import { formatError } from "@/lib/errorFormat";
 import ErrorBanner from "@/components/ErrorBanner";
 import { useRouter } from "next/navigation";
 import s from "@/styles/layout.module.css";
+import { getThemePresets, type ThemePreset } from "@/lib/themePresets";
+import { applyThemeColors } from "@/lib/themeColors";
 
 type Section = "profile" | "platform" | "security" | "notifications" | "danger";
 
@@ -64,6 +66,7 @@ export default function FounderSettingsPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [presets, setPresets] = useState<ThemePreset[]>([]);
 
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -86,14 +89,15 @@ export default function FounderSettingsPage() {
       setUserId(user.id);
       setEmail(user.email ?? "");
 
-      const data = await getFounderSettings(user.id);
-      setSettings(data);
-      setFullName(data.full_name ?? "");
-      setLocation(data.location ?? "");
-      setPlatformName(data.platform_name);
-      setDefaultCurrency(data.default_currency);
-      setDefaultPackage(data.default_package);
-      setTimezone(data.timezone);
+      const [data, orgPresets] = await Promise.all([getFounderSettings(user.id), getThemePresets()]);
+setSettings(data);
+setPresets(orgPresets);
+setFullName(data.full_name ?? "");
+setLocation(data.location ?? "");
+setPlatformName(data.platform_name);
+setDefaultCurrency(data.default_currency);
+setDefaultPackage(data.default_package);
+setTimezone(data.timezone);
     } catch (err) {
       setError(formatError(err));
     } finally {
@@ -145,21 +149,38 @@ export default function FounderSettingsPage() {
     }
   }
 
-  async function handleThemeChange(theme: ThemeName) {
-    if (!userId) return;
-    setSavingTheme(true);
-    document.documentElement.setAttribute("data-theme", theme); // instant preview
-    try {
-      const updated = await updateFounderSettings(userId, { platform_theme: theme });
-      setSettings(updated);
-    } catch (err) {
-      setActionError(formatError(err));
-      // revert preview on failure
-      if (settings) document.documentElement.setAttribute("data-theme", settings.platform_theme);
-    } finally {
-      setSavingTheme(false);
-    }
+  async function handleBuiltInThemeChange(theme: ThemeName) {
+  if (!userId) return;
+  setSavingTheme(true);
+  document.documentElement.style.cssText = "";
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: theme }));
+  try {
+    const updated = await updateFounderSettings(userId, { platform_theme: theme, theme_preset_id: null });
+    setSettings(updated);
+  } catch (err) {
+    setActionError(formatError(err));
+    if (settings) document.documentElement.setAttribute("data-theme", settings.platform_theme);
+  } finally {
+    setSavingTheme(false);
   }
+}
+
+async function handlePresetThemeChange(preset: ThemePreset) {
+  if (!userId) return;
+  setSavingTheme(true);
+  document.documentElement.removeAttribute("data-theme");
+  applyThemeColors(preset);
+  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
+  try {
+    const updated = await updateFounderSettings(userId, { theme_preset_id: preset.id });
+    setSettings(updated);
+  } catch (err) {
+    setActionError(formatError(err));
+  } finally {
+    setSavingTheme(false);
+  }
+}
 
   async function handleToggleNotification(key: keyof FounderSettings) {
     if (!userId || !settings) return;
@@ -392,13 +413,14 @@ export default function FounderSettingsPage() {
                     Only affects your Founder Dashboard — independent from any organization's theme.
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+                    
                     {THEMES.map((t) => {
-                      const active = settings?.platform_theme === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => handleThemeChange(t.id)}
-                          disabled={savingTheme}
+  const active = settings?.platform_theme === t.id && !settings?.theme_preset_id;
+  return (
+    <button
+      key={t.id}
+      onClick={() => handleBuiltInThemeChange(t.id)}
+      disabled={savingTheme}
                           style={{
                             textAlign: "left",
                             background: t.base,
@@ -423,6 +445,45 @@ export default function FounderSettingsPage() {
                       );
                     })}
                   </div>
+                  {presets.length > 0 && (
+  <>
+    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", margin: "16px 0 10px", letterSpacing: "0.05em" }}>
+      YOUR PRESETS
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+      {presets.map((p) => {
+        const active = settings?.theme_preset_id === p.id;
+        return (
+          <button
+            key={p.id}
+            onClick={() => handlePresetThemeChange(p)}
+            disabled={savingTheme}
+            style={{
+              textAlign: "left",
+              background: p.bg_base,
+              border: active ? `2px solid ${p.gold}` : "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 12,
+              cursor: savingTheme ? "default" : "pointer",
+              opacity: savingTheme && !active ? 0.6 : 1,
+            }}
+          >
+            <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 4, background: p.gold }} />
+              <div style={{ width: 14, height: 14, borderRadius: 4, background: p.bg_base, border: "1px solid rgba(255,255,255,0.15)" }} />
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: p.text_primary }}>
+              {p.name}{active && " ✓"}
+            </div>
+            {p.description && (
+              <div style={{ fontSize: 10.5, color: p.text_secondary }}>{p.description}</div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  </>
+)}
                 </div>
               </>
             )}

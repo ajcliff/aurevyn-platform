@@ -10,6 +10,7 @@ export type FounderSettings = {
   default_package: string;
   timezone: string;
   platform_theme: ThemeName;
+  theme_preset_id: string | null;
   notify_new_org: boolean;
   notify_payment_received: boolean;
   notify_payment_overdue: boolean;
@@ -27,6 +28,7 @@ const DEFAULTS: Omit<FounderSettings, "user_id" | "updated_at"> = {
   default_package: "Starter",
   timezone: "Africa/Nairobi",
   platform_theme: "rift-valley",
+  theme_preset_id: null,
   notify_new_org: true,
   notify_payment_received: true,
   notify_payment_overdue: true,

@@ -1,8 +1,7 @@
 import { createClient } from "./supabase";
 import { logActivity } from "@/lib/activity";
 
-export type ThemeName = "rift-valley" | "savannah-dusk" | "highland-tea" | "zanzibar-spice";
-
+export type ThemeName = "rift-valley" | "savannah-dusk" | "highland-tea" | "zanzibar-spice" | "custom";
 export type OrgSettings = {
   org_id: string;
   business_name: string | null;
@@ -13,6 +12,7 @@ export type OrgSettings = {
   default_wht_rate: number;
   invoice_prefix: string;
   theme: ThemeName;
+  theme_preset_id: string | null;
   updated_at: string;
 };
 
@@ -25,6 +25,7 @@ const DEFAULTS: Omit<OrgSettings, "org_id" | "updated_at"> = {
   default_wht_rate: 0,
   invoice_prefix: "INV-",
   theme: "rift-valley",
+  theme_preset_id: null,
 };
 
 export async function getOrgSettings(orgId: string): Promise<OrgSettings> {

@@ -81,3 +81,13 @@ export async function activateBlueprintForOrg(orgId: string, blueprintId: string
   if (error) { console.error(error); return false; }
   return true;
 }
+
+export async function deactivateEngine(orgId: string, engineId: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("organization_engines")
+    .update({ enabled: false })
+    .eq("org_id", orgId)
+    .eq("engine_id", engineId);
+  if (error) throw error;
+}
