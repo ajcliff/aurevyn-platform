@@ -1,0 +1,39 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 12px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  border: 1px solid var(--border);
+
+  transition: var(--transition-fast);
+}
+
+.default {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.gold {
+  background: rgba(212,175,55,.12);
+  border-color: rgba(212,175,55,.25);
+  color: var(--gold);
+}
+
+.green {
+  background: rgba(61,220,151,.12);
+  border-color: rgba(61,220,151,.25);
+  color: var(--green);
+}
+
+.blue {
+  background: rgba(90,169,255,.12);
+  border-color: rgba(90,169,255,.25);
+  color: var(--blue);
+}

@@ -1,0 +1,96 @@
+:root {
+  /* ===========================
+     COLORS
+  =========================== */
+
+  --color-bg: #080a0f;
+  --color-surface: #11141b;
+  --color-surface-2: #171b23;
+
+  --color-border: #242a36;
+  --color-border-strong: #313949;
+
+  --color-text: #f5f1e8;
+  --color-text-secondary: #d2cbc0;
+  --color-text-muted: #9f988c;
+  --color-text-subtle: #75706a;
+
+  --color-gold: #d4af37;
+  --color-gold-light: #e4c96f;
+  --color-gold-dark: #b18d2d;
+
+  --color-success: #2ec27e;
+  --color-warning: #ffb020;
+  --color-danger: #ff5c5c;
+  --color-info: #4f9dff;
+
+  /* ===========================
+     TYPOGRAPHY
+  =========================== */
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --text-xs: .75rem;
+  --text-sm: .875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.75rem;
+  --text-5xl: 4rem;
+
+  /* ===========================
+     SPACING
+  =========================== */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ===========================
+     RADIUS
+  =========================== */
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* ===========================
+     SHADOWS
+  =========================== */
+
+  --shadow-sm: 0 4px 10px rgba(0,0,0,.18);
+  --shadow-md: 0 10px 30px rgba(0,0,0,.28);
+  --shadow-lg: 0 25px 60px rgba(0,0,0,.40);
+
+  /* ===========================
+     LAYOUT
+  =========================== */
+
+  --container: 1320px;
+  --navbar-height: 78px;
+
+  /* ===========================
+     TRANSITIONS
+  =========================== */
+
+  --transition-fast: .18s ease;
+  --transition-normal: .28s ease;
+  --transition-slow: .45s ease;
+
+  --z-navbar: 100;
+  --z-modal: 1000;
+}

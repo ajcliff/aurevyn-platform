@@ -1,26 +1,228 @@
-@import "tailwindcss";
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base: #1A0F14;
+  --bg-surface: #21131A;
+  --bg-elevated: #2C1922;
+  --bg-card: #24141B;
+  --bg-hover: #331C26;
+  --border: #3D2530;
+  --border-light: #563347;
+  --gold: #C9A227;
+  --gold-light: #E0BC4A;
+  --gold-dim: #7A6017;
+  --gold-glow: rgba(201, 162, 39, 0.15);
+  --gold-glow-strong: rgba(201, 162, 39, 0.3);
+  --gold-contrast: #1A0F14;
+  --text-primary: #F0E6D8;
+  --text-secondary: #A08B94;
+  --text-muted: #5C4652;
+  --green: #6FA37A;
+  --green-glow: rgba(111, 163, 122, 0.2);
+  --amber: #E0A344;
+  --red: #C1503D;
+--sidebar-width: 232px;
+  --topbar-height: 52px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+  --shadow-gold: 0 0 20px rgba(201,162,39,0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Rift Valley — aubergine-wine base, warm gold accent (explicit block, mirrors :root) */
+[data-theme="rift-valley"] {
+  --bg-base: #1A0F14;
+  --bg-surface: #21131A;
+  --bg-elevated: #2C1922;
+  --bg-card: #24141B;
+  --bg-hover: #331C26;
+  --border: #3D2530;
+  --border-light: #563347;
+  --gold: #C9A227;
+  --gold-light: #E0BC4A;
+  --gold-dim: #7A6017;
+  --gold-glow: rgba(201, 162, 39, 0.15);
+  --gold-glow-strong: rgba(201, 162, 39, 0.3);
+  --gold-contrast: #1A0F14;
+  --text-primary: #F0E6D8;
+  --text-secondary: #A08B94;
+  --text-muted: #5C4652;
+  --green: #6FA37A;
+  --green-glow: rgba(111, 163, 122, 0.2);
+  --amber: #E0A344;
+  --red: #C1503D;
+  --shadow-gold: 0 0 20px rgba(201,162,39,0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Savannah Dusk — indigo-navy base, coral-red accent */
+[data-theme="savannah-dusk"] {
+  --bg-base: #0B0E1A;
+  --bg-surface: #111527;
+  --bg-elevated: #171C33;
+  --bg-card: #141830;
+  --bg-hover: #1D2340;
+  --border: #232A47;
+  --border-light: #333C5E;
+  --gold: #E15B4D;
+  --gold-light: #F17E6F;
+  --gold-dim: #8C372E;
+  --gold-glow: rgba(225, 91, 77, 0.15);
+  --gold-glow-strong: rgba(225, 91, 77, 0.3);
+  --gold-contrast: #0B0E1A;
+  --text-primary: #E9EBF5;
+  --text-secondary: #8A8FB0;
+  --text-muted: #4E526E;
+  --green: #4FBE8C;
+  --green-glow: rgba(79, 190, 140, 0.2);
+  --amber: #E0A63E;
+  --red: #E15B4D;
+  --shadow-gold: 0 0 20px rgba(225,91,77,0.15);
+}
+
+/* Highland Tea — forest green base, copper accent */
+[data-theme="highland-tea"] {
+  --bg-base: #0D1410;
+  --bg-surface: #121C16;
+  --bg-elevated: #182619;
+  --bg-card: #152018;
+  --bg-hover: #1D2D20;
+  --border: #233A29;
+  --border-light: #33513A;
+  --gold: #C87F3B;
+  --gold-light: #DE9C57;
+  --gold-dim: #7C4F24;
+  --gold-glow: rgba(200, 127, 59, 0.15);
+  --gold-glow-strong: rgba(200, 127, 59, 0.3);
+  --gold-contrast: #0D1410;
+  --text-primary: #E7EDE3;
+  --text-secondary: #8EA490;
+  --text-muted: #4E5F50;
+  --green: #5FAE72;
+  --green-glow: rgba(95, 174, 114, 0.2);
+  --amber: #D2A23F;
+  --red: #C1594A;
+  --shadow-gold: 0 0 20px rgba(200,127,59,0.15);
+}
+
+/* Zanzibar Spice — light theme, warm parchment base, clove-brown accent */
+[data-theme="zanzibar-spice"] {
+  --bg-base: #F2E8D5;
+  --bg-surface: #FFFBF2;
+  --bg-elevated: #EADFC7;
+  --bg-card: #FFFBF2;
+  --bg-hover: #F3DCC8;
+  --border: #DCCBA8;
+  --border-light: #C7B48A;
+  --gold: #5B3A29;
+  --gold-light: #7A4F38;
+  --gold-dim: #3C2519;
+  --gold-glow: rgba(91, 58, 41, 0.10);
+  --gold-glow-strong: rgba(91, 58, 41, 0.2);
+  --gold-contrast: #FFFBF2;
+  --text-primary: #2B1D14;
+  --text-secondary: #6B5745;
+  --text-muted: #A6947E;
+  --green: #2E7D4F;
+  --green-glow: rgba(46, 125, 79, 0.15);
+  --amber: #8A4A1E;
+  --red: #B23A2C;
+  --shadow-gold: 0 0 20px rgba(91,58,41,0.1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  height: 100%;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+::selection { background: var(--gold-glow-strong); color: var(--gold-light); }
+
+button, input, select, textarea {
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--gold-dim) !important;
+  box-shadow: 0 0 0 2px var(--gold-glow);
+}
+
+.page-shell {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+}
+
+.page-main {
+  position: fixed;
+  top: var(--topbar-height);
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  overflow-y: scroll;
+  padding: 28px 24px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page-main-drawer {
+  position: fixed;
+  top: var(--topbar-height);
+  left: var(--sidebar-width);
+  right: 320px;
+  bottom: 0;
+  overflow-y: scroll;
+  padding: 28px 24px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page-settings {
+  position: fixed;
+  top: var(--topbar-height);
+  left: var(--sidebar-width);
+  right: 0px;
+  bottom: 0;
+  overflow-y: scroll;
+  padding: 28px 24px 120px;
+  display: flex;
+  gap: 24px;
+}
+
+.page-main,
+.page-main-drawer,
+.page-settings {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: scroll !important;
+}
+
+body{
+    font-family: var(--font-inter);
+}
+
+h1,h2,h3,h4,h5,h6{
+    font-family: var(--font-heading);
 }

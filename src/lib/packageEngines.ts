@@ -1,0 +1,25 @@
+export const PACKAGE_ENGINES: Record<string, string[]> = {
+  core: ["finance", "pos"],
+  growth: ["finance", "pos", "inventory", "crm"],
+  professional: [
+    "finance",
+    "pos",
+    "inventory",
+    "crm",
+    "analytics",
+    "procurement",
+    "documents",
+  ],
+  enterprise: [
+    "finance",
+    "pos",
+    "inventory",
+    "crm",
+    "analytics",
+    "procurement",
+    "documents",
+    "hr-payroll",
+    "ai-insights",
+    "business-ops",
+  ],
+};

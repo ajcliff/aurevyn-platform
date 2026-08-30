@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "../../../dev/aurevyn/apps"
+		},
+		{
+			"path": "../../../dev/aurevyn/core"
+		},
+		{
+			"path": "../../../dev/aurevyn/database"
+		},
+		{
+			"path": "../../../dev/aurevyn/modules"
+		},
+		{
+			"path": "../../../dev/aurevyn/node_modules"
+		},
+		{
+			"path": "../../../dev/aurevyn/shared"
+		}
+	]
+}

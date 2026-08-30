@@ -1,0 +1,557 @@
+/* =========================================================
+   AUREVYN — MARKETING DESIGN SYSTEM
+   Scoped to public/marketing pages only via .mkt-shell wrapper.
+   Concept: engineering blueprint / schematic drawing.
+   Does not touch the app dashboard's --bg-base/--gold tokens.
+========================================================= */
+
+.mkt-shell {
+  /* ---- Color ---- */
+  --mkt-ink: #0a0e13;
+  --mkt-ink-2: #0d1219;
+  --mkt-surface: #10161d;
+  --mkt-surface-raised: #141b23;
+  --mkt-line: #212b34;
+  --mkt-line-strong: #34424f;
+  --mkt-paper: #f2eee2;
+  --mkt-paper-dim: #a7afb8;
+  --mkt-paper-faint: #5c6570;
+
+  --mkt-blueprint: #4aa8ff;      /* cyanotype blue — signature line color */
+  --mkt-blueprint-dim: #2c6faf;
+  --mkt-blueprint-glow: rgba(74, 168, 255, 0.14);
+
+  --mkt-brass: #c9a24b;          /* muted, matte brass — not shiny gold */
+  --mkt-brass-light: #ddbd74;
+  --mkt-brass-glow: rgba(201, 162, 75, 0.16);
+
+  --mkt-signal: #3ecf8e;
+  --mkt-alert: #ff6b5e;
+  --mkt-violet: #b98af0;
+  --mkt-amber: #f0a860;
+
+  /* ---- Type ---- */
+  --mkt-font-sans: var(--font-mkt-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mkt-font-mono: var(--font-mkt-plex-mono), "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* ---- Layout ---- */
+  --mkt-container: 1240px;
+  --mkt-radius: 4px;
+  --mkt-grid-size: 28px;
+
+  background: var(--mkt-ink);
+  color: var(--mkt-paper);
+  font-family: var(--mkt-font-sans);
+  position: relative;
+  min-height: 100vh;
+}
+
+.mkt-shell * {
+  box-sizing: border-box;
+}
+
+.mkt-shell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Blueprint graph-paper backdrop */
+.mkt-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--mkt-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mkt-line) 1px, transparent 1px);
+  background-size: var(--mkt-grid-size) var(--mkt-grid-size);
+  opacity: 0.28;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 85%);
+}
+
+.mkt-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* =========================================================
+   TYPOGRAPHY
+========================================================= */
+
+.mkt-shell h1,
+.mkt-shell h2,
+.mkt-shell h3,
+.mkt-shell h4 {
+  font-family: var(--mkt-font-sans);
+  color: var(--mkt-paper);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.mkt-h1 {
+  font-size: clamp(2.5rem, 5.4vw, 4.25rem);
+  font-weight: 600;
+}
+
+.mkt-h2 {
+  font-size: clamp(1.9rem, 3.4vw, 2.75rem);
+}
+
+.mkt-h3 {
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+}
+
+.mkt-body {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--mkt-paper-dim);
+  margin: 0;
+}
+
+.mkt-body-lg {
+  font-size: 1.1875rem;
+  line-height: 1.65;
+  color: var(--mkt-paper-dim);
+  margin: 0;
+}
+
+.mkt-mono {
+  font-family: var(--mkt-font-mono);
+}
+
+.mkt-eyebrow {
+  font-family: var(--mkt-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mkt-blueprint);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mkt-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--mkt-blueprint);
+  box-shadow: 0 0 0 3px var(--mkt-blueprint-glow);
+}
+
+.mkt-eyebrow--brass {
+  color: var(--mkt-brass-light);
+}
+.mkt-eyebrow--brass::before {
+  background: var(--mkt-brass-light);
+  box-shadow: 0 0 0 3px var(--mkt-brass-glow);
+}
+
+/* =========================================================
+   LAYOUT
+========================================================= */
+
+.mkt-container {
+  width: min(100% - 48px, var(--mkt-container));
+  margin-inline: auto;
+}
+
+.mkt-section {
+  padding-block: 120px;
+  border-bottom: 1px solid var(--mkt-line);
+}
+
+.mkt-section--tight {
+  padding-block: 80px;
+}
+
+/* Corner registration marks, like a drafting sheet corner */
+.mkt-sheet {
+  position: relative;
+}
+
+.mkt-sheet::before,
+.mkt-sheet::after,
+.mkt-sheet .mkt-crosshair-tl,
+.mkt-sheet .mkt-crosshair-br {
+  content: "";
+}
+
+.mkt-crosshair {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
+}
+.mkt-crosshair::before,
+.mkt-crosshair::after {
+  content: "";
+  position: absolute;
+  background: var(--mkt-line-strong);
+}
+.mkt-crosshair::before { top: 50%; left: 0; width: 100%; height: 1px; }
+.mkt-crosshair::after { left: 50%; top: 0; height: 100%; width: 1px; }
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.mkt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 24px;
+  border-radius: var(--mkt-radius);
+  font-family: var(--mkt-font-sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.mkt-btn:active {
+  transform: translateY(1px);
+}
+
+.mkt-btn--primary {
+  background: var(--mkt-brass);
+  color: #0a0e13;
+  font-weight: 600;
+}
+.mkt-btn--primary:hover {
+  background: var(--mkt-brass-light);
+  box-shadow: 0 0 0 4px var(--mkt-brass-glow);
+}
+
+.mkt-btn--ghost {
+  background: transparent;
+  border-color: var(--mkt-line-strong);
+  color: var(--mkt-paper);
+}
+.mkt-btn--ghost:hover {
+  border-color: var(--mkt-blueprint);
+  color: var(--mkt-blueprint);
+}
+
+.mkt-btn--sm {
+  padding: 9px 16px;
+  font-size: 0.8125rem;
+}
+
+.mkt-btn--full {
+  width: 100%;
+}
+
+/* =========================================================
+   CARDS — corner-bracket "technical drawing frame"
+========================================================= */
+
+.mkt-card {
+  position: relative;
+  background: var(--mkt-surface);
+  border: 1px solid var(--mkt-line);
+  padding: 28px;
+}
+
+.mkt-card::before,
+.mkt-card::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--mkt-blueprint-dim);
+  opacity: 0.7;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+.mkt-card::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+.mkt-card::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+.mkt-card:hover::before,
+.mkt-card:hover::after {
+  border-color: var(--mkt-blueprint);
+  opacity: 1;
+}
+.mkt-card:hover {
+  border-color: var(--mkt-line-strong);
+  background: var(--mkt-surface-raised);
+}
+
+.mkt-tag {
+  display: inline-block;
+  font-family: var(--mkt-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mkt-paper-faint);
+  border: 1px solid var(--mkt-line-strong);
+  padding: 3px 8px;
+}
+
+/* =========================================================
+   GRIDS
+========================================================= */
+
+.mkt-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--mkt-line);
+  border: 1px solid var(--mkt-line);
+}
+
+.mkt-grid > * {
+  background: var(--mkt-ink);
+}
+
+.mkt-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mkt-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mkt-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* =========================================================
+   FORM FIELDS
+========================================================= */
+
+.mkt-field-label {
+  display: block;
+  font-family: var(--mkt-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mkt-paper-faint);
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+.mkt-input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--mkt-ink-2);
+  border: 1px solid var(--mkt-line-strong);
+  color: var(--mkt-paper);
+  font-family: var(--mkt-font-sans);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.mkt-input:focus {
+  border-color: var(--mkt-blueprint);
+}
+.mkt-input::placeholder {
+  color: var(--mkt-paper-faint);
+}
+
+.mkt-form-error {
+  color: var(--mkt-alert);
+  font-size: 0.75rem;
+  margin-top: 6px;
+}
+
+.mkt-alert-box {
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 107, 94, 0.35);
+  background: rgba(255, 107, 94, 0.08);
+  color: #ff9b90;
+  font-size: 0.8125rem;
+  margin-top: 4px;
+}
+
+/* =========================================================
+   MISC
+========================================================= */
+
+.mkt-divider {
+  height: 1px;
+  background: var(--mkt-line);
+  border: none;
+}
+
+.mkt-dim {
+  color: var(--mkt-paper-faint);
+}
+
+.mkt-num {
+  font-family: var(--mkt-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.mkt-badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mkt-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mkt-signal);
+}
+.mkt-badge-live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mkt-signal);
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+  animation: mkt-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mkt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-shell * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =========================================================
+   SCROLL REVEAL
+========================================================= */
+
+.mkt-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.mkt-reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* =========================================================
+   PRODUCT MOCKUPS (showcase panels)
+========================================================= */
+
+.mkt-mock-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--mkt-line);
+  font-size: 0.9375rem;
+}
+
+.mkt-mock-pos__ticket {
+  border: 1px dashed var(--mkt-line-strong);
+  padding: 16px;
+}
+
+.mkt-mock-pos__total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 12px;
+  margin-top: 4px;
+  font-weight: 600;
+  color: var(--mkt-brass-light);
+}
+
+.mkt-mock-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.mkt-mock-table th {
+  text-align: left;
+  font-family: var(--mkt-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mkt-paper-faint);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--mkt-line-strong);
+}
+.mkt-mock-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--mkt-line);
+}
+
+.mkt-mock-badge {
+  font-family: var(--mkt-font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+}
+.mkt-mock-badge--ok { color: var(--mkt-signal); }
+.mkt-mock-badge--low { color: var(--mkt-brass-light); }
+.mkt-mock-badge--critical { color: var(--mkt-alert); }
+.mkt-mock-badge--info { color: var(--mkt-blueprint); }
+
+.mkt-mock-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 120px;
+  margin-top: 8px;
+}
+.mkt-mock-bar {
+  flex: 1;
+  background: linear-gradient(to top, var(--mkt-blueprint-dim), var(--mkt-blueprint));
+  opacity: 0.75;
+}
+
+.mkt-mock-list {
+  display: flex;
+  flex-direction: column;
+}
+.mkt-mock-list__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--mkt-line);
+}
+.mkt-mock-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mkt-surface-raised);
+  border: 1px solid var(--mkt-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mkt-font-mono);
+  font-size: 0.75rem;
+  color: var(--mkt-brass-light);
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 980px) {
+  .mkt-cols-3,
+  .mkt-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mkt-section { padding-block: 88px; }
+}
+
+@media (max-width: 640px) {
+  .mkt-container { width: min(100% - 32px, var(--mkt-container)); }
+  .mkt-cols-2,
+  .mkt-cols-3,
+  .mkt-cols-4 {
+    grid-template-columns: 1fr;
+  }
+  .mkt-section { padding-block: 64px; }
+  .mkt-section--tight { padding-block: 56px; }
+}

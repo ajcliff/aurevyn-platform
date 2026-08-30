@@ -1,0 +1,23 @@
+:root{
+
+--background:#080A0F;
+
+--background-soft:#10131B;
+
+--glass:rgba(255,255,255,.05);
+
+--glass-border:rgba(255,255,255,.08);
+
+--text:#F5F1E8;
+
+--muted:#B4B4B4;
+
+--gold:#D6B36A;
+
+--gold-light:#E8C98A;
+
+--shadow:0 20px 60px rgba(0,0,0,.4);
+
+--radius:22px;
+
+}
