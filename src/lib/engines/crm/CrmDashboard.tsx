@@ -36,7 +36,7 @@ const INVOICE_STATUS_COLORS: Record<string, string> = {
   cancelled: "var(--text-muted)",
 };
 
-const styles: Record<string, CSSProperties> = {
+const styles = {
   page: { padding: 24, background: "#07070f", minHeight: "100vh", color: "#fff", display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 },
   main: { display: "flex", flexDirection: "column", gap: 20, minWidth: 0 },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center" },
@@ -68,7 +68,7 @@ const styles: Record<string, CSSProperties> = {
   timelineItem: { padding: "10px 0", borderBottom: "1px solid var(--border)", fontSize: 13 },
   subSection: { marginTop: 20, marginBottom: 8 },
   linkRow: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" },
-};
+} satisfies Record<string, CSSProperties | ((color: string) => CSSProperties)>;
 
 function statusBadge(s: CustomerStatus) {
   const map: Record<CustomerStatus, string> = { lead: "#c9a227", active: "var(--green)", inactive: "#555" };

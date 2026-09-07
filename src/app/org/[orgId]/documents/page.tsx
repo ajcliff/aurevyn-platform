@@ -15,6 +15,7 @@ const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   receipt: "Receipt",
   invoice: "Invoice",
   contract: "Contract",
+  purchase_order: "Purchase Order",
   hr: "HR File",
   report: "Report",
   other: "Other",

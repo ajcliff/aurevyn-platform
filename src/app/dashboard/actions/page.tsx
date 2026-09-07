@@ -120,6 +120,10 @@ export default function ActionsPage() {
         features: newPackage.features,
         orgs: 0,
       });
+      if (!created) {
+        setCreateError("Couldn't create the package. Please try again.");
+        return;
+      }
       await logActivity({
         icon: "📦",
         title: "New package created",

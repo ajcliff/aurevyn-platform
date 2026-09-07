@@ -18,7 +18,7 @@ import {
 import { exportToCSV } from "@/lib/csvExport";
 import { logActivity } from "@/lib/activity";
 
-const styles: Record<string, CSSProperties> = {
+const styles = {
   page: { padding: 24, background: "#07070f", minHeight: "100vh", color: "#fff", display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 },
   main: { display: "flex", flexDirection: "column", gap: 20, minWidth: 0 },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center" },
@@ -45,7 +45,7 @@ const styles: Record<string, CSSProperties> = {
   modal: { width: 480, maxWidth: "90vw", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22 },
   field: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 },
   label: { fontSize: 12, color: "var(--text-muted)" },
-};
+} satisfies Record<string, CSSProperties | ((color: string) => CSSProperties)>;
 
 function empStatusBadge(s: EmploymentStatus) {
   const map: Record<EmploymentStatus, string> = { active: "var(--green)", on_leave: "#c9a227", terminated: "#555" };

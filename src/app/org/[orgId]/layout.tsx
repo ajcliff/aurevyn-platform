@@ -20,6 +20,7 @@ import AskOrgBrain from "@/components/AskOrgBrain";
 import { applyThemeColors, clearCustomThemeColors } from "@/lib/themeColors";
 import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
 import { getThemePresets } from "@/lib/themePresets";
+import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
 
 const ENGINE_ICONS: Record<string, string> = {
@@ -75,6 +76,7 @@ function getDefaultTitle(pathname: string, engines: InstalledEngine[]): string {
 export default function OrgLayout({ children }: { children: ReactNode }) {
   const { orgId } = useParams<{ orgId: string }>();
   const pathname = usePathname();
+  useSessionExpiryGuard();
   const [showBrain, setShowBrain] = useState(false);
   const [notifications, setNotifications] = useState<OrgNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -84,6 +86,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -310,6 +313,8 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
         <CommandPalette
           items={orgCommands}
           onSearchData={(q) => searchOrgData(orgId, q, installedSlugs, membership.userId)}
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
         />
       </PageHeaderProvider>
     </EngineProvider>

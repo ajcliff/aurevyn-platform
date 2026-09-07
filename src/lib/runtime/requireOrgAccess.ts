@@ -11,7 +11,7 @@ export type OrgAccess = {
 };
 
 /**
- * Server-only. For use inside Next.js Route Handlers (app/api/**/route.ts).
+ * Server-only. For use inside Next.js Route Handlers (app/api/.../route.ts).
  *
  * API routes receive `organizationId` as a plain value in the request body
  * or query string — nothing stops a client from sending a different org's

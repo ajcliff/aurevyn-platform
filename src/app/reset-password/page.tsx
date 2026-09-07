@@ -1,18 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { isStrongEnoughPassword } from "@/lib/validation";
 import AuthShell from "@/components/marketing/AuthShell";
 
-export default function ResetPasswordPage() {
+function ResetPasswordInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [verifying, setVerifying] = useState(true);
+  const [verifyError, setVerifyError] = useState("");
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    async function verifyLink() {
+      const code = searchParams.get("code");
+
+      if (!code) {
+        setVerifyError("This reset link is invalid or missing. Please request a new one.");
+        setVerifying(false);
+        return;
+      }
+
+      const supabase = createClient();
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError) {
+        setVerifyError(
+          "This reset link has expired or already been used. Please request a new one."
+        );
+        setVerifying(false);
+        return;
+      }
+
+      setVerifying(false);
+    }
+
+    verifyLink();
+  }, [searchParams]);
 
   async function handleReset() {
     if (!isStrongEnoughPassword(password)) {
@@ -39,6 +71,33 @@ export default function ResetPasswordPage() {
 
     setDone(true);
     setTimeout(() => router.push("/login"), 2000);
+  }
+
+  if (verifying) {
+    return (
+      <AuthShell width={400}>
+        <p className="mkt-body" style={{ fontSize: "0.8125rem" }}>
+          Verifying your reset link…
+        </p>
+      </AuthShell>
+    );
+  }
+
+  if (verifyError) {
+    return (
+      <AuthShell width={400}>
+        <div className="mkt-eyebrow" style={{ marginBottom: 6 }}>Reset password</div>
+        <h1 className="mkt-h3" style={{ fontSize: "1.25rem" }}>Link invalid</h1>
+        <div className="mkt-alert-box" style={{ marginTop: 10 }}>{verifyError}</div>
+        <a
+          href="/forgot-password"
+          className="mkt-btn mkt-btn--primary mkt-btn--full"
+          style={{ marginTop: 16, display: "inline-block", textAlign: "center" }}
+        >
+          Request a new link
+        </a>
+      </AuthShell>
+    );
   }
 
   return (
@@ -87,5 +146,13 @@ export default function ResetPasswordPage() {
         </>
       )}
     </AuthShell>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordInner />
+    </Suspense>
   );
 }

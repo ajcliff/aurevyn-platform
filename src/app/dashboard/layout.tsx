@@ -8,6 +8,7 @@ import CommandPalette, { type CommandItem } from "@/components/CommandPalette";
 import FounderThemeProvider from "@/components/FounderThemeProvider";
 import { createClient } from "@/lib/supabase";
 import { getFounderSettings } from "@/lib/founderSettings";
+import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import EmptyState from "@/components/EmptyState";
 import styles from "@/styles/layout.module.css";
 
@@ -34,6 +35,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  useSessionExpiryGuard();
 
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);

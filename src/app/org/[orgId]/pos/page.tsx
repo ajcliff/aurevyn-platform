@@ -43,6 +43,15 @@ import {
   type Promotion
 } from "@/lib/promotions";
 
+type CompletedSale = {
+  id: string;
+  total: number;
+  payment_method: string;
+  cashier: string;
+  created_at?: string;
+  items: PosSaleItem[];
+};
+
 type CartItem = {
   productId: string;
   name: string;
@@ -71,9 +80,8 @@ const todaySales = useMemo(() => {
 
   return sales.filter(
     (sale) =>
-      new Date(
-        sale.created_at
-      ).toDateString() === today
+      sale.created_at &&
+      new Date(sale.created_at).toDateString() === today
   );
 }, [sales]);
 
@@ -109,7 +117,7 @@ const [pricelistOverride, setPricelistOverride] = useState("");
 const [showReceipt, setShowReceipt] = useState(false);
 
 const [completedSale, setCompletedSale] =
-  useState<PosSale | null>(null);
+  useState<CompletedSale | null>(null);
 
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -372,6 +380,8 @@ function handleExportSalesCSV() {
       const created = await createSale(sale);
 setCompletedSale({
   ...created,
+  id: created.id!,
+  cashier: created.cashier ?? sale.cashier ?? "System",
   items,
 });
 
@@ -576,7 +586,7 @@ return (
                     alignItems: "center",
                   }}
                 >
-                  <span>{new Date(sale.created_at).toLocaleString("en-KE")}</span>
+                  <span>{sale.created_at ? new Date(sale.created_at).toLocaleString("en-KE") : "—"}</span>
                   <span>{sale.payment_method}</span>
                   <span>{sale.status}</span>
                   <span>KES {Number(sale.total).toLocaleString()}</span>

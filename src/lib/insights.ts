@@ -82,12 +82,12 @@ function topMoverInsight(sales: PosSale[], orgId: string): Insight | null {
   });
 
   let best: { name: string; pct: number; thisWk: number; lastWk: number } | null = null;
-  thisWeek.forEach((thisWk, name) => {
+  for (const [name, thisWk] of thisWeek) {
     const lastWk = lastWeek.get(name) || 0;
-    if (lastWk < 500) return;
+    if (lastWk < 500) continue;
     const pct = Math.round(((thisWk - lastWk) / lastWk) * 100);
     if (!best || Math.abs(pct) > Math.abs(best.pct)) best = { name, pct, thisWk, lastWk };
-  });
+  }
 
   if (!best || Math.abs(best.pct) < 25) return null;
 

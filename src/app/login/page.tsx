@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/marketing/AuthShell";
 
-export default function LoginPage() {
+function LoginInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  const expired = searchParams.get("reason") === "expired";
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -64,6 +67,12 @@ export default function LoginPage() {
         Sign in to continue to your workspace.
       </p>
 
+      {expired && (
+        <div className="mkt-alert-box" style={{ marginTop: 10, marginBottom: 4 }}>
+          Your session expired. Please sign in again.
+        </div>
+      )}
+
       <label className="mkt-field-label">Email</label>
       <input
         type="email"
@@ -108,5 +117,13 @@ export default function LoginPage() {
         </a>
       </div>
     </AuthShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }

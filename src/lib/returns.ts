@@ -90,9 +90,9 @@ export async function approveReturn(
 
             item.product_id,
 
-            -Number(item.quantity),
+            Number(item.quantity),
 
-            "return",
+            "stock_in",
 
             "Customer Return"
 
