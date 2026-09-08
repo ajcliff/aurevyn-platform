@@ -112,9 +112,10 @@ export async function getSaleItems(saleId: string) {
 }
 
 export async function createSale(
-  sale: PosSale
+  sale: PosSale,
+  client?: ReturnType<typeof createClient>
 ) {
-  const supabase = createClient();
+  const supabase = client ?? createClient();
 
   const { data: saleData, error: saleError } =
     await supabase

@@ -116,23 +116,30 @@ export default function SalesSummaryPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div className="card" style={cardStyle}>
           <h3 style={{ marginBottom: 12 }}>By Payment Method</h3>
-          {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
-            <div key={method} style={rowStyle}>
-              <span style={{ textTransform: "capitalize" }}>{method}</span>
-              <span style={{ fontWeight: 600 }}>KES {amount.toLocaleString()}</span>
-            </div>
-          ))}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
+              <div key={method} style={miniCardStyle}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "capitalize" }}>{method}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>KES {amount.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="card" style={cardStyle}>
           <h3 style={{ marginBottom: 12 }}>Top Products</h3>
-          {summary.topProducts.map((p) => (
-            <div key={p.name} style={rowStyle}>
-              <span>{p.name} ({p.quantity})</span>
-              <span style={{ fontWeight: 600 }}>KES {p.revenue.toLocaleString()}</span>
+          {summary.topProducts.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No sales in this period.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {summary.topProducts.map((p) => (
+                <div key={p.name} style={miniCardStyle}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{p.name} ({p.quantity})</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>KES {p.revenue.toLocaleString()}</div>
+                </div>
+              ))}
             </div>
-          ))}
-          {summary.topProducts.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No sales in this period.</div>}
+          )}
         </div>
       </div>
     </div>
@@ -144,6 +151,13 @@ const cardStyle: React.CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 14,
   padding: 20,
+};
+
+const miniCardStyle: React.CSSProperties = {
+  background: "var(--bg-elevated)",
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "10px 12px",
 };
 
 const rowStyle: React.CSSProperties = {

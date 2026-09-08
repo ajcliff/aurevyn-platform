@@ -7,6 +7,7 @@ export type ErrorLogEntry = {
   message: string;
   code: string | null;
   context: Record<string, unknown> | null;
+  severity: "info" | "error" | "critical";
   created_at: string;
 };
 
@@ -16,7 +17,9 @@ export async function logError(params: {
   code?: string | null;
   orgId?: string | null;
   context?: Record<string, unknown> | null;
+  severity?: "info" | "error" | "critical";
 }): Promise<void> {
+  const severity = params.severity ?? "error";
   try {
     const supabase = createClient();
     await supabase.from("error_logs").insert({
@@ -25,10 +28,25 @@ export async function logError(params: {
       code: params.code ?? null,
       org_id: params.orgId ?? null,
       context: params.context ?? null,
+      severity,
     });
   } catch (err) {
     // Logging must never itself break the page.
     console.error("Failed to write error log:", err);
+  }
+
+  if (severity === "critical") {
+    // Fire-and-forget - a failed alert email should never block the caller.
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "critical_error",
+        source: params.source,
+        message: params.message,
+        orgId: params.orgId ?? null,
+      }),
+    }).catch(() => {});
   }
 }
 

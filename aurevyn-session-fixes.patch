@@ -1,0 +1,1868 @@
+diff --git a/package-lock.json b/package-lock.json
+index 86bf83f..35e6f47 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -24,6 +24,7 @@
+         "next": "16.2.9",
+         "react": "19.2.4",
+         "react-dom": "19.2.4",
++        "resend": "^6.26.0",
+         "three": "^0.185.1",
+         "zod": "^4.4.3"
+       },
+@@ -1390,6 +1391,12 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@stablelib/base64": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/@stablelib/base64/-/base64-1.0.1.tgz",
++      "integrity": "sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==",
++      "license": "MIT"
++    },
+     "node_modules/@studio-freight/lenis": {
+       "version": "1.0.42",
+       "resolved": "https://registry.npmjs.org/@studio-freight/lenis/-/lenis-1.0.42.tgz",
+@@ -4284,6 +4291,12 @@
+       ],
+       "license": "(MIT AND Zlib)"
+     },
++    "node_modules/fast-sha256": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/fast-sha256/-/fast-sha256-1.3.0.tgz",
++      "integrity": "sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==",
++      "license": "Unlicense"
++    },
+     "node_modules/fastq": {
+       "version": "1.20.1",
+       "resolved": "https://registry.npmjs.org/fastq/-/fastq-1.20.1.tgz",
+@@ -6397,6 +6410,12 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/postal-mime": {
++      "version": "2.7.5",
++      "resolved": "https://registry.npmjs.org/postal-mime/-/postal-mime-2.7.5.tgz",
++      "integrity": "sha512-GNEXKvWFQnbgO5NlrGzVa0FmWzBZ24PersAWErttSg1Hjpf0ATxTwS5DOMGaOpTG6bUh5cTr7xi0jAD942wCJA==",
++      "license": "MIT-0"
++    },
+     "node_modules/postcss": {
+       "version": "8.5.15",
+       "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.15.tgz",
+@@ -6638,6 +6657,27 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/resend": {
++      "version": "6.26.0",
++      "resolved": "https://registry.npmjs.org/resend/-/resend-6.26.0.tgz",
++      "integrity": "sha512-vkrULozV5nGF8o7tyun/t0+qFgtPpn+cyRhVqeorhOsPUNDiSc/9p/pn8AprdHqJpYaTvftpnQgWurW++FkCdw==",
++      "license": "MIT",
++      "dependencies": {
++        "postal-mime": "2.7.5",
++        "standardwebhooks": "1.0.0"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "peerDependencies": {
++        "@react-email/render": "*"
++      },
++      "peerDependenciesMeta": {
++        "@react-email/render": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/resolve": {
+       "version": "2.0.0-next.7",
+       "resolved": "https://registry.npmjs.org/resolve/-/resolve-2.0.0-next.7.tgz",
+@@ -7052,6 +7092,16 @@
+         "node": ">=0.1.14"
+       }
+     },
++    "node_modules/standardwebhooks": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.0.0.tgz",
++      "integrity": "sha512-BbHGOQK9olHPMvQNHWul6MYlrRTAOKn03rOe4A8O3CLWhNf4YHBqq2HJKKC+sfqpxiBY52pNeesD6jIiLDz8jg==",
++      "license": "MIT",
++      "dependencies": {
++        "@stablelib/base64": "^1.0.0",
++        "fast-sha256": "^1.3.0"
++      }
++    },
+     "node_modules/stats-gl": {
+       "version": "2.4.2",
+       "resolved": "https://registry.npmjs.org/stats-gl/-/stats-gl-2.4.2.tgz",
+diff --git a/package.json b/package.json
+index 205871b..8cef699 100644
+--- a/package.json
++++ b/package.json
+@@ -25,6 +25,7 @@
+     "next": "16.2.9",
+     "react": "19.2.4",
+     "react-dom": "19.2.4",
++    "resend": "^6.26.0",
+     "three": "^0.185.1",
+     "zod": "^4.4.3"
+   },
+diff --git a/src/app/api/notify/route.ts b/src/app/api/notify/route.ts
+new file mode 100644
+index 0000000..2c4e52c
+--- /dev/null
++++ b/src/app/api/notify/route.ts
+@@ -0,0 +1,68 @@
++import { NextRequest, NextResponse } from "next/server";
++import { Resend } from "resend";
++
++// Server-only env var - never prefixed with NEXT_PUBLIC_, so it's not exposed to the browser.
++const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
++
++const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || "AUREVYN <onboarding@resend.dev>";
++const FOUNDER_ALERT_EMAIL = process.env.FOUNDER_ALERT_EMAIL;
++
++type NotifyPayload =
++  | { type: "welcome"; to: string; orgName: string; ownerName: string }
++  | { type: "critical_error"; source: string; message: string; orgId?: string | null };
++
++export async function POST(req: NextRequest) {
++  if (!resend) {
++    // Not configured yet - fail silently so this never breaks the app for
++    // people who haven't set up RESEND_API_KEY. Logged server-side only.
++    console.warn("RESEND_API_KEY not set - skipping email send.");
++    return NextResponse.json({ skipped: true });
++  }
++
++  const payload = (await req.json()) as NotifyPayload;
++
++  try {
++    if (payload.type === "welcome") {
++      await resend.emails.send({
++        from: FROM_ADDRESS,
++        to: payload.to,
++        subject: `Welcome to AUREVYN, ${payload.orgName}`,
++        html: `
++          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
++            <h2>Welcome aboard, ${payload.ownerName}!</h2>
++            <p><strong>${payload.orgName}</strong> is now live on AUREVYN. You've got full access to every engine for the next 30 days, on us — plenty of time to see what actually fits how your business runs.</p>
++            <p>Log in any time to explore, add your team, and get set up.</p>
++            <p style="color: #888; font-size: 13px; margin-top: 32px;">— The AUREVYN team</p>
++          </div>
++        `,
++      });
++    }
++
++    if (payload.type === "critical_error") {
++      if (!FOUNDER_ALERT_EMAIL) {
++        console.warn("FOUNDER_ALERT_EMAIL not set - skipping critical error alert.");
++        return NextResponse.json({ skipped: true });
++      }
++      await resend.emails.send({
++        from: FROM_ADDRESS,
++        to: FOUNDER_ALERT_EMAIL,
++        subject: `🚨 AUREVYN critical error: ${payload.source}`,
++        html: `
++          <div style="font-family: monospace; max-width: 560px; margin: 0 auto; padding: 24px;">
++            <h3 style="color: #dc2626;">Critical error logged</h3>
++            <p><strong>Source:</strong> ${payload.source}</p>
++            <p><strong>Message:</strong> ${payload.message}</p>
++            ${payload.orgId ? `<p><strong>Org ID:</strong> ${payload.orgId}</p>` : ""}
++            <p style="color: #888; font-size: 12px;">Check the Error Logs page in the founder dashboard for full context.</p>
++          </div>
++        `,
++      });
++    }
++
++    return NextResponse.json({ sent: true });
++  } catch (err) {
++    console.error("Failed to send email:", err);
++    // Never let an email failure break the caller's flow.
++    return NextResponse.json({ sent: false }, { status: 200 });
++  }
++}
+diff --git a/src/app/dashboard/error-logs/page.tsx b/src/app/dashboard/error-logs/page.tsx
+index e1fb6d7..34a4aef 100644
+--- a/src/app/dashboard/error-logs/page.tsx
++++ b/src/app/dashboard/error-logs/page.tsx
+@@ -183,6 +183,11 @@ export default function ErrorLogsPage() {
+                   {timeAgo(log.created_at)}
+                 </span>
+                 <span style={{ fontSize: 11 }}>
++                  {log.severity === "critical" && (
++                    <span style={{ ...sourceTagStyle, background: "#dc262620", color: "#dc2626", marginRight: 6 }}>
++                      Critical
++                    </span>
++                  )}
+                   <span style={sourceTagStyle}>{log.source}</span>
+                 </span>
+                 <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+diff --git a/src/app/dashboard/layout.tsx b/src/app/dashboard/layout.tsx
+index 0370edc..0130807 100644
+--- a/src/app/dashboard/layout.tsx
++++ b/src/app/dashboard/layout.tsx
+@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase";
+ import { getFounderSettings } from "@/lib/founderSettings";
+ import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
+ import EmptyState from "@/components/EmptyState";
++import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
++import QuickNotesWidget from "@/components/QuickNotesWidget";
+ import styles from "@/styles/layout.module.css";
+ 
+ const MOBILE_BREAKPOINT = 900;
+@@ -162,6 +164,8 @@ onAction={() => { window.location.href = "/login"; }}        />
+         open={paletteOpen}
+         onOpenChange={setPaletteOpen}
+       />
++      <MobileViewOnlyBanner />
++      <QuickNotesWidget orgId={null} />
+     </div>
+   );
+ }
+\ No newline at end of file
+diff --git a/src/app/dashboard/settings/page.tsx b/src/app/dashboard/settings/page.tsx
+index 607a8e7..674a3fa 100644
+--- a/src/app/dashboard/settings/page.tsx
++++ b/src/app/dashboard/settings/page.tsx
+@@ -524,9 +524,9 @@ async function handlePresetThemeChange(preset: ThemePreset) {
+                   <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Notifications</h2>
+                   <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Choose what you get notified about</p>
+                 </div>
+-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", overflow: "hidden", maxWidth: 620 }}>
+-                  {settings && NOTIF_LABELS.map((n, i) => (
+-                    <div key={n.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: i < NOTIF_LABELS.length - 1 ? "1px solid var(--border)" : "none" }}>
++                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 620 }}>
++                  {settings && NOTIF_LABELS.map((n) => (
++                    <div key={n.key} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                       <div>
+                         <div style={{ fontSize: 13, fontWeight: 600 }}>{n.label}</div>
+                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{n.desc}</div>
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 1441ae7..1dac3e0 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -225,4 +225,28 @@ body{
+ 
+ h1,h2,h3,h4,h5,h6{
+     font-family: var(--font-heading);
++}
++
++/* View-only mode on small screens: the real enforcement happens at the data
++   layer (src/lib/supabase.ts blocks writes), this just makes it visually
++   obvious upfront rather than letting people fill out a form only to see
++   an error on submit. Search/filter inputs are exempted since those don't
++   mutate data. */
++@media (max-width: 899px) {
++  input:not([type="search"]):not([data-mobile-safe]),
++  textarea:not([data-mobile-safe]),
++  select:not([data-mobile-safe]) {
++    opacity: 0.55;
++    pointer-events: none;
++  }
++}
++
++/* POS has its own deliberate mobile + offline support (see
++   src/lib/posOfflineQueue.ts) - undo the blanket read-only styling
++   for it specifically. */
++.pos-mobile-enabled input,
++.pos-mobile-enabled textarea,
++.pos-mobile-enabled select {
++  opacity: 1 !important;
++  pointer-events: auto !important;
+ }
+\ No newline at end of file
+diff --git a/src/app/org/[orgId]/layout.tsx b/src/app/org/[orgId]/layout.tsx
+index daf5a3a..4a5e84c 100644
+--- a/src/app/org/[orgId]/layout.tsx
++++ b/src/app/org/[orgId]/layout.tsx
+@@ -21,6 +21,8 @@ import { applyThemeColors, clearCustomThemeColors } from "@/lib/themeColors";
+ import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
+ import { getThemePresets } from "@/lib/themePresets";
+ import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
++import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
++import QuickNotesWidget from "@/components/QuickNotesWidget";
+ import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
+ 
+ const ENGINE_ICONS: Record<string, string> = {
+@@ -316,6 +318,8 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
+           open={paletteOpen}
+           onOpenChange={setPaletteOpen}
+         />
++        <MobileViewOnlyBanner />
++        <QuickNotesWidget orgId={orgId} />
+       </PageHeaderProvider>
+     </EngineProvider>
+   );
+diff --git a/src/app/org/[orgId]/pos/page.tsx b/src/app/org/[orgId]/pos/page.tsx
+index 5c476b6..17f549f 100644
+--- a/src/app/org/[orgId]/pos/page.tsx
++++ b/src/app/org/[orgId]/pos/page.tsx
+@@ -5,7 +5,7 @@ import {
+   getCurrentOrg
+ } from "@/lib/runtime/currentOrg";
+ import { useParams } from "next/navigation";
+-import { createClient } from "@/lib/supabase";
++import { createClient, isMobileViewport } from "@/lib/supabase";
+ import { logActivity } from "@/lib/activity";
+ import CustomerSelector from "@/components/pos/CustomerSelector";
+ import SplitPaymentEditor from "@/components/payments/SplitPaymentEditor";
+@@ -42,6 +42,7 @@ import {
+   getPromotions,
+   type Promotion
+ } from "@/lib/promotions";
++import { queueOfflineSale, syncQueuedSales, getQueuedSales } from "@/lib/posOfflineQueue";
+ 
+ type CompletedSale = {
+   id: string;
+@@ -118,6 +119,8 @@ const [showReceipt, setShowReceipt] = useState(false);
+ 
+ const [completedSale, setCompletedSale] =
+   useState<CompletedSale | null>(null);
++const [pendingSyncCount, setPendingSyncCount] = useState(0);
++const [syncing, setSyncing] = useState(false);
+ 
+ 
+   const [checkoutOpen, setCheckoutOpen] = useState(false);
+@@ -179,6 +182,29 @@ if (defaultWarehouse) {
+ 
+ }
+ 
++  useEffect(() => {
++    if (!orgId) return;
++
++    setPendingSyncCount(getQueuedSales().length);
++
++    async function trySync() {
++      if (getQueuedSales().length === 0) return;
++      setSyncing(true);
++      const result = await syncQueuedSales(orgId);
++      setPendingSyncCount(getQueuedSales().length);
++      setSyncing(false);
++      if (result.synced > 0) {
++        const [productsData, salesData] = await Promise.all([getProducts(orgId), getSales(orgId)]);
++        setProducts(productsData);
++        setSales(salesData);
++      }
++    }
++
++    trySync();
++    window.addEventListener("online", trySync);
++    return () => window.removeEventListener("online", trySync);
++  }, [orgId]);
++
+   useEffect(() => {
+     const channel = supabase
+       .channel("pos-page")
+@@ -350,6 +376,8 @@ function handleExportSalesCSV() {
+       return;
+     }
+ 
++    let sale: PosSale | undefined;
++
+     try {
+       setLoading(true);
+ 
+@@ -362,7 +390,7 @@ function handleExportSalesCSV() {
+ 
+       const methodSummary = paymentLines.map((l) => methodLabel(l.method)).join(" + ");
+ 
+-      const sale: PosSale = {
++      sale = {
+         customer_name:
+   selectedCustomer?.name || "Walk-in Customer",
+         customer_id: selectedCustomer?.id || null,
+@@ -377,7 +405,33 @@ function handleExportSalesCSV() {
+         discount_amount: discountAmount
+       };
+ 
+-      const created = await createSale(sale);
++      const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
++
++      if (isOffline) {
++        queueOfflineSale(
++          sale,
++          paymentLines,
++          cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
++          selectedWarehouseId || null
++        );
++        setPendingSyncCount(getQueuedSales().length);
++
++        setCart([]);
++        setSelectedDiscountId("");
++        setPaymentLines([]);
++        setPaymentValid(false);
++        setChangeDue(0);
++        setLoading(false);
++        alert("No connection right now — this sale has been saved on your phone and will sync automatically once you're back online.");
++        return;
++      }
++
++      // On mobile, use the write-enabled client for this one deliberately-supported
++      // flow. On desktop this is identical to the normal client (mobile lock is a
++      // no-op there), so behavior is unchanged outside of small screens.
++      const saleClient = isMobileViewport() ? createClient({ allowMobileWrites: true }) : createClient();
++
++      const created = await createSale(sale, saleClient);
+ setCompletedSale({
+   ...created,
+   id: created.id!,
+@@ -391,7 +445,7 @@ setCompletedSale({
+           sourceType: "pos_sale",
+           sourceId: created.id,
+           details: line,
+-        });
++        }, saleClient);
+       }
+ 
+       for (const item of cart) {
+@@ -399,11 +453,13 @@ setCompletedSale({
+           item.productId,
+           item.quantity,
+           "stock_out",
+-          `POS Sale ${created.id}`
++          `POS Sale ${created.id}`,
++          undefined,
++          saleClient
+         );
+ 
+         if (selectedWarehouseId) {
+-          await deductStockFromWarehouse(item.productId, selectedWarehouseId, item.quantity);
++          await deductStockFromWarehouse(item.productId, selectedWarehouseId, item.quantity, saleClient);
+         }
+       }
+ 
+@@ -412,7 +468,7 @@ await logActivity({
+         title: "POS Sale Completed",
+         sub: `KES ${cartTotal.toLocaleString()}`,
+         org_id: orgId,
+-      });
++      }, saleClient);
+ 
+       setCart([]);
+       setSelectedDiscountId("");
+@@ -433,7 +489,28 @@ setSales(salesData);
+     } catch (error) {
+       const message = error instanceof Error ? error.message : "Unknown error";
+       console.error("Sale failed:", message, error);
+-      alert(`Failed to complete sale: ${message}`);
++
++      const looksLikeNetworkFailure =
++        typeof navigator !== "undefined" && !navigator.onLine ||
++        /fetch|network|Failed to fetch/i.test(message);
++
++      if (looksLikeNetworkFailure && sale) {
++        queueOfflineSale(
++          sale,
++          paymentLines,
++          cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
++          selectedWarehouseId || null
++        );
++        setPendingSyncCount(getQueuedSales().length);
++        setCart([]);
++        setSelectedDiscountId("");
++        setPaymentLines([]);
++        setPaymentValid(false);
++        setChangeDue(0);
++        alert("Connection dropped mid-sale — it's been saved on your phone and will sync automatically once you're back online.");
++      } else {
++        alert(`Failed to complete sale: ${message}`);
++      }
+     } finally {
+       setLoading(false);
+     }
+@@ -445,7 +522,7 @@ const searchParams = useSearchParams();
+ 
+ const saleId = searchParams.get("sale");
+ return (
+-    <div style={{ display: "flex", height: "100%", minHeight: 0, gap: "20px" }}>
++    <div className="pos-mobile-enabled" style={{ display: "flex", height: "100%", minHeight: 0, gap: "20px" }}>
+       {/* Main column */}
+       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+         <div style={{ flexShrink: 0 }}>
+@@ -453,6 +530,25 @@ return (
+           <p className={s.pageSub}>
+             Sell products, manage transactions and process payments
+           </p>
++          {pendingSyncCount > 0 && (
++            <div
++              style={{
++                fontSize: 12,
++                fontWeight: 600,
++                color: syncing ? "#3dd68c" : "#f59e0b",
++                background: syncing ? "#3dd68c20" : "#f59e0b20",
++                border: `1px solid ${syncing ? "#3dd68c" : "#f59e0b"}40`,
++                borderRadius: 8,
++                padding: "6px 10px",
++                display: "inline-block",
++                marginBottom: 8,
++              }}
++            >
++              {syncing
++                ? "Syncing offline sales…"
++                : `${pendingSyncCount} sale${pendingSyncCount === 1 ? "" : "s"} saved offline, waiting to sync`}
++            </div>
++          )}
+ 
+           <div
+             style={{
+diff --git a/src/app/org/[orgId]/pos/summary/page.tsx b/src/app/org/[orgId]/pos/summary/page.tsx
+index d175c5d..efda938 100644
+--- a/src/app/org/[orgId]/pos/summary/page.tsx
++++ b/src/app/org/[orgId]/pos/summary/page.tsx
+@@ -116,23 +116,30 @@ export default function SalesSummaryPage() {
+       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+         <div className="card" style={cardStyle}>
+           <h3 style={{ marginBottom: 12 }}>By Payment Method</h3>
+-          {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
+-            <div key={method} style={rowStyle}>
+-              <span style={{ textTransform: "capitalize" }}>{method}</span>
+-              <span style={{ fontWeight: 600 }}>KES {amount.toLocaleString()}</span>
+-            </div>
+-          ))}
++          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
++            {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
++              <div key={method} style={miniCardStyle}>
++                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "capitalize" }}>{method}</div>
++                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>KES {amount.toLocaleString()}</div>
++              </div>
++            ))}
++          </div>
+         </div>
+ 
+         <div className="card" style={cardStyle}>
+           <h3 style={{ marginBottom: 12 }}>Top Products</h3>
+-          {summary.topProducts.map((p) => (
+-            <div key={p.name} style={rowStyle}>
+-              <span>{p.name} ({p.quantity})</span>
+-              <span style={{ fontWeight: 600 }}>KES {p.revenue.toLocaleString()}</span>
++          {summary.topProducts.length === 0 ? (
++            <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No sales in this period.</div>
++          ) : (
++            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
++              {summary.topProducts.map((p) => (
++                <div key={p.name} style={miniCardStyle}>
++                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{p.name} ({p.quantity})</div>
++                  <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>KES {p.revenue.toLocaleString()}</div>
++                </div>
++              ))}
+             </div>
+-          ))}
+-          {summary.topProducts.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No sales in this period.</div>}
++          )}
+         </div>
+       </div>
+     </div>
+@@ -146,6 +153,13 @@ const cardStyle: React.CSSProperties = {
+   padding: 20,
+ };
+ 
++const miniCardStyle: React.CSSProperties = {
++  background: "var(--bg-elevated)",
++  border: "1px solid var(--border)",
++  borderRadius: 10,
++  padding: "10px 12px",
++};
++
+ const rowStyle: React.CSSProperties = {
+   display: "flex",
+   justifyContent: "space-between",
+diff --git a/src/app/register/page.tsx b/src/app/register/page.tsx
+index 5185a47..7c7758a 100644
+--- a/src/app/register/page.tsx
++++ b/src/app/register/page.tsx
+@@ -217,6 +217,9 @@ export default function RegisterPage() {
+         .eq("slug", blueprintSlug)
+         .maybeSingle();
+ 
++      const trialEndsAt = new Date();
++      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
++
+       const { data: organization, error: orgError } = await supabase
+         .from("organizations")
+         .insert({
+@@ -231,6 +234,7 @@ export default function RegisterPage() {
+           branch_count: form.branches,
+           tax_id: form.taxId.trim() || null,
+           website: form.website.trim() || null,
++          trial_ends_at: trialEndsAt.toISOString(),
+         })
+         .select()
+         .single();
+@@ -255,25 +259,33 @@ export default function RegisterPage() {
+ 
+       if (membershipError) throw membershipError;
+ 
+-      const slugs = PACKAGE_ENGINES[form.packageSlug] ?? [];
+-      if (slugs.length > 0) {
+-        const { data: engines } = await supabase
+-          .from("engines")
+-          .select("id, slug")
+-          .in("slug", slugs);
+-
+-        if (engines?.length) {
+-          const engineRows = engines.map((engine) => ({
+-            org_id: orgId,
+-            engine_id: engine.id,
+-            engine_slug: engine.slug,
+-            enabled: true,
+-            subscription_tier: form.packageSlug,
+-          }));
+-          await supabase.from("organization_engines").insert(engineRows);
+-        }
++      // Everyone gets every engine free for the 30-day trial, regardless of
++      // which package they picked at signup - that choice just becomes their
++      // pre-selected default once the mandatory plan-selection screen shows
++      // up after the trial ends (see src/components/PackageSelectionGate.tsx).
++      const { data: allEngines } = await supabase.from("engines").select("id, slug");
++      if (allEngines?.length) {
++        const engineRows = allEngines.map((engine) => ({
++          org_id: orgId,
++          engine_id: engine.id,
++          engine_slug: engine.slug,
++          enabled: true,
++          subscription_tier: form.packageSlug,
++        }));
++        await supabase.from("organization_engines").insert(engineRows);
+       }
+ 
++      fetch("/api/notify", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({
++          type: "welcome",
++          to: form.email.trim(),
++          orgName: form.companyName.trim(),
++          ownerName: form.fullName.trim(),
++        }),
++      }).catch(() => {});
++
+       if (!hasSession) {
+         // Organization is set up, but they can't be signed in yet.
+         setPendingConfirmation(true);
+diff --git a/src/components/MobileViewOnlyBanner.tsx b/src/components/MobileViewOnlyBanner.tsx
+new file mode 100644
+index 0000000..c8b4c4b
+--- /dev/null
++++ b/src/components/MobileViewOnlyBanner.tsx
+@@ -0,0 +1,59 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { MOBILE_BREAKPOINT } from "@/lib/supabase";
++
++export default function MobileViewOnlyBanner() {
++  const [isMobile, setIsMobile] = useState(false);
++  const [dismissed, setDismissed] = useState(false);
++
++  useEffect(() => {
++    function check() {
++      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
++    }
++    check();
++    window.addEventListener("resize", check);
++    return () => window.removeEventListener("resize", check);
++  }, []);
++
++  if (!isMobile || dismissed) return null;
++
++  return (
++    <div
++      style={{
++        position: "fixed",
++        top: 0,
++        left: 0,
++        right: 0,
++        zIndex: 10000,
++        background: "#f59e0b",
++        color: "#1a1200",
++        fontSize: 12,
++        fontWeight: 600,
++        padding: "8px 12px",
++        display: "flex",
++        alignItems: "center",
++        justifyContent: "space-between",
++        gap: 8,
++      }}
++    >
++      <span>View-only on this screen size — switch to a laptop or desktop to make changes.</span>
++      <button
++        onClick={() => setDismissed(true)}
++        style={{
++          background: "transparent",
++          border: "none",
++          color: "#1a1200",
++          fontWeight: 700,
++          fontSize: 14,
++          cursor: "pointer",
++          padding: "0 4px",
++          flexShrink: 0,
++        }}
++        aria-label="Dismiss"
++      >
++        ✕
++      </button>
++    </div>
++  );
++}
+diff --git a/src/components/PackageSelectionGate.tsx b/src/components/PackageSelectionGate.tsx
+new file mode 100644
+index 0000000..d75fe28
+--- /dev/null
++++ b/src/components/PackageSelectionGate.tsx
+@@ -0,0 +1,110 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { getSellablePackages, confirmPackageSelection, type SellablePackage } from "@/lib/trial";
++
++type Props = {
++  orgId: string;
++  orgName: string;
++  onConfirmed: () => void;
++};
++
++export default function PackageSelectionGate({ orgId, orgName, onConfirmed }: Props) {
++  const [packages, setPackages] = useState<SellablePackage[]>([]);
++  const [selected, setSelected] = useState<string | null>(null);
++  const [confirming, setConfirming] = useState(false);
++  const [loading, setLoading] = useState(true);
++
++  useEffect(() => {
++    getSellablePackages().then((pkgs) => {
++      setPackages(pkgs);
++      setLoading(false);
++    });
++  }, []);
++
++  async function handleConfirm() {
++    if (!selected) return;
++    setConfirming(true);
++    const ok = await confirmPackageSelection(orgId, orgName, selected);
++    setConfirming(false);
++    if (ok) {
++      onConfirmed();
++    } else {
++      alert("Something went wrong confirming your plan. Please try again.");
++    }
++  }
++
++  return (
++    <div
++      style={{
++        position: "fixed",
++        inset: 0,
++        zIndex: 20000,
++        background: "rgba(10,10,10,0.92)",
++        display: "flex",
++        alignItems: "center",
++        justifyContent: "center",
++        padding: 20,
++      }}
++    >
++      <div style={{ maxWidth: 720, width: "100%" }}>
++        <div style={{ textAlign: "center", marginBottom: 28 }}>
++          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
++            Your free trial has ended
++          </h1>
++          <p style={{ fontSize: 14, color: "#9ca3af" }}>
++            Pick the plan that fits how you've actually been using AUREVYN — you can change this later.
++          </p>
++        </div>
++
++        {loading ? (
++          <div style={{ textAlign: "center", color: "#9ca3af" }}>Loading plans...</div>
++        ) : (
++          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 24 }}>
++            {packages.map((pkg) => (
++              <button
++                key={pkg.slug}
++                onClick={() => setSelected(pkg.slug)}
++                style={{
++                  textAlign: "left",
++                  padding: "18px 20px",
++                  borderRadius: 14,
++                  border: selected === pkg.slug ? "2px solid #f5b800" : "1px solid #333",
++                  background: selected === pkg.slug ? "#f5b80014" : "#161616",
++                  cursor: "pointer",
++                  color: "#fff",
++                }}
++              >
++                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{pkg.name}</div>
++                <div style={{ fontSize: 15, fontWeight: 600, color: "#f5b800", marginBottom: 8 }}>{pkg.price}</div>
++                <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.5 }}>{pkg.features}</div>
++              </button>
++            ))}
++          </div>
++        )}
++
++        <button
++          onClick={handleConfirm}
++          disabled={!selected || confirming}
++          style={{
++            width: "100%",
++            padding: "14px 0",
++            borderRadius: 10,
++            border: "none",
++            background: selected ? "#f5b800" : "#333",
++            color: selected ? "#000" : "#666",
++            fontWeight: 700,
++            fontSize: 14,
++            cursor: selected ? "pointer" : "not-allowed",
++          }}
++        >
++          {confirming ? "Setting up your plan..." : "Confirm plan"}
++        </button>
++
++        <p style={{ textAlign: "center", fontSize: 12, color: "#6b7280", marginTop: 14 }}>
++          We'll send an invoice to your account — no card needed right now.
++        </p>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/QuickNotesWidget.tsx b/src/components/QuickNotesWidget.tsx
+new file mode 100644
+index 0000000..4484499
+--- /dev/null
++++ b/src/components/QuickNotesWidget.tsx
+@@ -0,0 +1,286 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import Drawer from "@/components/Drawer";
++import {
++  getActiveQuickNotes,
++  getCompletedQuickNotes,
++  createQuickNote,
++  completeQuickNote,
++  reopenQuickNote,
++  deleteQuickNote,
++  type QuickNote,
++  type QuickNoteVisibility,
++} from "@/lib/quickNotes";
++
++type Props = {
++  orgId: string | null;
++};
++
++export default function QuickNotesWidget({ orgId }: Props) {
++  const [open, setOpen] = useState(false);
++  const [tab, setTab] = useState<"active" | "history">("active");
++  const [notes, setNotes] = useState<QuickNote[]>([]);
++  const [history, setHistory] = useState<QuickNote[]>([]);
++  const [content, setContent] = useState("");
++  const [visibility, setVisibility] = useState<QuickNoteVisibility>("private");
++  const [loading, setLoading] = useState(false);
++
++  useEffect(() => {
++    if (open) load();
++  }, [open, tab]);
++
++  async function load() {
++    setLoading(true);
++    if (tab === "active") {
++      setNotes(await getActiveQuickNotes(orgId));
++    } else {
++      setHistory(await getCompletedQuickNotes(orgId));
++    }
++    setLoading(false);
++  }
++
++  async function handleAdd() {
++    if (!content.trim()) return;
++    const created = await createQuickNote(orgId, content.trim(), visibility);
++    if (created) {
++      setContent("");
++      setNotes((prev) => [created, ...prev]);
++    }
++  }
++
++  async function handleComplete(id: string) {
++    setNotes((prev) => prev.filter((n) => n.id !== id));
++    await completeQuickNote(id);
++  }
++
++  async function handleReopen(id: string) {
++    setHistory((prev) => prev.filter((n) => n.id !== id));
++    await reopenQuickNote(id);
++  }
++
++  async function handleDelete(id: string) {
++    setHistory((prev) => prev.filter((n) => n.id !== id));
++    await deleteQuickNote(id);
++  }
++
++  return (
++    <>
++      <button
++        onClick={() => setOpen(true)}
++        data-mobile-safe
++        style={{
++          position: "fixed",
++          bottom: 20,
++          right: 20,
++          zIndex: 9998,
++          width: 48,
++          height: 48,
++          borderRadius: "50%",
++          border: "1px solid var(--border)",
++          background: "var(--bg-card)",
++          color: "var(--text-primary)",
++          fontSize: 20,
++          cursor: "pointer",
++          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
++        }}
++        aria-label="Quick notes"
++      >
++        📝
++      </button>
++
++      <Drawer open={open} onClose={() => setOpen(false)} title="Quick Notes" width={400}>
++        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
++          <TabButton active={tab === "active"} onClick={() => setTab("active")}>
++            Active
++          </TabButton>
++          <TabButton active={tab === "history"} onClick={() => setTab("history")}>
++            History
++          </TabButton>
++        </div>
++
++        {tab === "active" && (
++          <>
++            <textarea
++              data-mobile-safe
++              value={content}
++              onChange={(e) => setContent(e.target.value)}
++              placeholder="Type a quick note or task..."
++              rows={2}
++              style={textareaStyle}
++            />
++            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
++              <select
++                data-mobile-safe
++                value={visibility}
++                onChange={(e) => setVisibility(e.target.value as QuickNoteVisibility)}
++                style={selectStyle}
++              >
++                <option value="private">Only me</option>
++                <option value="shared">Whole team</option>
++              </select>
++              <button data-mobile-safe onClick={handleAdd} style={primaryButton}>
++                Add
++              </button>
++            </div>
++
++            {loading ? (
++              <div style={emptyStyle}>Loading...</div>
++            ) : notes.length === 0 ? (
++              <div style={emptyStyle}>No active notes.</div>
++            ) : (
++              notes.map((note) => (
++                <div key={note.id} style={noteRow}>
++                  <button
++                    data-mobile-safe
++                    onClick={() => handleComplete(note.id)}
++                    style={checkButton}
++                    aria-label="Mark complete"
++                  >
++                    ○
++                  </button>
++                  <div style={{ flex: 1 }}>
++                    <div style={{ fontSize: 13 }}>{note.content}</div>
++                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
++                      {note.visibility === "shared" ? "Team" : "Private"} · {timeAgo(note.created_at)}
++                    </div>
++                  </div>
++                </div>
++              ))
++            )}
++          </>
++        )}
++
++        {tab === "history" && (
++          <>
++            {loading ? (
++              <div style={emptyStyle}>Loading...</div>
++            ) : history.length === 0 ? (
++              <div style={emptyStyle}>No completed notes yet.</div>
++            ) : (
++              history.map((note) => (
++                <div key={note.id} style={noteRow}>
++                  <div style={{ flex: 1, opacity: 0.7 }}>
++                    <div style={{ fontSize: 13, textDecoration: "line-through" }}>{note.content}</div>
++                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
++                      Completed {note.completed_at ? timeAgo(note.completed_at) : ""}
++                    </div>
++                  </div>
++                  <button data-mobile-safe onClick={() => handleReopen(note.id)} style={ghostButton}>
++                    Reopen
++                  </button>
++                  <button data-mobile-safe onClick={() => handleDelete(note.id)} style={ghostButton}>
++                    Delete
++                  </button>
++                </div>
++              ))
++            )}
++          </>
++        )}
++      </Drawer>
++    </>
++  );
++}
++
++function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
++  return (
++    <button
++      data-mobile-safe
++      onClick={onClick}
++      style={{
++        flex: 1,
++        padding: "8px 0",
++        borderRadius: 8,
++        border: "1px solid var(--border)",
++        background: active ? "var(--bg-elevated)" : "transparent",
++        color: active ? "var(--text-primary)" : "var(--text-muted)",
++        fontSize: 12,
++        fontWeight: 600,
++        cursor: "pointer",
++      }}
++    >
++      {children}
++    </button>
++  );
++}
++
++function timeAgo(iso: string) {
++  const diffMs = Date.now() - new Date(iso).getTime();
++  const mins = Math.floor(diffMs / 60000);
++  if (mins < 1) return "just now";
++  if (mins < 60) return `${mins}m ago`;
++  const hrs = Math.floor(mins / 60);
++  if (hrs < 24) return `${hrs}h ago`;
++  const days = Math.floor(hrs / 24);
++  return `${days}d ago`;
++}
++
++const textareaStyle: React.CSSProperties = {
++  width: "100%",
++  padding: "10px 12px",
++  borderRadius: 8,
++  border: "1px solid var(--border)",
++  background: "var(--bg-base)",
++  color: "var(--text-primary)",
++  fontSize: 13,
++  resize: "vertical",
++  marginBottom: 8,
++};
++
++const selectStyle: React.CSSProperties = {
++  padding: "9px 10px",
++  borderRadius: 8,
++  border: "1px solid var(--border)",
++  background: "var(--bg-base)",
++  color: "var(--text-primary)",
++  fontSize: 12,
++};
++
++const primaryButton: React.CSSProperties = {
++  flex: 1,
++  padding: "9px 16px",
++  borderRadius: 8,
++  border: "none",
++  background: "var(--accent, #3b82f6)",
++  color: "#fff",
++  fontSize: 12,
++  fontWeight: 600,
++  cursor: "pointer",
++};
++
++const ghostButton: React.CSSProperties = {
++  padding: "6px 10px",
++  borderRadius: 8,
++  border: "1px solid var(--border)",
++  background: "transparent",
++  color: "var(--text-secondary)",
++  fontSize: 11,
++  cursor: "pointer",
++};
++
++const checkButton: React.CSSProperties = {
++  width: 22,
++  height: 22,
++  borderRadius: "50%",
++  border: "1px solid var(--border)",
++  background: "transparent",
++  color: "var(--text-muted)",
++  fontSize: 12,
++  cursor: "pointer",
++  flexShrink: 0,
++};
++
++const noteRow: React.CSSProperties = {
++  display: "flex",
++  gap: 10,
++  alignItems: "flex-start",
++  padding: "10px 0",
++  borderBottom: "1px solid var(--border)",
++};
++
++const emptyStyle: React.CSSProperties = {
++  fontSize: 13,
++  color: "var(--text-muted)",
++  textAlign: "center",
++  padding: "24px 0",
++};
+diff --git a/src/components/TrialCountdownBanner.tsx b/src/components/TrialCountdownBanner.tsx
+new file mode 100644
+index 0000000..b2755e4
+--- /dev/null
++++ b/src/components/TrialCountdownBanner.tsx
+@@ -0,0 +1,69 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { getTrialInfo } from "@/lib/trial";
++
++type Props = {
++  orgId: string;
++};
++
++export default function TrialCountdownBanner({ orgId }: Props) {
++  const [daysLeft, setDaysLeft] = useState<number | null>(null);
++  const [inGracePeriod, setInGracePeriod] = useState(false);
++  const [dismissed, setDismissed] = useState(false);
++
++  useEffect(() => {
++    getTrialInfo(orgId).then((info) => {
++      setDaysLeft(info.daysLeft);
++      setInGracePeriod(info.inGracePeriod);
++    });
++  }, [orgId]);
++
++  if (daysLeft === null || dismissed) return null;
++  // Only bother showing this in the last week of the trial or during grace -
++  // no need to nag on day one.
++  if (!inGracePeriod && daysLeft > 7) return null;
++
++  return (
++    <div
++      style={{
++        position: "fixed",
++        top: 0,
++        left: 0,
++        right: 0,
++        zIndex: 9997,
++        background: inGracePeriod ? "#dc2626" : "#f5b800",
++        color: inGracePeriod ? "#fff" : "#1a1200",
++        fontSize: 12,
++        fontWeight: 600,
++        padding: "8px 12px",
++        display: "flex",
++        alignItems: "center",
++        justifyContent: "space-between",
++        gap: 8,
++      }}
++    >
++      <span>
++        {inGracePeriod
++          ? `Your trial ended — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left to pick a plan before access pauses.`
++          : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left in your free trial.`}
++      </span>
++      <button
++        onClick={() => setDismissed(true)}
++        style={{
++          background: "transparent",
++          border: "none",
++          color: "inherit",
++          fontWeight: 700,
++          fontSize: 14,
++          cursor: "pointer",
++          padding: "0 4px",
++          flexShrink: 0,
++        }}
++        aria-label="Dismiss"
++      >
++        ✕
++      </button>
++    </div>
++  );
++}
+diff --git a/src/lib/activity.ts b/src/lib/activity.ts
+index c505d58..2dd7c64 100644
+--- a/src/lib/activity.ts
++++ b/src/lib/activity.ts
+@@ -45,9 +45,10 @@ export async function getOrgActivity(orgId: string, limit = 30): Promise<Activit
+ }
+ 
+ export async function logActivity(
+-  entry: Omit<Activity, "id" | "created_at">
++  entry: Omit<Activity, "id" | "created_at">,
++  client?: ReturnType<typeof createClient>
+ ) {
+-  const supabase = createClient();
++  const supabase = client ?? createClient();
+   const { error } = await supabase.from("activity").insert([entry]);
+   if (error) console.error("Error logging activity:", error);
+ }
+\ No newline at end of file
+diff --git a/src/lib/errorLog.ts b/src/lib/errorLog.ts
+index d018ebb..625c6e9 100644
+--- a/src/lib/errorLog.ts
++++ b/src/lib/errorLog.ts
+@@ -7,6 +7,7 @@ export type ErrorLogEntry = {
+   message: string;
+   code: string | null;
+   context: Record<string, unknown> | null;
++  severity: "info" | "error" | "critical";
+   created_at: string;
+ };
+ 
+@@ -16,7 +17,9 @@ export async function logError(params: {
+   code?: string | null;
+   orgId?: string | null;
+   context?: Record<string, unknown> | null;
++  severity?: "info" | "error" | "critical";
+ }): Promise<void> {
++  const severity = params.severity ?? "error";
+   try {
+     const supabase = createClient();
+     await supabase.from("error_logs").insert({
+@@ -25,11 +28,26 @@ export async function logError(params: {
+       code: params.code ?? null,
+       org_id: params.orgId ?? null,
+       context: params.context ?? null,
++      severity,
+     });
+   } catch (err) {
+     // Logging must never itself break the page.
+     console.error("Failed to write error log:", err);
+   }
++
++  if (severity === "critical") {
++    // Fire-and-forget - a failed alert email should never block the caller.
++    fetch("/api/notify", {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({
++        type: "critical_error",
++        source: params.source,
++        message: params.message,
++        orgId: params.orgId ?? null,
++      }),
++    }).catch(() => {});
++  }
+ }
+ 
+ export async function getErrorLogs(limit = 200): Promise<ErrorLogEntry[]> {
+diff --git a/src/lib/inventory.ts b/src/lib/inventory.ts
+index fa7f7e4..22fa54c 100644
+--- a/src/lib/inventory.ts
++++ b/src/lib/inventory.ts
+@@ -119,9 +119,10 @@ export async function updateStock(
+   quantity: number,
+   type: "stock_in" | "stock_out" | "adjustment",
+   note = "",
+-  warehouseId?: string
++  warehouseId?: string,
++  client?: ReturnType<typeof createClient>
+ ) {
+-  const supabase = createClient();
++  const supabase = client ?? createClient();
+ 
+   const { data: product, error: fetchError } = await supabase
+     .from("inventory_products")
+diff --git a/src/lib/payments.ts b/src/lib/payments.ts
+index c61972c..3d2cd78 100644
+--- a/src/lib/payments.ts
++++ b/src/lib/payments.ts
+@@ -101,14 +101,17 @@ export function validatePaymentDetails(input: PaymentDetailsInput): string | nul
+   }
+ }
+ 
+-export async function recordPayment(input: {
+-  orgId: string;
+-  sourceType: PaymentSourceType;
+-  sourceId: string;
+-  details: PaymentDetailsInput;
+-  recordedByName?: string;
+-}): Promise<Payment | null> {
+-  const supabase = createClient();
++export async function recordPayment(
++  input: {
++    orgId: string;
++    sourceType: PaymentSourceType;
++    sourceId: string;
++    details: PaymentDetailsInput;
++    recordedByName?: string;
++  },
++  client?: ReturnType<typeof createClient>
++): Promise<Payment | null> {
++  const supabase = client ?? createClient();
+ 
+   const { details } = input;
+ 
+diff --git a/src/lib/pos.ts b/src/lib/pos.ts
+index 0dce8ec..2281112 100644
+--- a/src/lib/pos.ts
++++ b/src/lib/pos.ts
+@@ -112,9 +112,10 @@ export async function getSaleItems(saleId: string) {
+ }
+ 
+ export async function createSale(
+-  sale: PosSale
++  sale: PosSale,
++  client?: ReturnType<typeof createClient>
+ ) {
+-  const supabase = createClient();
++  const supabase = client ?? createClient();
+ 
+   const { data: saleData, error: saleError } =
+     await supabase
+diff --git a/src/lib/posOfflineQueue.ts b/src/lib/posOfflineQueue.ts
+new file mode 100644
+index 0000000..ac27d95
+--- /dev/null
++++ b/src/lib/posOfflineQueue.ts
+@@ -0,0 +1,145 @@
++import { createClient } from "./supabase";
++import { createSale, type PosSale, type PosSaleItem } from "./pos";
++import { recordPayment, type PaymentDetailsInput } from "./payments";
++import { updateStock } from "./inventory";
++import { deductStockFromWarehouse } from "./warehouses";
++import { logActivity } from "./activity";
++
++const STORAGE_KEY = "aurevyn_pos_offline_queue";
++
++export type QueuedSale = {
++  localId: string;
++  queuedAt: string;
++  sale: PosSale;
++  paymentLines: PaymentDetailsInput[];
++  cartItems: { productId: string; quantity: number }[];
++  warehouseId: string | null;
++};
++
++function readQueue(): QueuedSale[] {
++  if (typeof window === "undefined") return [];
++  try {
++    const raw = window.localStorage.getItem(STORAGE_KEY);
++    return raw ? JSON.parse(raw) : [];
++  } catch {
++    return [];
++  }
++}
++
++function writeQueue(queue: QueuedSale[]) {
++  if (typeof window === "undefined") return;
++  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
++}
++
++export function getQueuedSales(): QueuedSale[] {
++  return readQueue();
++}
++
++export function queueOfflineSale(
++  sale: PosSale,
++  paymentLines: PaymentDetailsInput[],
++  cartItems: { productId: string; quantity: number }[],
++  warehouseId: string | null
++): QueuedSale {
++  const queue = readQueue();
++  const entry: QueuedSale = {
++    localId: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
++    queuedAt: new Date().toISOString(),
++    sale,
++    paymentLines,
++    cartItems,
++    warehouseId,
++  };
++  queue.push(entry);
++  writeQueue(queue);
++  return entry;
++}
++
++let syncing = false;
++
++/**
++ * Replays every queued sale in order against the real backend. Uses a
++ * mobile-write-enabled client since this runs from the POS engine, which
++ * has its own deliberate mobile support (unlike every other engine, which
++ * stays locked - see src/lib/supabase.ts).
++ *
++ * Oversell safety net: updateStock already floors stock at zero rather
++ * than going negative, but that alone would silently hide a real-world
++ * conflict (two offline devices selling the last unit before either
++ * synced). Here we check availability before deducting and log an
++ * activity flag if a queued sale oversold, so the org owner sees it and
++ * can reconcile with the customer - the sale itself still completes,
++ * since the item was already physically handed over.
++ */
++export async function syncQueuedSales(orgId: string): Promise<{ synced: number; failed: number }> {
++  if (syncing) return { synced: 0, failed: 0 };
++  if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: 0, failed: 0 };
++
++  syncing = true;
++  const client = createClient({ allowMobileWrites: true });
++  const queue = readQueue();
++  let synced = 0;
++  let failed = 0;
++  const remaining: QueuedSale[] = [];
++
++  for (const entry of queue) {
++    try {
++      const created = await createSale(entry.sale, client);
++      if (!created?.id) throw new Error("Sale creation failed during sync");
++
++      for (const line of entry.paymentLines) {
++        await recordPayment(
++          { orgId, sourceType: "pos_sale", sourceId: created.id, details: line },
++          client
++        );
++      }
++
++      for (const item of entry.cartItems) {
++        const { data: level } = await client
++          .from("inventory_stock_levels")
++          .select("quantity")
++          .eq("product_id", item.productId)
++          .maybeSingle();
++
++        const available = Number(level?.quantity ?? 0);
++        if (available < item.quantity) {
++          await logActivity(
++            {
++              icon: "⚠️",
++              title: "Offline sale oversold stock",
++              sub: `Queued sale needed ${item.quantity}, only ${available} were available when synced. Reconcile with the customer if needed.`,
++              org_id: orgId,
++            },
++            client
++          );
++        }
++
++        await updateStock(item.productId, item.quantity, "stock_out", `POS Sale ${created.id} (synced from offline queue)`, undefined, client);
++
++        if (entry.warehouseId) {
++          await deductStockFromWarehouse(item.productId, entry.warehouseId, item.quantity, client);
++        }
++      }
++
++      await logActivity(
++        {
++          icon: "🛒",
++          title: "POS Sale Completed (synced from offline)",
++          sub: `KES ${entry.sale.total.toLocaleString()}`,
++          org_id: orgId,
++        },
++        client
++      );
++
++      synced++;
++    } catch (err) {
++      console.error("Failed to sync queued sale:", err);
++      failed++;
++      remaining.push(entry);
++    }
++  }
++
++  writeQueue(remaining);
++  syncing = false;
++  return { synced, failed };
++}
+diff --git a/src/lib/quickNotes.ts b/src/lib/quickNotes.ts
+new file mode 100644
+index 0000000..a00ffb8
+--- /dev/null
++++ b/src/lib/quickNotes.ts
+@@ -0,0 +1,92 @@
++import { createClient } from "./supabase";
++
++export type QuickNoteVisibility = "private" | "shared";
++
++export type QuickNote = {
++  id: string;
++  org_id: string | null;
++  user_id: string;
++  content: string;
++  visibility: QuickNoteVisibility;
++  completed_at: string | null;
++  created_at: string;
++};
++
++/**
++ * Pass orgId for the org-space version (team notes), or null for the
++ * founder's own personal notes on the platform dashboard.
++ */
++export async function getActiveQuickNotes(orgId: string | null): Promise<QuickNote[]> {
++  const supabase = createClient();
++  let query = supabase
++    .from("quick_notes")
++    .select("*")
++    .is("completed_at", null)
++    .order("created_at", { ascending: false });
++
++  query = orgId ? query.eq("org_id", orgId) : query.is("org_id", null);
++
++  const { data, error } = await query;
++  if (error) {
++    console.error("Error fetching quick notes:", error);
++    return [];
++  }
++  return data as QuickNote[];
++}
++
++export async function getCompletedQuickNotes(orgId: string | null, limit = 50): Promise<QuickNote[]> {
++  const supabase = createClient();
++  let query = supabase
++    .from("quick_notes")
++    .select("*")
++    .not("completed_at", "is", null)
++    .order("completed_at", { ascending: false })
++    .limit(limit);
++
++  query = orgId ? query.eq("org_id", orgId) : query.is("org_id", null);
++
++  const { data, error } = await query;
++  if (error) {
++    console.error("Error fetching completed quick notes:", error);
++    return [];
++  }
++  return data as QuickNote[];
++}
++
++export async function createQuickNote(
++  orgId: string | null,
++  content: string,
++  visibility: QuickNoteVisibility
++): Promise<QuickNote | null> {
++  const supabase = createClient();
++  const { data: userData } = await supabase.auth.getUser();
++  const userId = userData.user?.id;
++  if (!userId) return null;
++
++  const { data, error } = await supabase
++    .from("quick_notes")
++    .insert([{ org_id: orgId, user_id: userId, content, visibility }])
++    .select()
++    .single();
++
++  if (error) {
++    console.error("Error creating quick note:", error);
++    return null;
++  }
++  return data as QuickNote;
++}
++
++export async function completeQuickNote(id: string): Promise<void> {
++  const supabase = createClient();
++  await supabase.from("quick_notes").update({ completed_at: new Date().toISOString() }).eq("id", id);
++}
++
++export async function reopenQuickNote(id: string): Promise<void> {
++  const supabase = createClient();
++  await supabase.from("quick_notes").update({ completed_at: null }).eq("id", id);
++}
++
++export async function deleteQuickNote(id: string): Promise<void> {
++  const supabase = createClient();
++  await supabase.from("quick_notes").delete().eq("id", id);
++}
+diff --git a/src/lib/supabase.ts b/src/lib/supabase.ts
+index 063c38d..58aff63 100644
+--- a/src/lib/supabase.ts
++++ b/src/lib/supabase.ts
+@@ -1,8 +1,85 @@
+ import { createBrowserClient } from "@supabase/ssr";
+ 
+-export function createClient() {
+-  return createBrowserClient(
++const MOBILE_BREAKPOINT = 900;
++
++function isMobileViewport(): boolean {
++  if (typeof window === "undefined") return false;
++  return window.innerWidth < MOBILE_BREAKPOINT;
++}
++
++const READ_ONLY_ERROR = {
++  message: "This is a view-only screen on a small screen. Switch to a laptop or desktop to make changes.",
++  details: "",
++  hint: "",
++  code: "MOBILE_READ_ONLY",
++};
++
++/**
++ * A "poisoned" thenable that mimics Supabase's query builder chain shape.
++ * Any method call on it (.eq, .select, .single, .order, etc.) returns another
++ * instance of itself, so arbitrarily deep chaining after a blocked mutation
++ * still resolves to the same read-only error the moment it's awaited —
++ * matching Supabase's normal `{ data, error }` response contract exactly,
++ * so existing `if (error)` handling across the app "just works" without
++ * needing every call site to be touched individually.
++ */
++function createBlockedResult(): any {
++  const promise = Promise.resolve({ data: null, error: READ_ONLY_ERROR });
++  return new Proxy(promise, {
++    get(target, prop, receiver) {
++      if (prop in target) {
++        const value = Reflect.get(target, prop, receiver);
++        return typeof value === "function" ? value.bind(target) : value;
++      }
++      return () => createBlockedResult();
++    },
++  });
++}
++
++const MUTATING_METHODS = ["insert", "update", "upsert", "delete"] as const;
++
++/**
++ * By default, writes are blocked on mobile viewports everywhere (see
++ * isMobileViewport above). Pass { allowMobileWrites: true } only for flows
++ * that have their own deliberate mobile support built in (currently just
++ * POS checkout, which queues sales offline and syncs them - see
++ * src/lib/posOfflineQueue.ts). Every other call site should use the
++ * default and stay locked.
++ */
++export function createClient(options?: { allowMobileWrites?: boolean }) {
++  const client = createBrowserClient(
+     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+   );
+-}
+\ No newline at end of file
++
++  const bypassMobileLock = options?.allowMobileWrites === true;
++
++  const originalFrom = client.from.bind(client);
++
++  client.from = ((table: string) => {
++    const builder = originalFrom(table as any);
++    if (bypassMobileLock || !isMobileViewport()) return builder;
++
++    for (const method of MUTATING_METHODS) {
++      (builder as any)[method] = () => createBlockedResult();
++    }
++    return builder;
++  }) as typeof client.from;
++
++  const originalStorageFrom = client.storage.from.bind(client.storage);
++  const STORAGE_MUTATING_METHODS = ["upload", "update", "remove", "move", "copy"] as const;
++
++  client.storage.from = ((bucket: string) => {
++    const storageBuilder = originalStorageFrom(bucket);
++    if (bypassMobileLock || !isMobileViewport()) return storageBuilder;
++
++    for (const method of STORAGE_MUTATING_METHODS) {
++      (storageBuilder as any)[method] = async () => ({ data: null, error: READ_ONLY_ERROR });
++    }
++    return storageBuilder;
++  }) as typeof client.storage.from;
++
++  return client;
++}
++
++export { isMobileViewport, MOBILE_BREAKPOINT };
+diff --git a/src/lib/trial.ts b/src/lib/trial.ts
+new file mode 100644
+index 0000000..80fa0c3
+--- /dev/null
++++ b/src/lib/trial.ts
+@@ -0,0 +1,183 @@
++import { createClient } from "./supabase";
++import { logActivity } from "./activity";
++
++export type TrialInfo = {
++  trialEndsAt: string | null;
++  trialLocked: boolean;
++  packageConfirmedAt: string | null;
++  daysLeft: number | null;
++  inGracePeriod: boolean;
++};
++
++export async function getTrialInfo(orgId: string): Promise<TrialInfo> {
++  const supabase = createClient();
++  const { data, error } = await supabase
++    .from("organizations")
++    .select("trial_ends_at, trial_locked, package_confirmed_at")
++    .eq("id", orgId)
++    .single();
++
++  if (error || !data) {
++    return { trialEndsAt: null, trialLocked: false, packageConfirmedAt: null, daysLeft: null, inGracePeriod: false };
++  }
++
++  let daysLeft: number | null = null;
++  let inGracePeriod = false;
++
++  if (data.trial_ends_at && !data.package_confirmed_at) {
++    const trialEnd = new Date(data.trial_ends_at).getTime();
++    const now = Date.now();
++    const graceEnd = trialEnd + 2 * 24 * 60 * 60 * 1000;
++
++    if (now < trialEnd) {
++      daysLeft = Math.ceil((trialEnd - now) / (24 * 60 * 60 * 1000));
++    } else if (now < graceEnd) {
++      inGracePeriod = true;
++      daysLeft = Math.ceil((graceEnd - now) / (24 * 60 * 60 * 1000));
++    }
++  }
++
++  return {
++    trialEndsAt: data.trial_ends_at,
++    trialLocked: data.trial_locked,
++    packageConfirmedAt: data.package_confirmed_at,
++    daysLeft,
++    inGracePeriod,
++  };
++}
++
++export type SellablePackage = {
++  name: string;
++  slug: string;
++  price: string;
++  features: string;
++};
++
++/**
++ * Only the four real sellable tiers - "Unlimited" is excluded here since it
++ * has no package_module_limits data and appears to be leftover/duplicate
++ * test data (priced lower than Enterprise despite offering the same
++ * "everything" scope) - worth reviewing and likely removing from the
++ * packages table directly.
++ */
++const SELLABLE_PACKAGE_SLUGS = ["core", "growth", "professional", "enterprise"];
++
++export async function getSellablePackages(): Promise<SellablePackage[]> {
++  const supabase = createClient();
++  const { data, error } = await supabase
++    .from("packages")
++    .select("name, slug, price, features")
++    .in("slug", SELLABLE_PACKAGE_SLUGS);
++
++  if (error || !data) return [];
++
++  const order = SELLABLE_PACKAGE_SLUGS;
++  return (data as SellablePackage[]).sort((a, b) => order.indexOf(a.slug) - order.indexOf(b.slug));
++}
++
++/**
++ * Engines covered by package_module_limits, mapped to their engine slugs.
++ * The other engines in the catalog (Attendance, Business Operations,
++ * Documents, Fees, Finance, Patients, Procurement, Real Estate, SACCO
++ * Members, Students) have no pricing-tier data defined yet - as an
++ * interim rule until that's filled in properly, they're only included in
++ * the two "everything" tiers (Professional and Enterprise), matching what
++ * those tiers' feature descriptions already promise.
++ */
++const MODULE_NAME_TO_ENGINE_SLUG: Record<string, string> = {
++  "Point of Sale": "pos",
++  "Inventory Management": "inventory",
++  "HR & Payroll": "hr-payroll",
++  CRM: "crm",
++  Analytics: "analytics",
++  "AI Insights": "ai-insights",
++};
++
++const UNMAPPED_ENGINE_SLUGS = [
++  "attendance", "business-ops", "documents", "fees", "finance",
++  "patients", "procurement", "real-estate", "sacco-members", "students",
++];
++
++export async function getEngineSlugsForPackage(packageName: string): Promise<string[]> {
++  const supabase = createClient();
++  const { data } = await supabase
++    .from("package_module_limits")
++    .select("module_name, enabled")
++    .eq("package_name", packageName)
++    .eq("enabled", true);
++
++  const slugs = (data ?? [])
++    .map((row) => MODULE_NAME_TO_ENGINE_SLUG[row.module_name])
++    .filter((slug): slug is string => Boolean(slug));
++
++  if (packageName === "Professional" || packageName === "Enterprise") {
++    slugs.push(...UNMAPPED_ENGINE_SLUGS);
++  }
++
++  return slugs;
++}
++
++/**
++ * Confirms the org's chosen package after the trial: activates only the
++ * engines that package includes, records the choice, unlocks the org, and
++ * creates a pending platform invoice using the existing manual-payment
++ * pattern (no real payment gateway needed to test this end-to-end).
++ */
++export async function confirmPackageSelection(orgId: string, orgName: string, packageSlug: string): Promise<boolean> {
++  const supabase = createClient();
++
++  const { data: pkg } = await supabase
++    .from("packages")
++    .select("name, price")
++    .eq("slug", packageSlug)
++    .single();
++
++  if (!pkg) return false;
++
++  const engineSlugs = await getEngineSlugsForPackage(pkg.name);
++
++  const { data: allEngines } = await supabase.from("engines").select("id, slug");
++  const engineIdsToEnable = (allEngines ?? [])
++    .filter((e) => engineSlugs.includes(e.slug))
++    .map((e) => e.id);
++
++  await supabase.from("organization_engines").update({ enabled: false }).eq("org_id", orgId);
++
++  if (engineIdsToEnable.length > 0) {
++    await supabase
++      .from("organization_engines")
++      .update({ enabled: true, subscription_tier: pkg.name })
++      .eq("org_id", orgId)
++      .in("engine_id", engineIdsToEnable);
++  }
++
++  await supabase
++    .from("organizations")
++    .update({
++      package: pkg.name,
++      trial_locked: false,
++      package_confirmed_at: new Date().toISOString(),
++    })
++    .eq("id", orgId);
++
++  const numericAmount = parseInt(pkg.price.replace(/[^\d]/g, ""), 10) || 0;
++
++  await supabase.from("scheduled_platform_invoices").insert({
++    org_id: orgId,
++    org_name: orgName,
++    description: `${pkg.name} plan - monthly subscription`,
++    amount: numericAmount,
++    frequency: "monthly",
++    next_run: new Date().toISOString().slice(0, 10),
++    active: true,
++  });
++
++  await logActivity({
++    icon: "✅",
++    title: "Plan selected",
++    sub: `${orgName} chose the ${pkg.name} plan`,
++    org_id: orgId,
++  });
++
++  return true;
++}
+diff --git a/src/lib/warehouses.ts b/src/lib/warehouses.ts
+index add5926..a491023 100644
+--- a/src/lib/warehouses.ts
++++ b/src/lib/warehouses.ts
+@@ -116,9 +116,10 @@ export async function getStockValueByWarehouse(orgId: string) {
+ export async function deductStockFromWarehouse(
+   productId: string,
+   warehouseId: string,
+-  quantity: number
++  quantity: number,
++  client?: ReturnType<typeof createClient>
+ ) {
+-  const supabase = createClient();
++  const supabase = client ?? createClient();
+ 
+   const { data: level } = await supabase
+     .from("inventory_stock_levels")

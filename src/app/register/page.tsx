@@ -217,6 +217,9 @@ export default function RegisterPage() {
         .eq("slug", blueprintSlug)
         .maybeSingle();
 
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
@@ -231,6 +234,7 @@ export default function RegisterPage() {
           branch_count: form.branches,
           tax_id: form.taxId.trim() || null,
           website: form.website.trim() || null,
+          trial_ends_at: trialEndsAt.toISOString(),
         })
         .select()
         .single();
@@ -255,24 +259,32 @@ export default function RegisterPage() {
 
       if (membershipError) throw membershipError;
 
-      const slugs = PACKAGE_ENGINES[form.packageSlug] ?? [];
-      if (slugs.length > 0) {
-        const { data: engines } = await supabase
-          .from("engines")
-          .select("id, slug")
-          .in("slug", slugs);
-
-        if (engines?.length) {
-          const engineRows = engines.map((engine) => ({
-            org_id: orgId,
-            engine_id: engine.id,
-            engine_slug: engine.slug,
-            enabled: true,
-            subscription_tier: form.packageSlug,
-          }));
-          await supabase.from("organization_engines").insert(engineRows);
-        }
+      // Everyone gets every engine free for the 30-day trial, regardless of
+      // which package they picked at signup - that choice just becomes their
+      // pre-selected default once the mandatory plan-selection screen shows
+      // up after the trial ends (see src/components/PackageSelectionGate.tsx).
+      const { data: allEngines } = await supabase.from("engines").select("id, slug");
+      if (allEngines?.length) {
+        const engineRows = allEngines.map((engine) => ({
+          org_id: orgId,
+          engine_id: engine.id,
+          engine_slug: engine.slug,
+          enabled: true,
+          subscription_tier: form.packageSlug,
+        }));
+        await supabase.from("organization_engines").insert(engineRows);
       }
+
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "welcome",
+          to: form.email.trim(),
+          orgName: form.companyName.trim(),
+          ownerName: form.fullName.trim(),
+        }),
+      }).catch(() => {});
 
       if (!hasSession) {
         // Organization is set up, but they can't be signed in yet.

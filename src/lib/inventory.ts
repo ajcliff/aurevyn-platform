@@ -119,9 +119,10 @@ export async function updateStock(
   quantity: number,
   type: "stock_in" | "stock_out" | "adjustment",
   note = "",
-  warehouseId?: string
+  warehouseId?: string,
+  client?: ReturnType<typeof createClient>
 ) {
-  const supabase = createClient();
+  const supabase = client ?? createClient();
 
   const { data: product, error: fetchError } = await supabase
     .from("inventory_products")

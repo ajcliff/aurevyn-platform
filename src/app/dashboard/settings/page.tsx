@@ -524,9 +524,9 @@ async function handlePresetThemeChange(preset: ThemePreset) {
                   <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Notifications</h2>
                   <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Choose what you get notified about</p>
                 </div>
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", overflow: "hidden", maxWidth: 620 }}>
-                  {settings && NOTIF_LABELS.map((n, i) => (
-                    <div key={n.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: i < NOTIF_LABELS.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 620 }}>
+                  {settings && NOTIF_LABELS.map((n) => (
+                    <div key={n.key} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{n.label}</div>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{n.desc}</div>

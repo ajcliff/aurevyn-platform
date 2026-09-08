@@ -101,14 +101,17 @@ export function validatePaymentDetails(input: PaymentDetailsInput): string | nul
   }
 }
 
-export async function recordPayment(input: {
-  orgId: string;
-  sourceType: PaymentSourceType;
-  sourceId: string;
-  details: PaymentDetailsInput;
-  recordedByName?: string;
-}): Promise<Payment | null> {
-  const supabase = createClient();
+export async function recordPayment(
+  input: {
+    orgId: string;
+    sourceType: PaymentSourceType;
+    sourceId: string;
+    details: PaymentDetailsInput;
+    recordedByName?: string;
+  },
+  client?: ReturnType<typeof createClient>
+): Promise<Payment | null> {
+  const supabase = client ?? createClient();
 
   const { details } = input;
 

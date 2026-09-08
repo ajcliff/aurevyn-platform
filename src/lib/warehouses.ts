@@ -116,9 +116,10 @@ export async function getStockValueByWarehouse(orgId: string) {
 export async function deductStockFromWarehouse(
   productId: string,
   warehouseId: string,
-  quantity: number
+  quantity: number,
+  client?: ReturnType<typeof createClient>
 ) {
-  const supabase = createClient();
+  const supabase = client ?? createClient();
 
   const { data: level } = await supabase
     .from("inventory_stock_levels")

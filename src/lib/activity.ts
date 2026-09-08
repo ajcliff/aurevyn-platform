@@ -45,9 +45,10 @@ export async function getOrgActivity(orgId: string, limit = 30): Promise<Activit
 }
 
 export async function logActivity(
-  entry: Omit<Activity, "id" | "created_at">
+  entry: Omit<Activity, "id" | "created_at">,
+  client?: ReturnType<typeof createClient>
 ) {
-  const supabase = createClient();
+  const supabase = client ?? createClient();
   const { error } = await supabase.from("activity").insert([entry]);
   if (error) console.error("Error logging activity:", error);
 }

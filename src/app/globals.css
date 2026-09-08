@@ -226,3 +226,27 @@ body{
 h1,h2,h3,h4,h5,h6{
     font-family: var(--font-heading);
 }
+
+/* View-only mode on small screens: the real enforcement happens at the data
+   layer (src/lib/supabase.ts blocks writes), this just makes it visually
+   obvious upfront rather than letting people fill out a form only to see
+   an error on submit. Search/filter inputs are exempted since those don't
+   mutate data. */
+@media (max-width: 899px) {
+  input:not([type="search"]):not([data-mobile-safe]),
+  textarea:not([data-mobile-safe]),
+  select:not([data-mobile-safe]) {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+}
+
+/* POS has its own deliberate mobile + offline support (see
+   src/lib/posOfflineQueue.ts) - undo the blanket read-only styling
+   for it specifically. */
+.pos-mobile-enabled input,
+.pos-mobile-enabled textarea,
+.pos-mobile-enabled select {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}

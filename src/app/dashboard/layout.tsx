@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase";
 import { getFounderSettings } from "@/lib/founderSettings";
 import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import EmptyState from "@/components/EmptyState";
+import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
+import QuickNotesWidget from "@/components/QuickNotesWidget";
 import styles from "@/styles/layout.module.css";
 
 const MOBILE_BREAKPOINT = 900;
@@ -162,6 +164,8 @@ onAction={() => { window.location.href = "/login"; }}        />
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
       />
+      <MobileViewOnlyBanner />
+      <QuickNotesWidget orgId={null} />
     </div>
   );
 }

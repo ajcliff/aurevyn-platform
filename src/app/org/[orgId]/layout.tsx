@@ -21,6 +21,8 @@ import { applyThemeColors, clearCustomThemeColors } from "@/lib/themeColors";
 import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
 import { getThemePresets } from "@/lib/themePresets";
 import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
+import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
+import QuickNotesWidget from "@/components/QuickNotesWidget";
 import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
 
 const ENGINE_ICONS: Record<string, string> = {
@@ -316,6 +318,8 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
         />
+        <MobileViewOnlyBanner />
+        <QuickNotesWidget orgId={orgId} />
       </PageHeaderProvider>
     </EngineProvider>
   );

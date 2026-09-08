@@ -183,6 +183,11 @@ export default function ErrorLogsPage() {
                   {timeAgo(log.created_at)}
                 </span>
                 <span style={{ fontSize: 11 }}>
+                  {log.severity === "critical" && (
+                    <span style={{ ...sourceTagStyle, background: "#dc262620", color: "#dc2626", marginRight: 6 }}>
+                      Critical
+                    </span>
+                  )}
                   <span style={sourceTagStyle}>{log.source}</span>
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

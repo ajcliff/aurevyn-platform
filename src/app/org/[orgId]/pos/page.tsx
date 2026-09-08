@@ -5,7 +5,7 @@ import {
   getCurrentOrg
 } from "@/lib/runtime/currentOrg";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient, isMobileViewport } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
 import CustomerSelector from "@/components/pos/CustomerSelector";
 import SplitPaymentEditor from "@/components/payments/SplitPaymentEditor";
@@ -42,6 +42,7 @@ import {
   getPromotions,
   type Promotion
 } from "@/lib/promotions";
+import { queueOfflineSale, syncQueuedSales, getQueuedSales } from "@/lib/posOfflineQueue";
 
 type CompletedSale = {
   id: string;
@@ -118,6 +119,8 @@ const [showReceipt, setShowReceipt] = useState(false);
 
 const [completedSale, setCompletedSale] =
   useState<CompletedSale | null>(null);
+const [pendingSyncCount, setPendingSyncCount] = useState(0);
+const [syncing, setSyncing] = useState(false);
 
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -178,6 +181,29 @@ if (defaultWarehouse) {
 }
 
 }
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    setPendingSyncCount(getQueuedSales().length);
+
+    async function trySync() {
+      if (getQueuedSales().length === 0) return;
+      setSyncing(true);
+      const result = await syncQueuedSales(orgId);
+      setPendingSyncCount(getQueuedSales().length);
+      setSyncing(false);
+      if (result.synced > 0) {
+        const [productsData, salesData] = await Promise.all([getProducts(orgId), getSales(orgId)]);
+        setProducts(productsData);
+        setSales(salesData);
+      }
+    }
+
+    trySync();
+    window.addEventListener("online", trySync);
+    return () => window.removeEventListener("online", trySync);
+  }, [orgId]);
 
   useEffect(() => {
     const channel = supabase
@@ -350,6 +376,8 @@ function handleExportSalesCSV() {
       return;
     }
 
+    let sale: PosSale | undefined;
+
     try {
       setLoading(true);
 
@@ -362,7 +390,7 @@ function handleExportSalesCSV() {
 
       const methodSummary = paymentLines.map((l) => methodLabel(l.method)).join(" + ");
 
-      const sale: PosSale = {
+      sale = {
         customer_name:
   selectedCustomer?.name || "Walk-in Customer",
         customer_id: selectedCustomer?.id || null,
@@ -377,7 +405,33 @@ function handleExportSalesCSV() {
         discount_amount: discountAmount
       };
 
-      const created = await createSale(sale);
+      const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+
+      if (isOffline) {
+        queueOfflineSale(
+          sale,
+          paymentLines,
+          cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          selectedWarehouseId || null
+        );
+        setPendingSyncCount(getQueuedSales().length);
+
+        setCart([]);
+        setSelectedDiscountId("");
+        setPaymentLines([]);
+        setPaymentValid(false);
+        setChangeDue(0);
+        setLoading(false);
+        alert("No connection right now — this sale has been saved on your phone and will sync automatically once you're back online.");
+        return;
+      }
+
+      // On mobile, use the write-enabled client for this one deliberately-supported
+      // flow. On desktop this is identical to the normal client (mobile lock is a
+      // no-op there), so behavior is unchanged outside of small screens.
+      const saleClient = isMobileViewport() ? createClient({ allowMobileWrites: true }) : createClient();
+
+      const created = await createSale(sale, saleClient);
 setCompletedSale({
   ...created,
   id: created.id!,
@@ -391,7 +445,7 @@ setCompletedSale({
           sourceType: "pos_sale",
           sourceId: created.id,
           details: line,
-        });
+        }, saleClient);
       }
 
       for (const item of cart) {
@@ -399,11 +453,13 @@ setCompletedSale({
           item.productId,
           item.quantity,
           "stock_out",
-          `POS Sale ${created.id}`
+          `POS Sale ${created.id}`,
+          undefined,
+          saleClient
         );
 
         if (selectedWarehouseId) {
-          await deductStockFromWarehouse(item.productId, selectedWarehouseId, item.quantity);
+          await deductStockFromWarehouse(item.productId, selectedWarehouseId, item.quantity, saleClient);
         }
       }
 
@@ -412,7 +468,7 @@ await logActivity({
         title: "POS Sale Completed",
         sub: `KES ${cartTotal.toLocaleString()}`,
         org_id: orgId,
-      });
+      }, saleClient);
 
       setCart([]);
       setSelectedDiscountId("");
@@ -433,7 +489,28 @@ setSales(salesData);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error("Sale failed:", message, error);
-      alert(`Failed to complete sale: ${message}`);
+
+      const looksLikeNetworkFailure =
+        typeof navigator !== "undefined" && !navigator.onLine ||
+        /fetch|network|Failed to fetch/i.test(message);
+
+      if (looksLikeNetworkFailure && sale) {
+        queueOfflineSale(
+          sale,
+          paymentLines,
+          cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          selectedWarehouseId || null
+        );
+        setPendingSyncCount(getQueuedSales().length);
+        setCart([]);
+        setSelectedDiscountId("");
+        setPaymentLines([]);
+        setPaymentValid(false);
+        setChangeDue(0);
+        alert("Connection dropped mid-sale — it's been saved on your phone and will sync automatically once you're back online.");
+      } else {
+        alert(`Failed to complete sale: ${message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -445,7 +522,7 @@ const searchParams = useSearchParams();
 
 const saleId = searchParams.get("sale");
 return (
-    <div style={{ display: "flex", height: "100%", minHeight: 0, gap: "20px" }}>
+    <div className="pos-mobile-enabled" style={{ display: "flex", height: "100%", minHeight: 0, gap: "20px" }}>
       {/* Main column */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ flexShrink: 0 }}>
@@ -453,6 +530,25 @@ return (
           <p className={s.pageSub}>
             Sell products, manage transactions and process payments
           </p>
+          {pendingSyncCount > 0 && (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: syncing ? "#3dd68c" : "#f59e0b",
+                background: syncing ? "#3dd68c20" : "#f59e0b20",
+                border: `1px solid ${syncing ? "#3dd68c" : "#f59e0b"}40`,
+                borderRadius: 8,
+                padding: "6px 10px",
+                display: "inline-block",
+                marginBottom: 8,
+              }}
+            >
+              {syncing
+                ? "Syncing offline sales…"
+                : `${pendingSyncCount} sale${pendingSyncCount === 1 ? "" : "s"} saved offline, waiting to sync`}
+            </div>
+          )}
 
           <div
             style={{
