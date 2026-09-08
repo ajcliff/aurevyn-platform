@@ -215,6 +215,10 @@
   white-space: nowrap;
 }
 
+.mkt-btn:hover {
+  transform: translateY(-1px);
+}
+
 .mkt-btn:active {
   transform: translateY(1px);
 }
@@ -427,12 +431,29 @@
 .mkt-reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.mkt-reveal--fade {
+  transform: none;
+}
+
+.mkt-reveal--scale {
+  transform: translateY(10px) scale(0.96);
+}
+
+.mkt-reveal--left {
+  transform: translateX(-28px);
+}
+
+.mkt-reveal--right {
+  transform: translateX(28px);
 }
 
 .mkt-reveal--visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate(0, 0) scale(1);
 }
 
 /* =========================================================

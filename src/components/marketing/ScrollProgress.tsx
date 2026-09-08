@@ -18,7 +18,9 @@ export default function ScrollProgress() {
 
   return (
     <div className="mkt-scroll-progress" aria-hidden="true">
-      <div className="mkt-scroll-progress__bar" style={{ width: `${progress}%` }} />
+      <div className="mkt-scroll-progress__bar" style={{ width: `${progress}%` }}>
+        <span className="mkt-scroll-progress__glow" />
+      </div>
       <style>{`
         .mkt-scroll-progress {
           position: fixed;
@@ -30,9 +32,25 @@ export default function ScrollProgress() {
           background: transparent;
         }
         .mkt-scroll-progress__bar {
+          position: relative;
           height: 100%;
           background: linear-gradient(to right, var(--mkt-blueprint), var(--mkt-brass));
-          transition: width 0.1s linear;
+          transition: width 0.12s ease-out;
+        }
+        .mkt-scroll-progress__glow {
+          position: absolute;
+          right: -6px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: var(--mkt-brass-light);
+          box-shadow: 0 0 10px 2px var(--mkt-brass-glow), 0 0 3px 1px var(--mkt-brass-light);
+          opacity: 0.9;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mkt-scroll-progress__bar { transition: none; }
         }
       `}</style>
     </div>
