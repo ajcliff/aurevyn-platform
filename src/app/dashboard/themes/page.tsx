@@ -100,8 +100,7 @@ export default function ThemesPage() {
       <main className={s.main}>
         <PageHeader
           title="Theme Presets"
-          subtitle={`${presets.length} preset${presets.length !== 1 ? "s" : ""} available to organizations`}
-          actions={<button onClick={openNewPreset} className={s.btnGold}>+ New Preset</button>}
+subtitle={`${presets.length} preset${presets.length !== 1 ? "s" : ""}`}          actions={<button onClick={openNewPreset} className={s.btnGold}>+ New Preset</button>}
         />
 
         {error && (
@@ -193,30 +192,265 @@ export default function ThemesPage() {
             No presets yet — organizations only see the 4 built-in themes until you create one.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-            {presets.map(p => (
-              <div key={p.id} style={{ background: p.bg_base, border: `1px solid ${p.border}`, borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <div style={{ width: 16, height: 16, borderRadius: 4, background: p.gold }} />
-                  <div style={{ width: 16, height: 16, borderRadius: 4, background: p.bg_card, border: `1px solid ${p.border_light}` }} />
-                  <div style={{ width: 16, height: 16, borderRadius: 4, background: p.green }} />
-                  <div style={{ width: 16, height: 16, borderRadius: 4, background: p.red }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: p.text_primary }}>{p.name}</div>
-                  {p.description && <div style={{ fontSize: 11, color: p.text_secondary, marginTop: 2 }}>{p.description}</div>}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-                  <button onClick={() => openEditPreset(p)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: `1px solid ${p.border_light}`, background: "transparent", color: p.text_secondary, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-                    Edit
-                  </button>
-                  <button onClick={() => handleDelete(p.id)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid #ef444460", background: "transparent", color: "#ef4444", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 300px))",
+    gap: 16,
+    justifyContent: "start",
+  }}
+>
+  {presets.map((p) => (
+    <div
+      key={p.id}
+      style={{
+        background: p.bg_base,
+        border: `1px solid ${p.border}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 210,
+      }}
+    >
+      {/* Theme preview */}
+      <div
+        style={{
+          height: 105,
+          padding: 12,
+          background: p.bg_base,
+          borderBottom: `1px solid ${p.border}`,
+          position: "relative",
+        }}
+      >
+        {/* Mini interface */}
+        <div
+          style={{
+            height: "100%",
+            borderRadius: 9,
+            border: `1px solid ${p.border_light}`,
+            background: p.bg_card,
+            padding: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          {/* Mini top bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div
+              style={{
+                width: 55,
+                height: 6,
+                borderRadius: 4,
+                background: p.text_primary,
+                opacity: 0.8,
+              }}
+            />
+
+            <div
+              style={{
+                width: 22,
+                height: 6,
+                borderRadius: 4,
+                background: p.gold,
+              }}
+            />
           </div>
+
+          {/* Mini content */}
+          <div
+            style={{
+              display: "flex",
+              gap: 7,
+              flex: 1,
+            }}
+          >
+            <div
+              style={{
+                width: 45,
+                borderRadius: 5,
+                background: p.bg_base,
+                border: `1px solid ${p.border_light}`,
+              }}
+            />
+
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: "70%",
+                  height: 6,
+                  borderRadius: 4,
+                  background: p.text_primary,
+                  opacity: 0.65,
+                }}
+              />
+
+              <div
+                style={{
+                  width: "50%",
+                  height: 5,
+                  borderRadius: 4,
+                  background: p.text_secondary,
+                  opacity: 0.5,
+                }}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 5,
+                  marginTop: "auto",
+                }}
+              >
+                <span
+                  style={{
+                    width: 20,
+                    height: 10,
+                    borderRadius: 3,
+                    background: p.gold,
+                  }}
+                />
+
+                <span
+                  style={{
+                    width: 20,
+                    height: 10,
+                    borderRadius: 3,
+                    background: p.green,
+                  }}
+                />
+
+                <span
+                  style={{
+                    width: 20,
+                    height: 10,
+                    borderRadius: 3,
+                    background: p.red,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Theme information */}
+      <div
+        style={{
+          padding: "12px 14px 8px",
+          flex: 1,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: p.text_primary,
+            lineHeight: 1.2,
+          }}
+        >
+          {p.name}
+        </div>
+
+        {p.description && (
+          <div
+            style={{
+              fontSize: 11,
+              color: p.text_secondary,
+              marginTop: 4,
+              lineHeight: 1.4,
+            }}
+          >
+            {p.description}
+          </div>
+        )}
+
+        {/* Color indicators */}
+        <div
+          style={{
+            display: "flex",
+            gap: 5,
+            marginTop: 10,
+          }}
+        >
+          {[p.gold, p.bg_card, p.green, p.red].map((color, index) => (
+            <div
+              key={index}
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: 4,
+                background: color,
+                border:
+                  index === 1
+                    ? `1px solid ${p.border_light}`
+                    : "none",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          padding: "0 14px 14px",
+        }}
+      >
+        <button
+          onClick={() => openEditPreset(p)}
+          style={{
+            flex: 1,
+            padding: "7px 10px",
+            borderRadius: 7,
+            border: `1px solid ${p.border_light}`,
+            background: "transparent",
+            color: p.text_secondary,
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Edit
+        </button>
+
+        <button
+          onClick={() => handleDelete(p.id)}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 7,
+            border: "1px solid #ef444440",
+            background: "transparent",
+            color: "#ef4444",
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
         )}
       </main>
     </div>

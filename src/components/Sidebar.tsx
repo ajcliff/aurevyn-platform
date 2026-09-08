@@ -134,8 +134,7 @@ export default function Sidebar({
     return pathname.startsWith(path);
   };
 
-  const width = isMobile ? 240 : collapsed ? 72 : 240;
-  const showLabels = !collapsed || isMobile;
+const width = isMobile ? 240 : collapsed ? 64 : 220;  const showLabels = !collapsed || isMobile;
 
   function go(path: string) {
     router.push(path);
@@ -198,9 +197,8 @@ export default function Sidebar({
         }
         style={{
           width: "100%",
-          minHeight: "76px",
-          padding: collapsed && !isMobile ? "14px 0" : "14px 16px",
-          display: "flex",
+minHeight: "68px",
+padding: collapsed && !isMobile ? "12px 0" : "12px 16px",          display: "flex",
           alignItems: "center",
           justifyContent:
             collapsed && !isMobile ? "center" : "flex-start",
@@ -217,10 +215,9 @@ export default function Sidebar({
         {/* Logo */}
         <div
           style={{
-            width: "38px",
-            height: "38px",
-            borderRadius: "10px",
-            overflow: "hidden",
+width: "34px",
+height: "34px",
+borderRadius: "9px",            overflow: "hidden",
             flexShrink: 0,
             border: "1px solid var(--border-light)",
             boxShadow: "0 0 0 1px rgba(255,255,255,0.02)",
