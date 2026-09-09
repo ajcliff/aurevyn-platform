@@ -1,0 +1,77 @@
+I need two things built for AUREVYN, a multi-tenant Business Operating System for
+Kenyan SMEs (Next.js 16, Turbopack, TypeScript, Supabase, CSS Modules + inline
+styles, no component library). Please match existing conventions exactly rather
+than introducing new patterns.
+
+CONTEXT: There's already a 4-step setup wizard at
+src/app/org/[orgId]/welcome/page.tsx (Branding → Team → Engines → Launch).
+Before building anything, look at that file and tell me whether it should be
+kept as-is, replaced, or coexist alongside what I'm asking for below - I don't
+want two competing welcome experiences.
+
+═══════════════════════════════════════════════
+1. WELCOME/ORIENTATION MESSAGE (not a questionnaire)
+═══════════════════════════════════════════════
+A single warm, non-interactive welcome screen shown once, right after a new
+org's first login - NOT a form, NOT data collection. It should:
+- Welcome them by name and company name
+- Explain clearly: they have every engine unlocked free for 30 days
+- Explain what happens after: they'll pick exactly which engines they use
+  and pay only for those - no fixed bundles, no forced extras
+- Point them toward 2-3 first actions (invite your team, explore an engine)
+- One clear "Got it, let's go" dismissal into the real org dashboard
+
+Integration specifics:
+- The `organizations` table already has an `welcome_completed` boolean
+  column (default false) - check it on load, and set it to true when
+  dismissed, so it never shows again for that org
+- Route it at src/app/org/[orgId]/welcome/page.tsx (new file, don't touch
+  the existing welcome/ folder)
+- Auth/data access: use `createClient()` from @/lib/supabase (the
+  @supabase/ssr browser client) exactly as every other org page does -
+  don't introduce a different Supabase client pattern
+- Match the visual style of src/app/org/[orgId]/layout.tsx and its
+  OrgShell/EngineProvider wrapper - this page still renders inside the
+  normal org shell, it's not a standalone full-screen takeover
+
+═══════════════════════════════════════════════
+2. LANDING PAGE IMPROVEMENT
+═══════════════════════════════════════════════
+Improve on the current marketing site (src/app/page.tsx +
+src/components/marketing/*.tsx: Hero, IndustriesSection, ProductShowcase,
+EnginesSection, ComparisonSection, PricingGrid, ProofSection, CtaBand,
+MarketingNav, MarketingFooter already exist - reuse/extend these rather
+than starting from scratch unless you have a strong reason not to).
+
+Must clearly communicate, high up on the page:
+- What AUREVYN actually is: one platform, all business engines (POS,
+  Inventory, Finance, HR, CRM, and more), built for Kenyan SMEs
+- The trial hook, which is a genuinely strong differentiator - lead with
+  it: "Try every engine free for 30 days. After that, pay only for what
+  you actually use - not a bundle you didn't ask for."
+- Trust signals appropriate for Kenyan small business owners (local
+  currency pricing in KES, data protection compliance - see
+  src/app/privacy/page.tsx which already references the Kenya Data
+  Protection Act 2019, plain non-corporate language)
+- Clear CTA to /register throughout, not just once at the bottom
+
+Integration specifics:
+- Auth links: "Log in" goes to /login, "Get started"/"Try free" goes to
+  /register - both routes already exist and work, don't rebuild them
+- Keep the same CSS approach as the rest of the marketing site (look for
+  the `mkt-` prefixed classes in src/styles/marketing.css)
+
+═══════════════════════════════════════════════
+GIT / INTEGRATION PROCESS
+═══════════════════════════════════════════════
+- Repo: github.com/ajcliff/aurevyn-platform, work off `master`
+- If you have direct filesystem + git write access (Claude Code or
+  similar): work on a feature branch, commit with clear messages, and
+  push directly - don't just describe changes, actually commit them
+- Before finishing: run `npx tsc --noEmit` and confirm zero errors -
+  the codebase is currently fully clean and I want to keep it that way
+- Don't touch: src/app/register/page.tsx, src/app/login/page.tsx,
+  src/lib/supabase.ts, or anything under src/app/dashboard/ - those are
+  actively maintained elsewhere and out of scope for this task
+- List every file you added or changed at the end so I can review the
+  full diff before merging

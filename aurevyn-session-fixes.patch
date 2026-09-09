@@ -118,7 +118,7 @@ index 0000000..2c4e52c
 +// Server-only env var - never prefixed with NEXT_PUBLIC_, so it's not exposed to the browser.
 +const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 +
-+const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || "AUREVYN <onboarding@resend.dev>";
++const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || "AUREVYN <welcome@resend.dev>";
 +const FOUNDER_ALERT_EMAIL = process.env.FOUNDER_ALERT_EMAIL;
 +
 +type NotifyPayload =

@@ -14,7 +14,6 @@ const INDUSTRIES = [
   "Retail",
   "Healthcare",
   "Education",
-  "SACCO",
   "Real Estate",
   "General Business",
   "Other",
@@ -26,7 +25,6 @@ const BUSINESS_TYPES = [
   "Private Limited Company",
   "Public Limited Company",
   "NGO / Non-profit",
-  "Cooperative / SACCO",
   "Government / Public Institution",
   "Other",
 ];
@@ -39,7 +37,6 @@ const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
   Retail: "retail",
   Healthcare: "clinic",
   Education: "school",
-  SACCO: "sacco",
   "Real Estate": "property",
   "General Business": "sme",
   Other: "sme",

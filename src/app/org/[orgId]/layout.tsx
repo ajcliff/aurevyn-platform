@@ -55,9 +55,8 @@ const NAV_LABELS: Record<string, string> = {
 
 const UNGATED_SEGMENTS = new Set([
   "me", "settings", "team", "employees", "activity", "approvals",
-  "documents", "knowledge", "warehouses", "pricelists", "summary", undefined,
+  "documents", "knowledge", "warehouses", "pricelists", "summary", "welcome", undefined,
 ]);
-
 const MOBILE_BREAKPOINT = 900;
 
 const STATUS_COLORS: Record<string, string> = {

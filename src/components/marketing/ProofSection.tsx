@@ -36,10 +36,14 @@ function ShieldIcon() {
   );
 }
 
-function ProofCard({ children }: { children: ReactNode }) {
+function ProofCard({ children, accentGlow }: { children: ReactNode; accentGlow: string }) {
   const ref = useTilt<HTMLDivElement>(4);
   return (
-    <div ref={ref} className="mkt-card mkt-proof-card">
+    <div
+      ref={ref}
+      className="mkt-card mkt-proof-card"
+      style={{ ["--proof-glow" as string]: accentGlow }}
+    >
       <span className="mkt-proof-card__spotlight" />
       {children}
     </div>
@@ -56,7 +60,7 @@ export default function ProofSection() {
         </h2>
 
         <RevealOnScroll stagger={90} className="mkt-grid mkt-cols-3 mkt-proof-grid">
-          <ProofCard>
+          <ProofCard accentGlow="var(--mkt-brass-glow)">
             <AiIcon />
             <div className="mkt-badge-live" style={{ marginTop: 14 }}>Live</div>
             <h3 className="mkt-h3" style={{ marginTop: 12 }}>Ask Aurevyn</h3>
@@ -67,7 +71,7 @@ export default function ProofSection() {
             </p>
           </ProofCard>
 
-          <ProofCard>
+          <ProofCard accentGlow="rgba(62, 207, 142, 0.18)">
             <MpesaIcon />
             <div className="mkt-tag" style={{ marginTop: 14 }}>M-Pesa</div>
             <h3 className="mkt-h3" style={{ marginTop: 12 }}>Native mobile money</h3>
@@ -78,7 +82,7 @@ export default function ProofSection() {
             </p>
           </ProofCard>
 
-          <ProofCard>
+          <ProofCard accentGlow="rgba(255, 107, 94, 0.18)">
             <ShieldIcon />
             <div className="mkt-tag" style={{ marginTop: 14 }}>Security</div>
             <h3 className="mkt-h3" style={{ marginTop: 12 }}>Threat monitoring</h3>
@@ -107,7 +111,7 @@ export default function ProofSection() {
           pointer-events: none;
           opacity: 0;
           transition: opacity 0.25s ease;
-          background: radial-gradient(200px circle at var(--mx, 50%) var(--my, 50%), var(--mkt-blueprint-glow), transparent 70%);
+          background: radial-gradient(200px circle at var(--mx, 50%) var(--my, 50%), var(--proof-glow, var(--mkt-blueprint-glow)), transparent 70%);
           mix-blend-mode: screen;
         }
         .mkt-proof-card:hover .mkt-proof-card__spotlight {
@@ -118,6 +122,7 @@ export default function ProofSection() {
         }
         .mkt-proof-card:hover .mkt-proof-icon {
           transform: scale(1.12) rotate(-4deg);
+          filter: drop-shadow(0 0 10px var(--proof-glow, transparent));
         }
         @media (prefers-reduced-motion: reduce) {
           .mkt-proof-card { transform: none !important; }

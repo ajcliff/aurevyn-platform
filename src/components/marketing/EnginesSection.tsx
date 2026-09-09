@@ -39,6 +39,15 @@ const ENGINES: { id: EngineId; code: string; desc: string }[] = [
   },
 ];
 
+const ENGINE_ICONS: Record<EngineId, string> = {
+  pos: "🛒",
+  inventory: "📦",
+  finance: "💰",
+  crm: "👥",
+  hr: "🧑‍💼",
+  security: "🛡️",
+};
+
 function EngineCard({ engine }: { engine: (typeof ENGINES)[number] }) {
   const tiltRef = useTilt<HTMLButtonElement>(5);
   const meta = ENGINE_META[engine.id];
@@ -52,7 +61,10 @@ function EngineCard({ engine }: { engine: (typeof ENGINES)[number] }) {
     >
       <span className="mkt-engine-card__spotlight" />
       <div className="mkt-engine-card__bar" />
-      <div className="mkt-tag">Engine · {engine.code}</div>
+      <div className="mkt-engine-card__top">
+        <span className="mkt-engine-card__icon" aria-hidden="true">{ENGINE_ICONS[engine.id]}</span>
+        <div className="mkt-tag mkt-engine-card__tag">Engine · {engine.code}</div>
+      </div>
       <h3 className="mkt-h3" style={{ marginTop: 16 }}>{meta.label}</h3>
       <p className="mkt-body" style={{ marginTop: 10, fontSize: "0.9375rem" }}>
         {engine.desc}
@@ -129,6 +141,28 @@ export default function EnginesSection() {
         }
         .mkt-engine-card:hover .mkt-engine-card__bar {
           transform: scaleX(1);
+        }
+        .mkt-engine-card__top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .mkt-engine-card__icon {
+          font-size: 1.4rem;
+          line-height: 1;
+          filter: grayscale(0.3);
+          transition: filter 0.25s ease, transform 0.25s ease;
+        }
+        .mkt-engine-card:hover .mkt-engine-card__icon {
+          filter: grayscale(0);
+          transform: scale(1.1);
+        }
+        .mkt-engine-card__tag {
+          transition: border-color 0.25s ease, color 0.25s ease;
+        }
+        .mkt-engine-card:hover .mkt-engine-card__tag {
+          border-color: var(--engine-color);
+          color: var(--engine-color);
         }
         .mkt-engine-card__cta {
           margin-top: auto;

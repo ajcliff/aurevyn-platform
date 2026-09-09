@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRef, type MouseEvent } from "react";
 import BlueprintDiagram from "./BlueprintDiagram";
@@ -40,6 +41,17 @@ export default function Hero() {
     <section className="mkt-hero">
       <div className="mkt-container mkt-hero__grid">
         <div>
+          <div className="mkt-hero__logo">
+            <Image
+              src="/logo.png"
+              alt="Aurevyn"
+              width={280}
+              height={68}
+              priority
+              style={{ height: "clamp(48px, 6vw, 84px)", width: "auto" }}
+            />
+          </div>
+
           <div className="mkt-eyebrow mkt-hero__eyebrow">Business Operating System · Rev 2026</div>
 
           <h1 className="mkt-h1 mkt-hero__headline" style={{ marginTop: 18 }}>
@@ -107,6 +119,16 @@ export default function Hero() {
           grid-template-columns: 1fr 1fr;
           gap: 40px;
           align-items: center;
+        }
+        .mkt-hero__logo {
+          opacity: 0;
+          transform: scale(0.94);
+          animation: mkt-logo-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          margin-bottom: 20px;
+        }
+        @keyframes mkt-logo-in {
+          from { opacity: 0; transform: scale(0.94); }
+          to { opacity: 1; transform: scale(1); }
         }
         .mkt-hero__eyebrow {
           opacity: 0;
@@ -178,7 +200,8 @@ export default function Hero() {
         @media (prefers-reduced-motion: reduce) {
           .mkt-hero__line span,
           .mkt-hero__fade-in,
-          .mkt-hero__eyebrow {
+          .mkt-hero__eyebrow,
+          .mkt-hero__logo {
             animation: none;
             opacity: 1;
             transform: none;

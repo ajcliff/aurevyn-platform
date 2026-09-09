@@ -10,6 +10,7 @@ export type Engine = {
   status: string;
   version: string;
   icon: string;
+  monthly_price: number;
   created_at: string;
 };
 
@@ -90,4 +91,17 @@ export async function deactivateEngine(orgId: string, engineId: string) {
     .eq("org_id", orgId)
     .eq("engine_id", engineId);
   if (error) throw error;
+}
+
+export async function updateEnginePrice(engineId: string, monthlyPrice: number) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("engines")
+    .update({ monthly_price: monthlyPrice })
+    .eq("id", engineId);
+  if (error) {
+    console.error("Error updating engine price:", error);
+    return false;
+  }
+  return true;
 }

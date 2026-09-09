@@ -59,7 +59,9 @@ export default function StorefrontBuilderDemo() {
                     <span className="mkt-builder__block-label">{b.label}</span>
                     <span className="mkt-builder__block-hint">{b.hint}</span>
                   </span>
-                  <span className="mkt-builder__block-icon">{added ? "✓" : "+"}</span>
+                  <span className={`mkt-builder__block-icon ${added ? "mkt-builder__block-icon--added" : ""}`}>
+                    {added ? "✓" : "+"}
+                  </span>
                 </button>
               );
             })}
@@ -75,7 +77,8 @@ export default function StorefrontBuilderDemo() {
               <span className="mkt-showcase__dot" />
               <span className="mkt-showcase__dot" />
               <span className="mkt-showcase__dot" />
-              <span className="mkt-mono mkt-showcase__url">
+              <span className={`mkt-mono mkt-showcase__url ${published ? "mkt-showcase__url--live" : ""}`}>
+                {published && <span className="mkt-showcase__live-dot" />}
                 {published ? "yourbusiness.aurevyn.site" : "draft — not published"}
               </span>
             </div>
@@ -155,8 +158,13 @@ export default function StorefrontBuilderDemo() {
         }
         .mkt-builder__block-icon {
           font-family: var(--mkt-font-mono);
-          color: var(--mkt-brass-light);
+          color: var(--mkt-paper-faint);
           flex-shrink: 0;
+          transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .mkt-builder__block-icon--added {
+          color: var(--mkt-signal);
+          transform: scale(1.15);
         }
         .mkt-builder__reset {
           margin-top: 8px;
@@ -189,9 +197,38 @@ export default function StorefrontBuilderDemo() {
         .mkt-builder__section {
           padding: 20px;
           border-bottom: 1px solid var(--mkt-line);
+          animation: mkt-block-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         .mkt-builder__section:last-child {
           border-bottom: none;
+        }
+        @keyframes mkt-block-in {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .mkt-showcase__url {
+          transition: color 0.3s ease;
+        }
+        .mkt-showcase__url--live {
+          color: var(--mkt-signal);
+        }
+        .mkt-showcase__live-dot {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--mkt-signal);
+          box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+          margin-right: 6px;
+          animation: mkt-pulse 2s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mkt-builder__section {
+            animation: none;
+          }
+          .mkt-showcase__live-dot {
+            animation: none;
+          }
         }
         @media (max-width: 800px) {
           .mkt-builder { grid-template-columns: 1fr; }
@@ -251,7 +288,7 @@ function BlockPreview({ id }: { id: BlockId }) {
         <div className="mkt-builder__section">
           <div className="mkt-tag" style={{ marginBottom: 10 }}>Contact</div>
           <p className="mkt-body mkt-mono" style={{ fontSize: "0.8125rem" }}>
-            +254 7XX XXX XXX · WhatsApp available
+            +254 111 953 554 · WhatsApp available
           </p>
         </div>
       );

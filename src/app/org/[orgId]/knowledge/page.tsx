@@ -15,7 +15,7 @@ import {
 const CATEGORY_LABELS: Record<ArticleCategory, string> = {
   sop: "SOP",
   policy: "Policy",
-  onboarding: "Onboarding",
+  welcome: "welcome",
   faq: "FAQ",
   general: "General",
 };
@@ -127,7 +127,7 @@ export default function KnowledgeBasePage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>Knowledge Base</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-            SOPs, policies, onboarding guides, and FAQs for {organization.name}.
+            SOPs, policies, welcome guides, and FAQs for {organization.name}.
           </p>
         </div>
         <button style={buttonGold} onClick={openNew}>

@@ -1,0 +1,359 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg-base);
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.glowA,
+.glowB,
+.glowC {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glowA {
+  width: 520px;
+  height: 520px;
+  top: -140px;
+  left: -120px;
+  background: #8b5cf6;
+}
+
+.glowB {
+  width: 460px;
+  height: 460px;
+  bottom: -160px;
+  right: -100px;
+  background: #f97316;
+}
+
+.glowC {
+  width: 420px;
+  height: 420px;
+  top: 45%;
+  left: 55%;
+  background: #22d3ee;
+}
+
+.particleField {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.sparkle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+  opacity: 0;
+  animation: sparkleTwinkle var(--dur) ease-in-out var(--delay) infinite;
+}
+
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0; transform: translateY(0); }
+  50% { opacity: 0.9; transform: translateY(-14px); }
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  max-width: 1040px;
+  width: 100%;
+  padding: 4rem 2rem 5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.loadingPulse,
+.errorBox {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: auto;
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+
+.kickerDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: inline-block;
+}
+
+.headline {
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.05;
+  margin: 0 0 1.5rem;
+  overflow: hidden;
+}
+
+.headlineLine {
+  display: block;
+  overflow: hidden;
+}
+
+.headlineWord {
+  display: inline-block;
+}
+
+.headlineWord:not(:last-child) {
+  margin-right: 0.3ch;
+}
+
+.subheading {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 620px;
+  margin: 0 0 2.5rem;
+}
+
+.orgName {
+  background: linear-gradient(90deg, #f97316, #a855f7, #22d3ee);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.statBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  min-width: 2ch;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.15rem;
+}
+
+.statDivider {
+  width: 1px;
+  height: 34px;
+  background: var(--border);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  margin-bottom: 2.5rem;
+  perspective: 1000px;
+}
+
+.engineCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  transition: box-shadow 0.25s ease;
+}
+
+.engineCard:hover {
+  box-shadow: 0 16px 40px -12px var(--engine-color);
+  border-color: var(--engine-color);
+}
+
+.engineCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--engine-color);
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.engineShine {
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.16),
+    transparent
+  );
+  animation: shineSweep 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shineSweep {
+  0% { left: -60%; }
+  40%, 100% { left: 140%; }
+}
+
+.engineIcon {
+  font-size: 2.1rem;
+  filter: drop-shadow(0 4px 14px var(--engine-color));
+  position: relative;
+}
+
+.engineName {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.engineBlurb {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  position: relative;
+  line-height: 1.4;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.actionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.actionChip:hover {
+  border-color: var(--gold);
+  color: var(--text-primary);
+}
+
+.ctaWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctaRing {
+  position: absolute;
+  inset: -10px;
+  border-radius: 999px;
+  border: 2px solid var(--gold);
+  pointer-events: none;
+}
+
+.cta,
+.ctaSmall {
+  position: relative;
+  padding: 1rem 2.75rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, var(--gold), #f97316);
+  color: var(--gold-contrast);
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(234, 179, 8, 0.3);
+}
+
+.ctaSmall {
+  font-size: 0.9rem;
+  padding: 0.6rem 1.5rem;
+}
+
+.cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.confettiPiece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .statsRow {
+    gap: 1.25rem;
+  }
+  .content {
+    padding: 3rem 1.25rem 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkle,
+  .engineShine {
+    animation: none;
+    opacity: 0;
+  }
+}

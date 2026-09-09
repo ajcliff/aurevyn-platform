@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
 
-export type ArticleCategory = "sop" | "policy" | "onboarding" | "faq" | "general";
+export type ArticleCategory = "sop" | "policy" | "welcome" | "faq" | "general";
 
 export type KnowledgeArticle = {
   id: string;

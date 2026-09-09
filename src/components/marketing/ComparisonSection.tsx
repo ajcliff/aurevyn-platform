@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 const ROWS = [
   { label: "Time to first sale", aurevyn: "Same day", legacy: "Weeks to quarters" },
   { label: "Setup", aurevyn: "Pick an industry blueprint", legacy: "Custom consultant build-out" },
@@ -17,6 +21,29 @@ const LEGACY_PHASES = [
 const TOTAL_WEEKS = LEGACY_PHASES.reduce((s, p) => s + p.weeks, 0);
 
 export default function ComparisonSection() {
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setRevealed(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section className="mkt-section">
       <div className="mkt-container">
@@ -30,7 +57,7 @@ export default function ComparisonSection() {
           was.
         </p>
 
-        <div className="mkt-timeline">
+        <div className="mkt-timeline" ref={timelineRef}>
           <div className="mkt-timeline__ruler">
             {Array.from({ length: 5 }, (_, i) => (
               <span key={i} className="mkt-mono">Week {i * 4}</span>
@@ -40,8 +67,11 @@ export default function ComparisonSection() {
           <div className="mkt-timeline__row">
             <span className="mkt-timeline__row-label mkt-mono">AUREVYN</span>
             <div className="mkt-timeline__track">
-              <div className="mkt-timeline__aurevyn-bar" style={{ width: "3%" }} />
-              <span className="mkt-timeline__aurevyn-label mkt-mono">Live — Day 1</span>
+              <div
+                className="mkt-timeline__aurevyn-bar"
+                style={{ width: revealed ? "3%" : "0%" }}
+              />
+              <span className="mkt-badge-live mkt-timeline__aurevyn-label">Live — Day 1</span>
             </div>
           </div>
 
@@ -52,7 +82,10 @@ export default function ComparisonSection() {
                 <div
                   key={p.label}
                   className="mkt-timeline__phase"
-                  style={{ width: `${(p.weeks / TOTAL_WEEKS) * 100}%`, opacity: 0.4 + i * 0.12 }}
+                  style={{
+                    width: revealed ? `${(p.weeks / TOTAL_WEEKS) * 100}%` : "0%",
+                    transitionDelay: `${300 + i * 140}ms`,
+                  }}
                   title={`${p.label} — ~${p.weeks} weeks`}
                 >
                   <span className="mkt-timeline__phase-label mkt-mono">{p.label}</span>
@@ -68,8 +101,12 @@ export default function ComparisonSection() {
             <div className="mkt-compare__col mkt-compare__col--aurevyn">Aurevyn</div>
             <div className="mkt-compare__col">Typical legacy ERP</div>
           </div>
-          {ROWS.map((r) => (
-            <div key={r.label} className="mkt-compare__row">
+          {ROWS.map((r, i) => (
+            <div
+              key={r.label}
+              className={`mkt-compare__row ${revealed ? "mkt-compare__row--in" : ""}`}
+              style={{ transitionDelay: `${i * 70}ms` }}
+            >
               <div className="mkt-compare__label">{r.label}</div>
               <div className="mkt-compare__col mkt-compare__col--aurevyn">
                 <span className="mkt-compare__check" aria-hidden="true">✓</span>
@@ -124,22 +161,24 @@ export default function ComparisonSection() {
           display: flex;
         }
         .mkt-timeline__aurevyn-bar {
-          background: var(--mkt-brass);
+          background: linear-gradient(90deg, var(--mkt-brass), var(--mkt-signal));
           height: 100%;
+          transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+          box-shadow: 0 0 18px var(--mkt-brass-glow);
         }
-        .mkt-timeline__aurevyn-label {
+        .mkt-timeline__aurevyn-label.mkt-badge-live {
           margin-left: 10px;
           align-self: center;
-          font-size: 0.75rem;
           color: var(--mkt-brass-light);
         }
         .mkt-timeline__phase {
-          background: var(--mkt-blueprint);
+          background: linear-gradient(180deg, rgba(140, 148, 158, 0.5), rgba(140, 148, 158, 0.28));
           height: 100%;
           border-right: 1px solid var(--mkt-ink);
           display: flex;
           align-items: center;
           overflow: hidden;
+          transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
         }
         .mkt-timeline__phase-label {
           padding-left: 8px;
@@ -155,12 +194,22 @@ export default function ComparisonSection() {
           display: grid;
           grid-template-columns: 1.2fr 1fr 1fr;
           border-bottom: 1px solid var(--mkt-line);
+          opacity: 0;
+          transform: translateY(10px);
+          transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .mkt-compare__row--in {
+          opacity: 1;
+          transform: translateY(0);
         }
         .mkt-compare__row:last-child {
           border-bottom: none;
         }
         .mkt-compare__row--head {
           background: var(--mkt-surface);
+          opacity: 1;
+          transform: none;
+          transition: none;
         }
         .mkt-compare__row--head .mkt-compare__col {
           font-family: var(--mkt-font-mono);
@@ -191,7 +240,7 @@ export default function ComparisonSection() {
           background: var(--mkt-blueprint-glow);
         }
         .mkt-compare__check {
-          color: var(--mkt-blueprint);
+          color: var(--mkt-signal);
           font-family: var(--mkt-font-mono);
         }
         @media (max-width: 700px) {
@@ -210,6 +259,13 @@ export default function ComparisonSection() {
           }
           .mkt-compare__col {
             border-right: none;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mkt-timeline__aurevyn-bar,
+          .mkt-timeline__phase,
+          .mkt-compare__row {
+            transition: none;
           }
         }
       `}</style>

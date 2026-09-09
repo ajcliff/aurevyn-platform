@@ -1,9 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
+import RevealOnScroll from "./RevealOnScroll";
 
 const COLUMNS = [
   {
     heading: "Product",
+    accent: "var(--mkt-blueprint)",
     links: [
       { href: "/#engines", label: "Engines" },
       { href: "/#industries", label: "Industries" },
@@ -13,6 +15,7 @@ const COLUMNS = [
   },
   {
     heading: "Company",
+    accent: "var(--mkt-violet)",
     links: [
       { href: "/contact", label: "Contact" },
       { href: "/login", label: "Log in" },
@@ -20,6 +23,7 @@ const COLUMNS = [
   },
   {
     heading: "Legal",
+    accent: "var(--mkt-amber)",
     links: [
       { href: "/terms", label: "Terms of service" },
       { href: "/privacy", label: "Privacy policy" },
@@ -30,6 +34,7 @@ const COLUMNS = [
 export default function MarketingFooter() {
   return (
     <footer className="mkt-footer">
+      <div className="mkt-footer__spectrum" aria-hidden="true" />
       <div className="mkt-container mkt-footer__top">
         <div className="mkt-footer__brand">
           <Image src="/logo.png" alt="Aurevyn" width={180} height={44} style={{ height: 32, width: "auto" }} />
@@ -42,20 +47,31 @@ export default function MarketingFooter() {
           </div>
         </div>
 
-        {COLUMNS.map((col) => (
-          <div key={col.heading} className="mkt-footer__col">
-            <div className="mkt-tag" style={{ marginBottom: 14 }}>{col.heading}</div>
-            <ul className="mkt-footer__list">
-              {col.links.map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} className="mkt-footer__link">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <RevealOnScroll stagger={80} variant="up" className="mkt-footer__cols">
+          {COLUMNS.map((col) => (
+            <div key={col.heading} className="mkt-footer__col">
+              <div
+                className="mkt-tag mkt-footer__col-tag"
+                style={{ marginBottom: 14, ["--col-accent" as string]: col.accent }}
+              >
+                {col.heading}
+              </div>
+              <ul className="mkt-footer__list">
+                {col.links.map((l) => (
+                  <li key={l.href}>
+                    <Link
+                      href={l.href}
+                      className="mkt-footer__link"
+                      style={{ ["--col-accent" as string]: col.accent }}
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </RevealOnScroll>
       </div>
 
       <div className="mkt-container mkt-footer__bottom">
@@ -66,12 +82,32 @@ export default function MarketingFooter() {
       <style>{`
         .mkt-footer {
           padding-top: 80px;
+          position: relative;
+        }
+        .mkt-footer__spectrum {
+          height: 3px;
+          background: linear-gradient(
+            90deg,
+            var(--mkt-blueprint),
+            var(--mkt-signal),
+            var(--mkt-brass),
+            var(--mkt-violet),
+            var(--mkt-amber),
+            var(--mkt-alert)
+          );
+          opacity: 0.75;
         }
         .mkt-footer__top {
           display: grid;
-          grid-template-columns: 1.6fr repeat(3, 1fr);
+          grid-template-columns: 1.6fr 3fr;
           gap: 32px;
+          padding-top: 44px;
           padding-bottom: 56px;
+        }
+        .mkt-footer__cols {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 32px;
         }
         .mkt-footer__list {
           list-style: none;
@@ -81,12 +117,20 @@ export default function MarketingFooter() {
           flex-direction: column;
           gap: 10px;
         }
+        .mkt-footer__col-tag {
+          transition: border-color 0.2s ease, color 0.2s ease;
+        }
+        .mkt-footer__col-tag:hover {
+          border-color: var(--col-accent);
+          color: var(--col-accent);
+        }
         .mkt-footer__link {
           font-size: 0.875rem;
           color: var(--mkt-paper-dim);
+          transition: color 0.2s ease;
         }
         .mkt-footer__link:hover {
-          color: var(--mkt-blueprint);
+          color: var(--col-accent, var(--mkt-blueprint));
         }
         .mkt-footer__bottom {
           border-top: 1px solid var(--mkt-line);
@@ -101,10 +145,12 @@ export default function MarketingFooter() {
         }
         @media (max-width: 760px) {
           .mkt-footer__top {
+            grid-template-columns: 1fr;
+          }
+          .mkt-footer__cols {
             grid-template-columns: 1fr 1fr;
           }
           .mkt-footer__brand {
-            grid-column: 1 / -1;
             margin-bottom: 12px;
           }
         }
