@@ -7,6 +7,10 @@ import {
   getFinanceTransactions,
   createAccount,
   createTransactionLogged,
+  updateAccount,
+  archiveAccount,
+  updateTransaction,
+  deleteTransaction,
   type FinanceAccount,
   type FinanceTransaction,
 } from "@/lib/finance";
@@ -34,9 +38,20 @@ export default function FinancePage() {
   const [txFilter, setTxFilter] = useState<"all" | "income" | "expense">("all");
 
   const [showNewAccount, setShowNewAccount] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [accName, setAccName] = useState("");
   const [accType, setAccType] = useState("bank");
   const [accBalance, setAccBalance] = useState("");
+
+  const [editingTx, setEditingTx] = useState<FinanceTransaction | null>(null);
+  const [editTxAmount, setEditTxAmount] = useState("");
+  const [editTxDescription, setEditTxDescription] = useState("");
+  const [editTxCategory, setEditTxCategory] = useState("sales");
+  const [editTxDate, setEditTxDate] = useState("");
+  const [editTxAccountId, setEditTxAccountId] = useState("");
+  const [editTxCoaId, setEditTxCoaId] = useState("");
+  const [editTxCostCenterId, setEditTxCostCenterId] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const [showNewTx, setShowNewTx] = useState(false);
   const [txType, setTxType] = useState<"income" | "expense">("income");
@@ -83,20 +98,89 @@ async function load() {
 
   const filteredTx = transactions.filter((t) => txFilter === "all" || t.type === txFilter);
 
-  async function handleCreateAccount() {
+  function handleOpenNewAccount() {
+    setEditingAccountId(null);
+    setAccName("");
+    setAccType("bank");
+    setAccBalance("");
+    setShowNewAccount(true);
+  }
+
+  function handleOpenEditAccount(a: FinanceAccount) {
+    setEditingAccountId(a.id);
+    setAccName(a.name);
+    setAccType(a.type);
+    setAccBalance(String(a.balance));
+    setShowNewAccount(true);
+  }
+
+  async function handleSaveAccount() {
     if (!accName.trim()) return;
-    await createAccount({
-      org_id: organization.id,
-      name: accName,
-      type: accType,
-      category: accType === "cash" ? "Cash in Hand" : "Banker",
-      balance: Number(accBalance) || 0,
-      currency: "KES",
-    });
+    if (editingAccountId) {
+      await updateAccount(editingAccountId, {
+        name: accName,
+        type: accType,
+        category: accType === "cash" ? "Cash in Hand" : "Banker",
+        balance: Number(accBalance) || 0,
+      });
+    } else {
+      await createAccount({
+        org_id: organization.id,
+        name: accName,
+        type: accType,
+        category: accType === "cash" ? "Cash in Hand" : "Banker",
+        balance: Number(accBalance) || 0,
+        currency: "KES",
+      });
+    }
+    setEditingAccountId(null);
     setAccName("");
     setAccType("bank");
     setAccBalance("");
     setShowNewAccount(false);
+    load();
+  }
+
+  async function handleArchiveAccount(a: FinanceAccount) {
+    if (!confirm(`Archive "${a.name}"? It will be hidden from this list but its transaction history is kept.`)) return;
+    await archiveAccount(a.id);
+    load();
+  }
+
+  function handleOpenEditTx(t: FinanceTransaction) {
+    setEditingTx(t);
+    setEditTxAmount(String(t.amount));
+    setEditTxDescription(t.description);
+    setEditTxCategory(t.category);
+    setEditTxDate(t.date);
+    setEditTxAccountId(t.account_id || "");
+    setEditTxCoaId(t.coa_id || "");
+    setEditTxCostCenterId(t.cost_center_id || "");
+  }
+
+  async function handleSaveEditTx() {
+    if (!editingTx || !editTxAmount || !editTxDescription.trim()) return;
+    try {
+      setEditSaving(true);
+      await updateTransaction(editingTx.id, {
+        amount: Number(editTxAmount),
+        description: editTxDescription,
+        category: editTxCategory,
+        date: editTxDate,
+        account_id: editTxAccountId || null,
+        coa_id: editTxCoaId || null,
+        cost_center_id: editTxCostCenterId || null,
+      });
+      setEditingTx(null);
+      load();
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteTx(t: FinanceTransaction) {
+    if (!confirm(`Delete this transaction (${t.description}, KES ${Number(t.amount).toLocaleString()})? This can't be undone.`)) return;
+    await deleteTransaction(t.id);
     load();
   }
 
@@ -218,12 +302,16 @@ async function load() {
         <div className="card" style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <h3>Bankers</h3>
-            <button style={ghostButton} onClick={() => setShowNewAccount(true)}>+ Account</button>
+            <button style={ghostButton} onClick={handleOpenNewAccount}>+ Account</button>
           </div>
           {bankers.map((a) => (
-            <div key={a.id} style={rowStyle}>
+            <div key={a.id} style={{ ...rowStyle, gridTemplateColumns: "1fr auto auto" }}>
               <span>{a.name}</span>
               <span style={{ fontWeight: 600 }}>KES {Number(a.balance).toLocaleString()}</span>
+              <span style={{ display: "flex", gap: 6 }}>
+                <button style={iconBtn} onClick={() => handleOpenEditAccount(a)} title="Edit">✏️</button>
+                <button style={iconBtn} onClick={() => handleArchiveAccount(a)} title="Archive">🗄️</button>
+              </span>
             </div>
           ))}
 {bankers.length === 0 && <EmptyState icon="🏦" message="No bank/mobile money accounts yet." />}        </div>
@@ -231,9 +319,13 @@ async function load() {
         <div className="card" style={cardStyle}>
           <h3 style={{ marginBottom: 12 }}>Cash in Hand</h3>
           {cashInHand.map((a) => (
-            <div key={a.id} style={rowStyle}>
+            <div key={a.id} style={{ ...rowStyle, gridTemplateColumns: "1fr auto auto" }}>
               <span>{a.name}</span>
               <span style={{ fontWeight: 600 }}>KES {Number(a.balance).toLocaleString()}</span>
+              <span style={{ display: "flex", gap: 6 }}>
+                <button style={iconBtn} onClick={() => handleOpenEditAccount(a)} title="Edit">✏️</button>
+                <button style={iconBtn} onClick={() => handleArchiveAccount(a)} title="Archive">🗄️</button>
+              </span>
             </div>
           ))}
 {cashInHand.length === 0 && <EmptyState icon="💵" message="No cash accounts recorded yet." />}        </div>
@@ -254,12 +346,16 @@ async function load() {
         </div>
 
         {filteredTx.map((t) => (
-          <div key={t.id} style={{ ...rowStyle, gridTemplateColumns: "1fr 1.5fr 1fr 1fr" }}>
+          <div key={t.id} style={{ ...rowStyle, gridTemplateColumns: "1fr 1.5fr 1fr 1fr auto" }}>
             <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{t.date}</span>
             <span>{t.description}</span>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.reference || "—"}</span>
             <span style={{ fontWeight: 600, color: t.type === "income" ? "#3dd68c" : "#ef4444", textAlign: "right" }}>
               {t.type === "income" ? "+" : "-"}KES {Number(t.amount).toLocaleString()}
+            </span>
+            <span style={{ display: "flex", gap: 6 }}>
+              <button style={iconBtn} onClick={() => handleOpenEditTx(t)} title="Edit">✏️</button>
+              <button style={iconBtn} onClick={() => handleDeleteTx(t)} title="Delete">🗑️</button>
             </span>
           </div>
         ))}
@@ -269,7 +365,7 @@ async function load() {
       {showNewAccount && (
         <div style={overlayStyle}>
           <div style={modalStyle}>
-            <h2 style={{ marginBottom: 16 }}>New Account</h2>
+            <h2 style={{ marginBottom: 16 }}>{editingAccountId ? "Edit Account" : "New Account"}</h2>
 
             <label style={labelStyle}>Account Name</label>
             <input placeholder="e.g. Equity Bank - Business" value={accName} onChange={(e) => setAccName(e.target.value)} style={inputStyle} />
@@ -281,12 +377,67 @@ async function load() {
               ))}
             </select>
 
-            <label style={labelStyle}>Opening Balance (KES)</label>
+            <label style={labelStyle}>{editingAccountId ? "Balance (KES)" : "Opening Balance (KES)"}</label>
             <input type="number" placeholder="0" value={accBalance} onChange={(e) => setAccBalance(e.target.value)} style={inputStyle} />
 
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button style={ghostButton} onClick={() => setShowNewAccount(false)}>Cancel</button>
-              <button style={{ ...buttonGold, flex: 1 }} onClick={handleCreateAccount}>Create</button>
+              <button style={ghostButton} onClick={() => { setShowNewAccount(false); setEditingAccountId(null); }}>Cancel</button>
+              <button style={{ ...buttonGold, flex: 1 }} onClick={handleSaveAccount}>{editingAccountId ? "Save Changes" : "Create"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingTx && (
+        <div style={overlayStyle}>
+          <div style={modalStyle}>
+            <h2 style={{ marginBottom: 16 }}>Edit Transaction</h2>
+
+            <label style={labelStyle}>Amount (KES)</label>
+            <input type="number" placeholder="0" value={editTxAmount} onChange={(e) => setEditTxAmount(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Description</label>
+            <input placeholder="What was this for?" value={editTxDescription} onChange={(e) => setEditTxDescription(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Category</label>
+            <select value={editTxCategory} onChange={(e) => setEditTxCategory(e.target.value)} style={inputStyle}>
+              {TX_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Account</label>
+            <select value={editTxAccountId} onChange={(e) => setEditTxAccountId(e.target.value)} style={inputStyle}>
+              <option value="">No specific account</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Chart of Accounts Category</label>
+            <select value={editTxCoaId} onChange={(e) => setEditTxCoaId(e.target.value)} style={inputStyle}>
+              <option value="">Not categorized</option>
+              {chartAccounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Cost Center (optional)</label>
+            <select value={editTxCostCenterId} onChange={(e) => setEditTxCostCenterId(e.target.value)} style={inputStyle}>
+              <option value="">No cost center</option>
+              {costCenters.map((cc) => (
+                <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Date</label>
+            <input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} style={inputStyle} />
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button style={ghostButton} onClick={() => setEditingTx(null)}>Cancel</button>
+              <button style={{ ...buttonGold, flex: 1 }} onClick={handleSaveEditTx} disabled={editSaving}>
+                {editSaving ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </div>
         </div>
@@ -418,6 +569,16 @@ const buttonGold: React.CSSProperties = {
   fontWeight: 700,
   fontSize: 12,
   cursor: "pointer",
+};
+
+const iconBtn: React.CSSProperties = {
+  background: "transparent",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  padding: "4px 8px",
+  fontSize: 11,
+  cursor: "pointer",
+  color: "var(--text-secondary)",
 };
 
 const ghostButton: React.CSSProperties = {

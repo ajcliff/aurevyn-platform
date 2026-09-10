@@ -9,6 +9,7 @@ export type FinanceAccount = {
   category: string;
   balance: number;
   currency: string;
+  status?: string;
   created_at: string;
 };
 
@@ -96,9 +97,51 @@ export async function getFinanceAccounts(orgId: string): Promise<FinanceAccount[
     .from("finance_accounts")
     .select("*")
     .eq("org_id", orgId)
+    .neq("status", "archived")
     .order("type");
   if (error) { console.error(error); return []; }
   return data as FinanceAccount[];
+}
+
+export async function updateAccount(id: string, updates: Partial<FinanceAccount>) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("finance_accounts")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  await logActivity({
+    icon: "✏️",
+    title: "Finance account updated",
+    sub: (data as FinanceAccount).name,
+    org_id: (data as FinanceAccount).org_id,
+  });
+
+  return data as FinanceAccount;
+}
+
+export async function archiveAccount(id: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("finance_accounts")
+    .update({ status: "archived" })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  await logActivity({
+    icon: "🗄️",
+    title: "Finance account archived",
+    sub: (data as FinanceAccount).name,
+    org_id: (data as FinanceAccount).org_id,
+  });
+
+  return true;
 }
 
 export async function getFinanceTransactions(orgId: string): Promise<FinanceTransaction[]> {
@@ -154,4 +197,96 @@ export async function createExpense(expense: Omit<FinanceExpense, "id" | "create
     .single();
   if (error) throw error;
   return data as FinanceExpense;
+}
+
+export async function updateTransaction(id: string, updates: Partial<FinanceTransaction>) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("finance_transactions")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  await logActivity({
+    icon: "✏️",
+    title: "Finance transaction updated",
+    sub: (data as FinanceTransaction).description,
+    org_id: (data as FinanceTransaction).org_id,
+  });
+
+  return data as FinanceTransaction;
+}
+
+export async function deleteTransaction(id: string) {
+  const supabase = createClient();
+
+  const { data, error: fetchError } = await supabase
+    .from("finance_transactions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw fetchError;
+
+  const { error } = await supabase
+    .from("finance_transactions")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+
+  await logActivity({
+    icon: "🗑️",
+    title: "Finance transaction deleted",
+    sub: `KES ${Number((data as FinanceTransaction).amount).toLocaleString()} — ${(data as FinanceTransaction).description}`,
+    org_id: (data as FinanceTransaction).org_id,
+  });
+
+  return true;
+}
+
+export async function updateExpense(id: string, updates: Partial<FinanceExpense>) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("finance_expenses")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  await logActivity({
+    icon: "✏️",
+    title: "Finance expense updated",
+    sub: (data as FinanceExpense).title,
+    org_id: (data as FinanceExpense).org_id,
+  });
+
+  return data as FinanceExpense;
+}
+
+export async function deleteExpense(id: string) {
+  const supabase = createClient();
+
+  const { data, error: fetchError } = await supabase
+    .from("finance_expenses")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw fetchError;
+
+  const { error } = await supabase
+    .from("finance_expenses")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+
+  await logActivity({
+    icon: "🗑️",
+    title: "Finance expense deleted",
+    sub: `KES ${Number((data as FinanceExpense).amount).toLocaleString()} — ${(data as FinanceExpense).title}`,
+    org_id: (data as FinanceExpense).org_id,
+  });
+
+  return true;
 }
