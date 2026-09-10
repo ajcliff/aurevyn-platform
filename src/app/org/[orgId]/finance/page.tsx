@@ -5,14 +5,19 @@ import { useEngine } from "@/lib/runtime/EngineContext";
 import {
   getFinanceAccounts,
   getFinanceTransactions,
+  getFinanceExpenses,
   createAccount,
   createTransactionLogged,
+  createExpense,
   updateAccount,
   archiveAccount,
   updateTransaction,
   deleteTransaction,
+  updateExpense,
+  deleteExpense,
   type FinanceAccount,
   type FinanceTransaction,
+  type FinanceExpense,
 } from "@/lib/finance";
 import { exportToCSV } from "@/lib/csvExport";
 import PaymentMethodForm from "@/components/payments/PaymentMethodForm";
@@ -28,12 +33,15 @@ const ACCOUNT_TYPES = [
 ];
 
 const TX_CATEGORIES = ["sales", "supplies", "rent", "salaries", "utilities", "transport", "other"];
+const EXPENSE_CATEGORIES = ["supplies", "rent", "salaries", "utilities", "transport", "maintenance", "other"];
+const EXPENSE_PAYMENT_METHODS = ["cash", "bank_transfer", "mpesa", "card", "cheque"];
 
 export default function FinancePage() {
   const { organization } = useEngine();
 
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [txFilter, setTxFilter] = useState<"all" | "income" | "expense">("all");
 
@@ -52,6 +60,17 @@ export default function FinancePage() {
   const [editTxCoaId, setEditTxCoaId] = useState("");
   const [editTxCostCenterId, setEditTxCostCenterId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+
+  const [showNewExpense, setShowNewExpense] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expTitle, setExpTitle] = useState("");
+  const [expAmount, setExpAmount] = useState("");
+  const [expCategory, setExpCategory] = useState("supplies");
+  const [expVendor, setExpVendor] = useState("");
+  const [expPaymentMethod, setExpPaymentMethod] = useState("cash");
+  const [expDate, setExpDate] = useState(new Date().toISOString().slice(0, 10));
+  const [expNotes, setExpNotes] = useState("");
+  const [expSaving, setExpSaving] = useState(false);
 
   const [showNewTx, setShowNewTx] = useState(false);
   const [txType, setTxType] = useState<"income" | "expense">("income");
@@ -75,14 +94,16 @@ const [txPaymentDetails, setTxPaymentDetails] = useState<PaymentDetailsInput | n
 
 async function load() {
     setLoading(true);
-    const [a, t, coa, cc] = await Promise.all([
+    const [a, t, e, coa, cc] = await Promise.all([
       getFinanceAccounts(organization.id),
       getFinanceTransactions(organization.id),
+      getFinanceExpenses(organization.id),
       getChartOfAccounts(organization.id),
       getCostCenters(organization.id),
     ]);
     setAccounts(a);
     setTransactions(t);
+    setExpenses(e);
     setChartAccounts(coa);
     setCostCenters(cc);
     setLoading(false);
@@ -184,6 +205,72 @@ async function load() {
     load();
   }
 
+  function handleOpenNewExpense() {
+    setEditingExpenseId(null);
+    setExpTitle("");
+    setExpAmount("");
+    setExpCategory("supplies");
+    setExpVendor("");
+    setExpPaymentMethod("cash");
+    setExpDate(new Date().toISOString().slice(0, 10));
+    setExpNotes("");
+    setShowNewExpense(true);
+  }
+
+  function handleOpenEditExpense(e: FinanceExpense) {
+    setEditingExpenseId(e.id);
+    setExpTitle(e.title);
+    setExpAmount(String(e.amount));
+    setExpCategory(e.category);
+    setExpVendor(e.vendor || "");
+    setExpPaymentMethod(e.payment_method || "cash");
+    setExpDate(e.date);
+    setExpNotes(e.notes || "");
+    setShowNewExpense(true);
+  }
+
+  async function handleSaveExpense() {
+    if (!expTitle.trim() || !expAmount) return;
+    try {
+      setExpSaving(true);
+      if (editingExpenseId) {
+        await updateExpense(editingExpenseId, {
+          title: expTitle,
+          amount: Number(expAmount),
+          category: expCategory,
+          vendor: expVendor,
+          payment_method: expPaymentMethod,
+          date: expDate,
+          notes: expNotes,
+        });
+      } else {
+        await createExpense({
+          org_id: organization.id,
+          title: expTitle,
+          amount: Number(expAmount),
+          currency: "KES",
+          category: expCategory,
+          vendor: expVendor,
+          payment_method: expPaymentMethod,
+          status: "completed",
+          date: expDate,
+          notes: expNotes,
+        });
+      }
+      setShowNewExpense(false);
+      setEditingExpenseId(null);
+      load();
+    } finally {
+      setExpSaving(false);
+    }
+  }
+
+  async function handleDeleteExpense(e: FinanceExpense) {
+    if (!confirm(`Delete this expense (${e.title}, KES ${Number(e.amount).toLocaleString()})? This can't be undone.`)) return;
+    await deleteExpense(e.id);
+    load();
+  }
+
  async function handleCreateTx() {
     if (!txAmount || !txDescription.trim()) return;
     if (!txPaymentDetails) {
@@ -274,6 +361,9 @@ async function load() {
           <a href={`/org/${organization.id}/finance/reports/profit-loss`} style={ghostButton}>
             Profit & Loss →
           </a>
+          <a href={`/org/${organization.id}/finance/cheques`} style={ghostButton}>
+            Pending Cheques →
+          </a>
         </div>
       </div>
 
@@ -361,6 +451,74 @@ async function load() {
         ))}
 
 {filteredTx.length === 0 && <EmptyState icon="💳" message="No transactions yet." />}      </div>
+
+      <div className="card" style={{ ...cardStyle, marginTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3>Expenses</h3>
+          <button style={buttonGold} onClick={handleOpenNewExpense}>+ Expense</button>
+        </div>
+
+        {expenses.map((e) => (
+          <div key={e.id} style={{ ...rowStyle, gridTemplateColumns: "1fr 1fr 1fr 1fr auto" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{e.date}</span>
+            <span>{e.title}</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{e.vendor || "—"}</span>
+            <span style={{ fontWeight: 600, color: "#ef4444", textAlign: "right" }}>
+              KES {Number(e.amount).toLocaleString()}
+            </span>
+            <span style={{ display: "flex", gap: 6 }}>
+              <button style={iconBtn} onClick={() => handleOpenEditExpense(e)} title="Edit">✏️</button>
+              <button style={iconBtn} onClick={() => handleDeleteExpense(e)} title="Delete">🗑️</button>
+            </span>
+          </div>
+        ))}
+
+        {expenses.length === 0 && <EmptyState icon="🧾" message="No expenses recorded yet." />}
+      </div>
+
+      {showNewExpense && (
+        <div style={overlayStyle}>
+          <div style={modalStyle}>
+            <h2 style={{ marginBottom: 16 }}>{editingExpenseId ? "Edit Expense" : "New Expense"}</h2>
+
+            <label style={labelStyle}>Title</label>
+            <input placeholder="e.g. Office supplies" value={expTitle} onChange={(e) => setExpTitle(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Amount (KES)</label>
+            <input type="number" placeholder="0" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Category</label>
+            <select value={expCategory} onChange={(e) => setExpCategory(e.target.value)} style={inputStyle}>
+              {EXPENSE_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Vendor</label>
+            <input placeholder="Who was this paid to?" value={expVendor} onChange={(e) => setExpVendor(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Payment Method</label>
+            <select value={expPaymentMethod} onChange={(e) => setExpPaymentMethod(e.target.value)} style={inputStyle}>
+              {EXPENSE_PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>{methodLabel(m as any)}</option>
+              ))}
+            </select>
+
+            <label style={labelStyle}>Date</label>
+            <input type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Notes (optional)</label>
+            <input placeholder="Any extra detail" value={expNotes} onChange={(e) => setExpNotes(e.target.value)} style={inputStyle} />
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button style={ghostButton} onClick={() => { setShowNewExpense(false); setEditingExpenseId(null); }}>Cancel</button>
+              <button style={{ ...buttonGold, flex: 1 }} onClick={handleSaveExpense} disabled={expSaving}>
+                {expSaving ? "Saving..." : editingExpenseId ? "Save Changes" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNewAccount && (
         <div style={overlayStyle}>
