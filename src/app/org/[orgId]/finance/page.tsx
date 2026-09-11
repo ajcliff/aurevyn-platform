@@ -361,6 +361,9 @@ async function load() {
           <a href={`/org/${organization.id}/finance/reports/profit-loss`} style={ghostButton}>
             Profit & Loss →
           </a>
+          <a href={`/org/${organization.id}/finance/reports/balance-sheet`} style={ghostButton}>
+            Balance Sheet →
+          </a>
           <a href={`/org/${organization.id}/finance/cheques`} style={ghostButton}>
             Pending Cheques →
           </a>

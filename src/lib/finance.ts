@@ -1,5 +1,6 @@
 import { createClient } from "./supabase";
 import { logActivity } from "@/lib/activity";
+import { postTransactionJournal, repostTransactionJournal, reverseJournalFor } from "@/lib/journal";
 
 export type FinanceAccount = {
   id: string;
@@ -44,6 +45,7 @@ export async function createTransactionLogged(tx: Omit<FinanceTransaction, "id" 
       sub: `KES ${Number(tx.amount).toLocaleString()} — ${tx.description}`,
       org_id: tx.org_id,
     });
+    await postTransactionJournal(created);
   }
   return created;
 }
@@ -216,6 +218,8 @@ export async function updateTransaction(id: string, updates: Partial<FinanceTran
     org_id: (data as FinanceTransaction).org_id,
   });
 
+  await repostTransactionJournal(data as FinanceTransaction);
+
   return data as FinanceTransaction;
 }
 
@@ -241,6 +245,8 @@ export async function deleteTransaction(id: string) {
     sub: `KES ${Number((data as FinanceTransaction).amount).toLocaleString()} — ${(data as FinanceTransaction).description}`,
     org_id: (data as FinanceTransaction).org_id,
   });
+
+  await reverseJournalFor("finance_transaction", id);
 
   return true;
 }
