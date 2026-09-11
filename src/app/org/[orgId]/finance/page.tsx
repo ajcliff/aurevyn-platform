@@ -370,6 +370,9 @@ async function load() {
           <a href={`/org/${organization.id}/finance/creditors`} style={ghostButton}>
             Creditors →
           </a>
+          <a href={`/org/${organization.id}/finance/reports/vat`} style={ghostButton}>
+            VAT Summary →
+          </a>
         </div>
       </div>
 

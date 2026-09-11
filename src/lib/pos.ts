@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase";
+import { postSaleJournal } from "@/lib/journal";
+import { getOrgSettings } from "@/lib/orgSettings";
 
 export interface PosSaleItem {
   id?: string;
@@ -22,6 +24,8 @@ customer_id?: string | null;
   items: PosSaleItem[];
 
   total: number;
+
+  tax_amount?: number;
 
   payment_method: string;
 
@@ -117,6 +121,13 @@ export async function createSale(
 ) {
   const supabase = client ?? createClient();
 
+  // VAT is extracted from the tax-inclusive sale total using the org's
+  // configured rate (org_settings.default_vat_rate), not added on top —
+  // POS retail pricing in Kenya is conventionally quoted VAT-inclusive.
+  const settings = await getOrgSettings(sale.org_id);
+  const vatRate = settings.default_vat_rate || 0;
+  const taxAmount = vatRate > 0 ? Number((sale.total * (vatRate / (100 + vatRate))).toFixed(2)) : 0;
+
   const { data: saleData, error: saleError } =
     await supabase
       .from("pos_sales")
@@ -126,6 +137,7 @@ export async function createSale(
         org_id: sale.org_id,
         items: sale.items,
         total: sale.total,
+        tax_amount: taxAmount,
         payment_method: sale.payment_method,
         status: sale.status ?? "completed",
         cashier: sale.cashier ?? "System",
@@ -152,6 +164,10 @@ export async function createSale(
       .insert(rows);
 
     if (itemError) throw itemError;
+  }
+
+  if ((sale.status ?? "completed") === "completed") {
+    await postSaleJournal(saleData);
   }
 
   return saleData;

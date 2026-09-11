@@ -2,6 +2,8 @@ import { createClient } from "./supabase";
 import { logActivity } from "@/lib/activity";
 import { decideApprovalRequest } from "@/lib/approvals";
 import { updateStock } from "@/lib/inventory";
+import { postPurchaseReceiptJournal } from "@/lib/journal";
+import { getOrgSettings } from "@/lib/orgSettings";
 
 export type PurchaseOrderStatus = "approved" | "ordered" | "partially_received" | "received" | "cancelled";
 export type PurchaseOrderOrigin = "approval" | "manual";
@@ -28,6 +30,7 @@ export type PurchaseOrder = {
   quantity: number | null;
   unit_cost: number | null;
   total_cost: number;
+  vat_amount: number;
   status: PurchaseOrderStatus;
   origin: PurchaseOrderOrigin;
   document_id: string | null;
@@ -89,6 +92,9 @@ export async function createPurchaseOrderFromApproval(input: {
 
   const po_number = await generatePoNumber(input.orgId);
   const total_cost = input.quantity * input.unitCost;
+  const settings = await getOrgSettings(input.orgId);
+  const vatRate = settings.default_vat_rate || 0;
+  const vat_amount = vatRate > 0 ? Number((total_cost * (vatRate / (100 + vatRate))).toFixed(2)) : 0;
 
   const { data, error } = await supabase
     .from("purchase_orders")
@@ -101,6 +107,7 @@ export async function createPurchaseOrderFromApproval(input: {
       quantity: input.quantity,
       unit_cost: input.unitCost,
       total_cost,
+      vat_amount,
       status: "approved",
       origin: "approval",
     })
@@ -154,6 +161,9 @@ export async function createManualPurchaseOrder(input: {
   const supabase = createClient();
   const po_number = await generatePoNumber(input.orgId);
   const total_cost = input.items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
+  const settings = await getOrgSettings(input.orgId);
+  const vatRate = settings.default_vat_rate || 0;
+  const vat_amount = vatRate > 0 ? Number((total_cost * (vatRate / (100 + vatRate))).toFixed(2)) : 0;
 
   const { data, error } = await supabase
     .from("purchase_orders")
@@ -167,6 +177,7 @@ export async function createManualPurchaseOrder(input: {
       quantity: null,
       unit_cost: null,
       total_cost,
+      vat_amount,
       status: "approved",
       origin: "manual",
     })
@@ -264,10 +275,12 @@ export async function receivePurchaseOrderItems(input: {
   const validReceipts = input.receipts.filter((r) => r.receiveQty > 0);
   if (validReceipts.length === 0) return getPurchaseOrderById(input.poId);
 
+  let receivedValue = 0;
+
   for (const r of validReceipts) {
     const { data: item, error: itemFetchError } = await supabase
       .from("purchase_order_items")
-      .select("received_quantity, quantity")
+      .select("received_quantity, quantity, unit_cost")
       .eq("id", r.itemId)
       .single();
 
@@ -277,6 +290,8 @@ export async function receivePurchaseOrderItems(input: {
     }
 
     const newReceived = Math.min(Number(item.received_quantity) + r.receiveQty, Number(item.quantity));
+    const qtyReceivedNow = newReceived - Number(item.received_quantity);
+    receivedValue += qtyReceivedNow * Number(item.unit_cost);
 
     const { error: updateError } = await supabase
       .from("purchase_order_items")
@@ -289,6 +304,16 @@ export async function receivePurchaseOrderItems(input: {
     }
 
     await updateStock(r.productId, r.receiveQty, "stock_in", `Received ${input.poNumber}`, input.warehouseId);
+  }
+
+  if (receivedValue > 0) {
+    await postPurchaseReceiptJournal({
+      orgId: input.orgId,
+      poId: input.poId,
+      poNumber: input.poNumber,
+      receivedValue,
+      date: new Date().toISOString().slice(0, 10),
+    });
   }
 
   // Recompute the PO's overall status from its line items.

@@ -1,6 +1,6 @@
 import { createClient } from "./supabase";
 import { logActivity } from "@/lib/activity";
-import { postTransactionJournal, repostTransactionJournal, reverseJournalFor } from "@/lib/journal";
+import { postTransactionJournal, repostTransactionJournal, reverseJournalFor, postExpenseJournal, repostExpenseJournal } from "@/lib/journal";
 
 export type FinanceAccount = {
   id: string;
@@ -198,6 +198,9 @@ export async function createExpense(expense: Omit<FinanceExpense, "id" | "create
     .select()
     .single();
   if (error) throw error;
+
+  await postExpenseJournal(data as FinanceExpense);
+
   return data as FinanceExpense;
 }
 
@@ -268,6 +271,8 @@ export async function updateExpense(id: string, updates: Partial<FinanceExpense>
     org_id: (data as FinanceExpense).org_id,
   });
 
+  await repostExpenseJournal(data as FinanceExpense);
+
   return data as FinanceExpense;
 }
 
@@ -293,6 +298,8 @@ export async function deleteExpense(id: string) {
     sub: `KES ${Number((data as FinanceExpense).amount).toLocaleString()} — ${(data as FinanceExpense).title}`,
     org_id: (data as FinanceExpense).org_id,
   });
+
+  await reverseJournalFor("finance_expense", id);
 
   return true;
 }

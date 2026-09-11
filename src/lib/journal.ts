@@ -140,3 +140,141 @@ export async function repostTransactionJournal(tx: FinanceTransaction): Promise<
   await reverseJournalFor("finance_transaction", tx.id);
   await postTransactionJournal(tx);
 }
+
+// Posts a finance_expense as a two-line journal entry: the expense category
+// (debit) against the generic "Unspecified Cash" asset account (credit) —
+// finance_expenses has no finance_accounts link the way finance_transactions
+// does, so there's no specific bank/cash account to post the credit side to.
+export async function postExpenseJournal(expense: {
+  id: string;
+  org_id: string;
+  title: string;
+  amount: number;
+  category: string;
+  date: string;
+}): Promise<void> {
+  const supabase = createClient();
+
+  const assetAccountId = await getOrCreateDefaultAccount(supabase, expense.org_id, "1000", "Unspecified Cash", "asset");
+  const code = `5${expense.category.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase()}`;
+  const categoryAccountId = await getOrCreateDefaultAccount(
+    supabase,
+    expense.org_id,
+    code,
+    `Expense - ${expense.category}`,
+    "expense"
+  );
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: expense.org_id,
+      source_type: "finance_expense",
+      source_id: expense.id,
+      description: expense.title,
+      date: expense.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const amount = Number(expense.amount);
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: expense.org_id, coa_id: categoryAccountId, debit: amount, credit: 0 },
+    { entry_id: entry.id, org_id: expense.org_id, coa_id: assetAccountId, debit: 0, credit: amount },
+  ]);
+  if (lineError) throw lineError;
+}
+
+export async function repostExpenseJournal(expense: {
+  id: string;
+  org_id: string;
+  title: string;
+  amount: number;
+  category: string;
+  date: string;
+}): Promise<void> {
+  await reverseJournalFor("finance_expense", expense.id);
+  await postExpenseJournal(expense);
+}
+
+// Posts a POS sale: cash/asset received (debit) against Sales Revenue and,
+// if the sale carries VAT, VAT Payable (credit, split from the revenue
+// portion). Does not yet post COGS/inventory reduction — see scope note
+// at the top of the file inherited from the original journal design.
+export async function postSaleJournal(sale: {
+  id: string;
+  org_id: string;
+  total: number;
+  tax_amount?: number;
+  created_at?: string;
+}): Promise<void> {
+  const supabase = createClient();
+
+  const assetAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "1000", "Unspecified Cash", "asset");
+  const revenueAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "4000", "Sales Revenue", "income");
+
+  const total = Number(sale.total);
+  const tax = Number(sale.tax_amount || 0);
+  const net = total - tax;
+  const date = (sale.created_at || new Date().toISOString()).slice(0, 10);
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: sale.org_id,
+      source_type: "pos_sale",
+      source_id: sale.id,
+      description: "POS sale",
+      date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const lines = [{ entry_id: entry.id, org_id: sale.org_id, coa_id: assetAccountId, debit: total, credit: 0 }];
+  lines.push({ entry_id: entry.id, org_id: sale.org_id, coa_id: revenueAccountId, debit: 0, credit: net });
+  if (tax > 0) {
+    const vatPayableId = await getOrCreateDefaultAccount(supabase, sale.org_id, "2100", "VAT Payable", "liability");
+    lines.push({ entry_id: entry.id, org_id: sale.org_id, coa_id: vatPayableId, debit: 0, credit: tax });
+  }
+
+  const { error: lineError } = await supabase.from("journal_lines").insert(lines);
+  if (lineError) throw lineError;
+}
+
+// Posts the value of goods received against a purchase order: Inventory
+// asset (debit) against Accounts Payable (credit) for the received value.
+// Called per-receipt, so partial receipts post their own partial entry.
+export async function postPurchaseReceiptJournal(input: {
+  orgId: string;
+  poId: string;
+  poNumber: string;
+  receivedValue: number;
+  date: string;
+}): Promise<void> {
+  if (input.receivedValue <= 0) return;
+  const supabase = createClient();
+
+  const inventoryAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1200", "Inventory", "asset");
+  const apAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "2000", "Accounts Payable", "liability");
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "purchase_order_receipt",
+      source_id: input.poId,
+      description: `Goods received - ${input.poNumber}`,
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: input.orgId, coa_id: inventoryAccountId, debit: input.receivedValue, credit: 0 },
+    { entry_id: entry.id, org_id: input.orgId, coa_id: apAccountId, debit: 0, credit: input.receivedValue },
+  ]);
+  if (lineError) throw lineError;
+}
