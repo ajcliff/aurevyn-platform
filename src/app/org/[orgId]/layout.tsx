@@ -49,13 +49,14 @@ const NAV_LABELS: Record<string, string> = {
   me: "My Profile",
   warehouses: "Warehouses",
   pricelists: "Pricelists",
+  fleet: "Fleet & Delivery",
   user: "My Profile",
   automation: "Automation",
 };
 
 const UNGATED_SEGMENTS = new Set([
   "me", "settings", "team", "employees", "activity", "approvals",
-  "documents", "knowledge", "warehouses", "pricelists", "summary", undefined,
+  "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", undefined,
 ]);
 
 const MOBILE_BREAKPOINT = 900;
@@ -670,6 +671,16 @@ const { header } = usePageHeader();
               label="Pricelists"
               icon="🏷️"
               active={pathname.startsWith(`/org/${orgId}/pricelists`)}
+              showLabel={showLabels}
+            />
+          )}
+
+          {engines.some((e) => e.engines?.slug === "pos" || e.engines?.slug === "inventory") && (
+            <SidebarLink
+              href={`/org/${orgId}/fleet`}
+              label="Fleet & Delivery"
+              icon="🚚"
+              active={pathname.startsWith(`/org/${orgId}/fleet`)}
               showLabel={showLabels}
             />
           )}
