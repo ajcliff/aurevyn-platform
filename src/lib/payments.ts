@@ -3,7 +3,7 @@ import { logActivity } from "@/lib/activity";
 
 export type PaymentMethod = "mpesa" | "cash" | "card" | "bank_transfer" | "cheque";
 export type PaymentStatus = "completed" | "pending" | "cleared" | "bounced";
-export type PaymentSourceType = "pos_sale" | "finance_transaction" | "invoice";
+export type PaymentSourceType = "pos_sale" | "finance_transaction" | "invoice" | "purchase_order";
 
 export type Payment = {
   id: string;

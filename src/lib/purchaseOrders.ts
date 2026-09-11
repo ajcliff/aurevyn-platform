@@ -31,6 +31,7 @@ export type PurchaseOrder = {
   status: PurchaseOrderStatus;
   origin: PurchaseOrderOrigin;
   document_id: string | null;
+  due_date: string | null;
   created_at: string;
   inventory_products?: { name: string; sku: string } | null;
   suppliers?: { name: string } | null;
@@ -211,6 +212,15 @@ export async function getPurchaseOrderById(id: string): Promise<PurchaseOrder | 
     return null;
   }
   return data as PurchaseOrder;
+}
+
+export async function updatePurchaseOrderDueDate(id: string, dueDate: string | null) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({ due_date: dueDate })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function updatePurchaseOrderStatus(
