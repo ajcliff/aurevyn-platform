@@ -1,77 +1,668 @@
-I need two things built for AUREVYN, a multi-tenant Business Operating System for
-Kenyan SMEs (Next.js 16, Turbopack, TypeScript, Supabase, CSS Modules + inline
-styles, no component library). Please match existing conventions exactly rather
-than introducing new patterns.
-
-CONTEXT: There's already a 4-step setup wizard at
-src/app/org/[orgId]/welcome/page.tsx (Branding → Team → Engines → Launch).
-Before building anything, look at that file and tell me whether it should be
-kept as-is, replaced, or coexist alongside what I'm asking for below - I don't
-want two competing welcome experiences.
-
-═══════════════════════════════════════════════
-1. WELCOME/ORIENTATION MESSAGE (not a questionnaire)
-═══════════════════════════════════════════════
-A single warm, non-interactive welcome screen shown once, right after a new
-org's first login - NOT a form, NOT data collection. It should:
-- Welcome them by name and company name
-- Explain clearly: they have every engine unlocked free for 30 days
-- Explain what happens after: they'll pick exactly which engines they use
-  and pay only for those - no fixed bundles, no forced extras
-- Point them toward 2-3 first actions (invite your team, explore an engine)
-- One clear "Got it, let's go" dismissal into the real org dashboard
-
-Integration specifics:
-- The `organizations` table already has an `welcome_completed` boolean
-  column (default false) - check it on load, and set it to true when
-  dismissed, so it never shows again for that org
-- Route it at src/app/org/[orgId]/welcome/page.tsx (new file, don't touch
-  the existing welcome/ folder)
-- Auth/data access: use `createClient()` from @/lib/supabase (the
-  @supabase/ssr browser client) exactly as every other org page does -
-  don't introduce a different Supabase client pattern
-- Match the visual style of src/app/org/[orgId]/layout.tsx and its
-  OrgShell/EngineProvider wrapper - this page still renders inside the
-  normal org shell, it's not a standalone full-screen takeover
-
-═══════════════════════════════════════════════
-2. LANDING PAGE IMPROVEMENT
-═══════════════════════════════════════════════
-Improve on the current marketing site (src/app/page.tsx +
-src/components/marketing/*.tsx: Hero, IndustriesSection, ProductShowcase,
-EnginesSection, ComparisonSection, PricingGrid, ProofSection, CtaBand,
-MarketingNav, MarketingFooter already exist - reuse/extend these rather
-than starting from scratch unless you have a strong reason not to).
-
-Must clearly communicate, high up on the page:
-- What AUREVYN actually is: one platform, all business engines (POS,
-  Inventory, Finance, HR, CRM, and more), built for Kenyan SMEs
-- The trial hook, which is a genuinely strong differentiator - lead with
-  it: "Try every engine free for 30 days. After that, pay only for what
-  you actually use - not a bundle you didn't ask for."
-- Trust signals appropriate for Kenyan small business owners (local
-  currency pricing in KES, data protection compliance - see
-  src/app/privacy/page.tsx which already references the Kenya Data
-  Protection Act 2019, plain non-corporate language)
-- Clear CTA to /register throughout, not just once at the bottom
-
-Integration specifics:
-- Auth links: "Log in" goes to /login, "Get started"/"Try free" goes to
-  /register - both routes already exist and work, don't rebuild them
-- Keep the same CSS approach as the rest of the marketing site (look for
-  the `mkt-` prefixed classes in src/styles/marketing.css)
-
-═══════════════════════════════════════════════
-GIT / INTEGRATION PROCESS
-═══════════════════════════════════════════════
-- Repo: github.com/ajcliff/aurevyn-platform, work off `master`
-- If you have direct filesystem + git write access (Claude Code or
-  similar): work on a feature branch, commit with clear messages, and
-  push directly - don't just describe changes, actually commit them
-- Before finishing: run `npx tsc --noEmit` and confirm zero errors -
-  the codebase is currently fully clean and I want to keep it that way
-- Don't touch: src/app/register/page.tsx, src/app/login/page.tsx,
-  src/lib/supabase.ts, or anything under src/app/dashboard/ - those are
-  actively maintained elsewhere and out of scope for this task
-- List every file you added or changed at the end so I can review the
-  full diff before merging
+diff --git a/src/app/dashboard/packages/page.tsx b/src/app/dashboard/packages/page.tsx
+index c7daed3..3c24c42 100644
+--- a/src/app/dashboard/packages/page.tsx
++++ b/src/app/dashboard/packages/page.tsx
+@@ -1,7 +1,8 @@
+ "use client";
+ 
+ import { useEffect, useState } from "react";
+-import { getPackages, createPackage, type Package } from "@/lib/packages";
++import { getPackages, createPackage, updatePackage, deletePackage, type Package } from "@/lib/packages";
++import { getEngines, updateEnginePrice, type Engine } from "@/lib/engines";
+ import { logActivity } from "@/lib/activity";
+ import { createClient } from "@/lib/supabase";
+ import s from "@/styles/layout.module.css";
+@@ -25,9 +26,15 @@ export default function PackagesPage() {
+   const [showCreate, setShowCreate] = useState(false);
+   const [newPackage, setNewPackage] = useState({ name: "", price: "", features: "", orgs: 0 });
+   const [limits, setLimits] = useState<any[]>([]);
++  const [engines, setEngines] = useState<Engine[]>([]);
++  const [editingPackagePrice, setEditingPackagePrice] = useState<string | null>(null);
++  const [priceDraft, setPriceDraft] = useState("");
++  const [editingEnginePrice, setEditingEnginePrice] = useState<string | null>(null);
++  const [enginePriceDraft, setEnginePriceDraft] = useState("");
+ 
+   useEffect(() => {
+     getPackages().then(setPackages);
++    getEngines().then((data) => setEngines(data.sort((a, b) => Number(b.monthly_price) - Number(a.monthly_price))));
+     const supabase = createClient();
+     supabase.from("package_module_limits").select("*").order("package_name")
+       .then(({ data }) => setLimits(data ?? []));
+@@ -49,6 +56,48 @@ export default function PackagesPage() {
+     }
+   };
+ 
++  const startEditPackagePrice = (pkg: Package) => {
++    setEditingPackagePrice(pkg.id);
++    setPriceDraft(pkg.price);
++  };
++
++  const savePackagePrice = async (pkg: Package) => {
++    const updated = await updatePackage(pkg.id, { price: priceDraft });
++    if (updated) {
++      setPackages((prev) => prev.map((p) => (p.id === pkg.id ? updated : p)));
++      await logActivity({ icon: "💲", title: "Package price updated", sub: `${pkg.name}: ${priceDraft}` });
++    }
++    setEditingPackagePrice(null);
++  };
++
++  const handleDeletePackage = async (pkg: Package) => {
++    if (!confirm(`Delete the "${pkg.name}" package? This can't be undone.`)) return;
++    const ok = await deletePackage(pkg.id);
++    if (ok) {
++      setPackages((prev) => prev.filter((p) => p.id !== pkg.id));
++      if (selectedPackage?.id === pkg.id) setSelectedPackage(null);
++    }
++  };
++
++  const startEditEnginePrice = (engine: Engine) => {
++    setEditingEnginePrice(engine.id);
++    setEnginePriceDraft(String(engine.monthly_price));
++  };
++
++  const saveEnginePrice = async (engine: Engine) => {
++    const numeric = parseFloat(enginePriceDraft) || 0;
++    const ok = await updateEnginePrice(engine.id, numeric);
++    if (ok) {
++      setEngines((prev) =>
++        prev
++          .map((e) => (e.id === engine.id ? { ...e, monthly_price: numeric } : e))
++          .sort((a, b) => Number(b.monthly_price) - Number(a.monthly_price))
++      );
++      await logActivity({ icon: "💲", title: "Engine price updated", sub: `${engine.name}: KES ${numeric.toLocaleString()}/mo` });
++    }
++    setEditingEnginePrice(null);
++  };
++
+   const totalMRR = packages.reduce((sum, p) => {
+     const price = parseInt(p.price.replace(/[^0-9]/g, "")) || 0;
+     return sum + price * p.orgs;
+@@ -87,16 +136,16 @@ export default function PackagesPage() {
+           {/* Package cards */}
+           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+             {packages.map((pkg) => {
+-              const color = tierColors[pkg.name] ?? "var(--gold)";
++              const tierKey = pkg.name.toLowerCase();
++              const color = tierColors[tierKey] ?? "var(--gold)";
+               const revenue = (parseInt(pkg.price.replace(/[^0-9]/g, "")) || 0) * pkg.orgs;
+-              const features = tierFeatures[pkg.name] ?? pkg.features.split(" · ");
++              const features = tierFeatures[tierKey] ?? pkg.features.split(" · ");
+               const pkgLimits = limits.filter(l => l.package_name === pkg.name);
+               const enabledModules = pkgLimits.filter(l => l.enabled);
+ 
+               return (
+                 <div
+                   key={pkg.id}
+-                  onClick={() => setSelectedPackage(selectedPackage?.id === pkg.id ? null : pkg)}
+                   style={{
+                     background: "var(--bg-card)",
+                     border: `2px solid ${selectedPackage?.id === pkg.id ? color : "var(--border)"}`,
+@@ -104,13 +153,37 @@ export default function PackagesPage() {
+                     transition: "all 0.15s ease",
+                   }}
+                 >
+-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
++                  <div
++                    onClick={() => setSelectedPackage(selectedPackage?.id === pkg.id ? null : pkg)}
++                    style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}
++                  >
+                     <div>
+                       <div style={{ fontSize: "16px", fontWeight: 700, color, marginBottom: "2px" }}>{pkg.name}</div>
+                       <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{pkg.orgs} organizations subscribed</div>
+                     </div>
+                     <div style={{ textAlign: "right" }}>
+-                      <div style={{ fontSize: "18px", fontWeight: 700, color }}>{pkg.price}</div>
++                      {editingPackagePrice === pkg.id ? (
++                        <input
++                          autoFocus
++                          value={priceDraft}
++                          onClick={(e) => e.stopPropagation()}
++                          onChange={(e) => setPriceDraft(e.target.value)}
++                          onBlur={() => savePackagePrice(pkg)}
++                          onKeyDown={(e) => e.key === "Enter" && savePackagePrice(pkg)}
++                          style={{
++                            fontSize: "16px", fontWeight: 700, color, background: "var(--bg-elevated)",
++                            border: `1px solid ${color}`, borderRadius: 6, padding: "2px 6px", width: 130, textAlign: "right",
++                          }}
++                        />
++                      ) : (
++                        <div
++                          onClick={(e) => { e.stopPropagation(); startEditPackagePrice(pkg); }}
++                          style={{ fontSize: "18px", fontWeight: 700, color, cursor: "text" }}
++                          title="Click to edit price"
++                        >
++                          {pkg.price} ✎
++                        </div>
++                      )}
+                       <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>MRR: KES {revenue.toLocaleString()}</div>
+                     </div>
+                   </div>
+@@ -142,6 +215,17 @@ export default function PackagesPage() {
+                       </div>
+                     </div>
+                   )}
++
++                  <button
++                    onClick={(e) => { e.stopPropagation(); handleDeletePackage(pkg); }}
++                    style={{
++                      marginTop: 12, width: "100%", padding: "6px 0", borderRadius: 8,
++                      border: "1px solid #ef444440", background: "transparent", color: "#ef4444",
++                      fontSize: 11, cursor: "pointer",
++                    }}
++                  >
++                    Delete package
++                  </button>
+                 </div>
+               );
+             })}
+@@ -184,6 +268,48 @@ export default function PackagesPage() {
+               </table>
+             </div>
+           </div>
++
++          {/* Engine pricing - used for a-la-carte plan selection after the free trial */}
++          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", overflow: "hidden" }}>
++            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)", fontSize: "13px", fontWeight: 600 }}>
++              Engine Pricing (a-la-carte)
++            </div>
++            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, background: "var(--border)" }}>
++              {engines.map((engine) => (
++                <div
++                  key={engine.id}
++                  style={{
++                    background: "var(--bg-card)", padding: "12px 20px",
++                    display: "flex", justifyContent: "space-between", alignItems: "center",
++                  }}
++                >
++                  <span style={{ fontSize: 12 }}>{engine.icon} {engine.name}</span>
++                  {editingEnginePrice === engine.id ? (
++                    <input
++                      autoFocus
++                      type="number"
++                      value={enginePriceDraft}
++                      onChange={(e) => setEnginePriceDraft(e.target.value)}
++                      onBlur={() => saveEnginePrice(engine)}
++                      onKeyDown={(e) => e.key === "Enter" && saveEnginePrice(engine)}
++                      style={{
++                        fontSize: 12, fontWeight: 700, color: "var(--gold)", background: "var(--bg-elevated)",
++                        border: "1px solid var(--gold)", borderRadius: 6, padding: "2px 6px", width: 90, textAlign: "right",
++                      }}
++                    />
++                  ) : (
++                    <span
++                      onClick={() => startEditEnginePrice(engine)}
++                      style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", cursor: "text" }}
++                      title="Click to edit price"
++                    >
++                      KES {Number(engine.monthly_price).toLocaleString()}/mo ✎
++                    </span>
++                  )}
++                </div>
++              ))}
++            </div>
++          </div>
+         </main>
+       </div>
+ 
+diff --git a/src/app/register/page.tsx b/src/app/register/page.tsx
+index 7c7758a..ff1683d 100644
+--- a/src/app/register/page.tsx
++++ b/src/app/register/page.tsx
+@@ -14,7 +14,6 @@ const INDUSTRIES = [
+   "Retail",
+   "Healthcare",
+   "Education",
+-  "SACCO",
+   "Real Estate",
+   "General Business",
+   "Other",
+@@ -26,7 +25,6 @@ const BUSINESS_TYPES = [
+   "Private Limited Company",
+   "Public Limited Company",
+   "NGO / Non-profit",
+-  "Cooperative / SACCO",
+   "Government / Public Institution",
+   "Other",
+ ];
+@@ -39,7 +37,6 @@ const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
+   Retail: "retail",
+   Healthcare: "clinic",
+   Education: "school",
+-  SACCO: "sacco",
+   "Real Estate": "property",
+   "General Business": "sme",
+   Other: "sme",
+diff --git a/src/components/PackageSelectionGate.tsx b/src/components/PackageSelectionGate.tsx
+index d75fe28..98ff1a7 100644
+--- a/src/components/PackageSelectionGate.tsx
++++ b/src/components/PackageSelectionGate.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState } from "react";
+-import { getSellablePackages, confirmPackageSelection, type SellablePackage } from "@/lib/trial";
++import { getEnginePricing, confirmEngineSelection, type PricedEngine } from "@/lib/trial";
+ 
+ type Props = {
+   orgId: string;
+@@ -10,22 +10,34 @@ type Props = {
+ };
+ 
+ export default function PackageSelectionGate({ orgId, orgName, onConfirmed }: Props) {
+-  const [packages, setPackages] = useState<SellablePackage[]>([]);
+-  const [selected, setSelected] = useState<string | null>(null);
++  const [engines, setEngines] = useState<PricedEngine[]>([]);
++  const [selected, setSelected] = useState<Set<string>>(new Set());
+   const [confirming, setConfirming] = useState(false);
+   const [loading, setLoading] = useState(true);
+ 
+   useEffect(() => {
+-    getSellablePackages().then((pkgs) => {
+-      setPackages(pkgs);
++    getEnginePricing().then((data) => {
++      setEngines(data);
+       setLoading(false);
+     });
+   }, []);
+ 
++  function toggle(id: string) {
++    setSelected((prev) => {
++      const next = new Set(prev);
++      if (next.has(id)) next.delete(id);
++      else next.add(id);
++      return next;
++    });
++  }
++
++  const total = engines
++    .filter((e) => selected.has(e.id))
++    .reduce((sum, e) => sum + Number(e.monthly_price), 0);
++
+   async function handleConfirm() {
+-    if (!selected) return;
+     setConfirming(true);
+-    const ok = await confirmPackageSelection(orgId, orgName, selected);
++    const ok = await confirmEngineSelection(orgId, orgName, Array.from(selected));
+     setConfirming(false);
+     if (ok) {
+       onConfirmed();
+@@ -45,64 +57,111 @@ export default function PackageSelectionGate({ orgId, orgName, onConfirmed }: Pr
+         alignItems: "center",
+         justifyContent: "center",
+         padding: 20,
++        overflowY: "auto",
+       }}
+     >
+-      <div style={{ maxWidth: 720, width: "100%" }}>
+-        <div style={{ textAlign: "center", marginBottom: 28 }}>
++      <div style={{ maxWidth: 640, width: "100%", padding: "40px 0" }}>
++        <div style={{ textAlign: "center", marginBottom: 24 }}>
+           <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
+             Your free trial has ended
+           </h1>
+           <p style={{ fontSize: 14, color: "#9ca3af" }}>
+-            Pick the plan that fits how you've actually been using AUREVYN — you can change this later.
++            You had every engine for 30 days — now pick exactly what you actually use. You only pay for what you check below.
+           </p>
+         </div>
+ 
+         {loading ? (
+-          <div style={{ textAlign: "center", color: "#9ca3af" }}>Loading plans...</div>
++          <div style={{ textAlign: "center", color: "#9ca3af" }}>Loading engines...</div>
+         ) : (
+-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 24 }}>
+-            {packages.map((pkg) => (
+-              <button
+-                key={pkg.slug}
+-                onClick={() => setSelected(pkg.slug)}
+-                style={{
+-                  textAlign: "left",
+-                  padding: "18px 20px",
+-                  borderRadius: 14,
+-                  border: selected === pkg.slug ? "2px solid #f5b800" : "1px solid #333",
+-                  background: selected === pkg.slug ? "#f5b80014" : "#161616",
+-                  cursor: "pointer",
+-                  color: "#fff",
+-                }}
+-              >
+-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{pkg.name}</div>
+-                <div style={{ fontSize: 15, fontWeight: 600, color: "#f5b800", marginBottom: 8 }}>{pkg.price}</div>
+-                <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.5 }}>{pkg.features}</div>
+-              </button>
+-            ))}
++          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
++            {engines.map((engine) => {
++              const isChecked = selected.has(engine.id);
++              return (
++                <button
++                  key={engine.id}
++                  onClick={() => toggle(engine.id)}
++                  style={{
++                    display: "flex",
++                    alignItems: "center",
++                    justifyContent: "space-between",
++                    textAlign: "left",
++                    padding: "12px 16px",
++                    borderRadius: 10,
++                    border: isChecked ? "2px solid #f5b800" : "1px solid #333",
++                    background: isChecked ? "#f5b80014" : "#161616",
++                    cursor: "pointer",
++                    color: "#fff",
++                  }}
++                >
++                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
++                    <div
++                      style={{
++                        width: 18,
++                        height: 18,
++                        borderRadius: 5,
++                        border: isChecked ? "none" : "1px solid #555",
++                        background: isChecked ? "#f5b800" : "transparent",
++                        display: "flex",
++                        alignItems: "center",
++                        justifyContent: "center",
++                        fontSize: 12,
++                        color: "#000",
++                        flexShrink: 0,
++                      }}
++                    >
++                      {isChecked && "✓"}
++                    </div>
++                    <span style={{ fontSize: 14, fontWeight: 500 }}>{engine.name}</span>
++                  </div>
++                  <span style={{ fontSize: 13, color: "#9ca3af" }}>
++                    KES {Number(engine.monthly_price).toLocaleString()}/mo
++                  </span>
++                </button>
++              );
++            })}
+           </div>
+         )}
+ 
++        <div
++          style={{
++            display: "flex",
++            justifyContent: "space-between",
++            alignItems: "center",
++            padding: "14px 18px",
++            borderRadius: 10,
++            background: "#161616",
++            border: "1px solid #333",
++            marginBottom: 16,
++          }}
++        >
++          <span style={{ fontSize: 13, color: "#9ca3af" }}>
++            {selected.size} engine{selected.size === 1 ? "" : "s"} selected
++          </span>
++          <span style={{ fontSize: 18, fontWeight: 700, color: "#f5b800" }}>
++            KES {total.toLocaleString()}/mo
++          </span>
++        </div>
++
+         <button
+           onClick={handleConfirm}
+-          disabled={!selected || confirming}
++          disabled={selected.size === 0 || confirming}
+           style={{
+             width: "100%",
+             padding: "14px 0",
+             borderRadius: 10,
+             border: "none",
+-            background: selected ? "#f5b800" : "#333",
+-            color: selected ? "#000" : "#666",
++            background: selected.size > 0 ? "#f5b800" : "#333",
++            color: selected.size > 0 ? "#000" : "#666",
+             fontWeight: 700,
+             fontSize: 14,
+-            cursor: selected ? "pointer" : "not-allowed",
++            cursor: selected.size > 0 ? "pointer" : "not-allowed",
+           }}
+         >
+           {confirming ? "Setting up your plan..." : "Confirm plan"}
+         </button>
+ 
+         <p style={{ textAlign: "center", fontSize: 12, color: "#6b7280", marginTop: 14 }}>
+-          We'll send an invoice to your account — no card needed right now.
++          We'll send an invoice to your account — no card needed right now. You can adjust your engines later.
+         </p>
+       </div>
+     </div>
+diff --git a/src/lib/engines.ts b/src/lib/engines.ts
+index d09330c..15b872a 100644
+--- a/src/lib/engines.ts
++++ b/src/lib/engines.ts
+@@ -10,6 +10,7 @@ export type Engine = {
+   status: string;
+   version: string;
+   icon: string;
++  monthly_price: number;
+   created_at: string;
+ };
+ 
+@@ -90,4 +91,17 @@ export async function deactivateEngine(orgId: string, engineId: string) {
+     .eq("org_id", orgId)
+     .eq("engine_id", engineId);
+   if (error) throw error;
++}
++
++export async function updateEnginePrice(engineId: string, monthlyPrice: number) {
++  const supabase = createClient();
++  const { error } = await supabase
++    .from("engines")
++    .update({ monthly_price: monthlyPrice })
++    .eq("id", engineId);
++  if (error) {
++    console.error("Error updating engine price:", error);
++    return false;
++  }
++  return true;
+ }
+\ No newline at end of file
+diff --git a/src/lib/packages.ts b/src/lib/packages.ts
+index a56b22b..561ad3e 100644
+--- a/src/lib/packages.ts
++++ b/src/lib/packages.ts
+@@ -46,4 +46,31 @@ export async function createPackage(
+   }
+ 
+   return data as Package;
++}
++
++export async function updatePackage(
++  id: string,
++  updates: Partial<Pick<Package, "price" | "features" | "name">>
++) {
++  const supabase = createClient();
++  const { data, error } = await supabase
++    .from("packages")
++    .update(updates)
++    .eq("id", id)
++    .select()
++    .single();
++
++  if (error) {
++    console.error("Error updating package:", error);
++    return null;
++  }
++
++  return data as Package;
++}
++
++export async function deletePackage(id: string) {
++  const supabase = createClient();
++  const { error } = await supabase.from("packages").delete().eq("id", id);
++  if (error) console.error("Error deleting package:", error);
++  return !error;
+ }
+\ No newline at end of file
+diff --git a/src/lib/trial.ts b/src/lib/trial.ts
+index 80fa0c3..5b61f6f 100644
+--- a/src/lib/trial.ts
++++ b/src/lib/trial.ts
+@@ -46,127 +46,69 @@ export async function getTrialInfo(orgId: string): Promise<TrialInfo> {
+   };
+ }
+ 
+-export type SellablePackage = {
++export type PricedEngine = {
++  id: string;
+   name: string;
+   slug: string;
+-  price: string;
+-  features: string;
++  monthly_price: number;
+ };
+ 
+-/**
+- * Only the four real sellable tiers - "Unlimited" is excluded here since it
+- * has no package_module_limits data and appears to be leftover/duplicate
+- * test data (priced lower than Enterprise despite offering the same
+- * "everything" scope) - worth reviewing and likely removing from the
+- * packages table directly.
+- */
+-const SELLABLE_PACKAGE_SLUGS = ["core", "growth", "professional", "enterprise"];
+-
+-export async function getSellablePackages(): Promise<SellablePackage[]> {
++export async function getEnginePricing(): Promise<PricedEngine[]> {
+   const supabase = createClient();
+   const { data, error } = await supabase
+-    .from("packages")
+-    .select("name, slug, price, features")
+-    .in("slug", SELLABLE_PACKAGE_SLUGS);
++    .from("engines")
++    .select("id, name, slug, monthly_price")
++    .order("monthly_price", { ascending: false });
+ 
+   if (error || !data) return [];
+-
+-  const order = SELLABLE_PACKAGE_SLUGS;
+-  return (data as SellablePackage[]).sort((a, b) => order.indexOf(a.slug) - order.indexOf(b.slug));
++  return data as PricedEngine[];
+ }
+ 
+ /**
+- * Engines covered by package_module_limits, mapped to their engine slugs.
+- * The other engines in the catalog (Attendance, Business Operations,
+- * Documents, Fees, Finance, Patients, Procurement, Real Estate, SACCO
+- * Members, Students) have no pricing-tier data defined yet - as an
+- * interim rule until that's filled in properly, they're only included in
+- * the two "everything" tiers (Professional and Enterprise), matching what
+- * those tiers' feature descriptions already promise.
++ * A-la-carte plan confirmation: the org picks exactly the engines they've
++ * actually used during the trial, priced individually and summed - not
++ * mapped to a fixed package tier. This avoids forcing anyone to pay for
++ * engines bundled into a tier that they don't actually use.
+  */
+-const MODULE_NAME_TO_ENGINE_SLUG: Record<string, string> = {
+-  "Point of Sale": "pos",
+-  "Inventory Management": "inventory",
+-  "HR & Payroll": "hr-payroll",
+-  CRM: "crm",
+-  Analytics: "analytics",
+-  "AI Insights": "ai-insights",
+-};
+-
+-const UNMAPPED_ENGINE_SLUGS = [
+-  "attendance", "business-ops", "documents", "fees", "finance",
+-  "patients", "procurement", "real-estate", "sacco-members", "students",
+-];
+-
+-export async function getEngineSlugsForPackage(packageName: string): Promise<string[]> {
++export async function confirmEngineSelection(
++  orgId: string,
++  orgName: string,
++  selectedEngineIds: string[]
++): Promise<boolean> {
+   const supabase = createClient();
+-  const { data } = await supabase
+-    .from("package_module_limits")
+-    .select("module_name, enabled")
+-    .eq("package_name", packageName)
+-    .eq("enabled", true);
+-
+-  const slugs = (data ?? [])
+-    .map((row) => MODULE_NAME_TO_ENGINE_SLUG[row.module_name])
+-    .filter((slug): slug is string => Boolean(slug));
+-
+-  if (packageName === "Professional" || packageName === "Enterprise") {
+-    slugs.push(...UNMAPPED_ENGINE_SLUGS);
+-  }
+-
+-  return slugs;
+-}
+-
+-/**
+- * Confirms the org's chosen package after the trial: activates only the
+- * engines that package includes, records the choice, unlocks the org, and
+- * creates a pending platform invoice using the existing manual-payment
+- * pattern (no real payment gateway needed to test this end-to-end).
+- */
+-export async function confirmPackageSelection(orgId: string, orgName: string, packageSlug: string): Promise<boolean> {
+-  const supabase = createClient();
+-
+-  const { data: pkg } = await supabase
+-    .from("packages")
+-    .select("name, price")
+-    .eq("slug", packageSlug)
+-    .single();
+-
+-  if (!pkg) return false;
+ 
+-  const engineSlugs = await getEngineSlugsForPackage(pkg.name);
++  const { data: allEngines } = await supabase.from("engines").select("id, name, monthly_price");
++  if (!allEngines) return false;
+ 
+-  const { data: allEngines } = await supabase.from("engines").select("id, slug");
+-  const engineIdsToEnable = (allEngines ?? [])
+-    .filter((e) => engineSlugs.includes(e.slug))
+-    .map((e) => e.id);
++  const selectedEngines = allEngines.filter((e) => selectedEngineIds.includes(e.id));
++  const total = selectedEngines.reduce((sum, e) => sum + Number(e.monthly_price), 0);
+ 
+   await supabase.from("organization_engines").update({ enabled: false }).eq("org_id", orgId);
+ 
+-  if (engineIdsToEnable.length > 0) {
++  if (selectedEngineIds.length > 0) {
+     await supabase
+       .from("organization_engines")
+-      .update({ enabled: true, subscription_tier: pkg.name })
++      .update({ enabled: true, subscription_tier: "Custom" })
+       .eq("org_id", orgId)
+-      .in("engine_id", engineIdsToEnable);
++      .in("engine_id", selectedEngineIds);
+   }
+ 
+   await supabase
+     .from("organizations")
+     .update({
+-      package: pkg.name,
++      package: `Custom (${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"})`,
+       trial_locked: false,
+       package_confirmed_at: new Date().toISOString(),
+     })
+     .eq("id", orgId);
+ 
+-  const numericAmount = parseInt(pkg.price.replace(/[^\d]/g, ""), 10) || 0;
++  const engineList = selectedEngines.map((e) => e.name).join(", ");
+ 
+   await supabase.from("scheduled_platform_invoices").insert({
+     org_id: orgId,
+     org_name: orgName,
+-    description: `${pkg.name} plan - monthly subscription`,
+-    amount: numericAmount,
++    description: `Custom plan (${engineList || "no engines selected"})`,
++    amount: total,
+     frequency: "monthly",
+     next_run: new Date().toISOString().slice(0, 10),
+     active: true,
+@@ -174,8 +116,8 @@ export async function confirmPackageSelection(orgId: string, orgName: string, pa
+ 
+   await logActivity({
+     icon: "✅",
+-    title: "Plan selected",
+-    sub: `${orgName} chose the ${pkg.name} plan`,
++    title: "Plan confirmed",
++    sub: `${orgName} selected ${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"} — KES ${total.toLocaleString()}/mo`,
+     org_id: orgId,
+   });
+ 

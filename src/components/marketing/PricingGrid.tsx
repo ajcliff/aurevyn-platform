@@ -5,12 +5,7 @@ import type { Package } from "@/lib/packages";
 import { ENGINE_META, ENGINE_ORDER } from "./engineData";
 import { useTilt } from "./interactions";
 
-const ACCENT_GLOWS = [
-  "var(--mkt-blueprint-glow)",
-  "rgba(62, 207, 142, 0.18)", // signal
-  "rgba(185, 138, 240, 0.18)", // violet
-  "rgba(240, 168, 96, 0.18)", // amber
-];
+const NON_FEATURED_GLOW = "var(--mkt-blueprint-glow)";
 
 function PricingCard({ pkg, featured, accent }: { pkg: Package; featured: boolean; accent: string }) {
   const tiltRef = useTilt<HTMLDivElement>(4);
@@ -90,7 +85,7 @@ export default function PricingGrid({
           key={pkg.id}
           pkg={pkg}
           featured={i === featured}
-          accent={ACCENT_GLOWS[i % ACCENT_GLOWS.length]}
+          accent={NON_FEATURED_GLOW}
         />
       ))}
 

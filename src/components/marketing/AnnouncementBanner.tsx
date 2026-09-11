@@ -27,6 +27,7 @@ function formatWindow(startsAt: string, endsAt: string) {
 export default function AnnouncementBanner() {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -54,12 +55,16 @@ export default function AnnouncementBanner() {
   const window = formatWindow(announcement.starts_at, announcement.ends_at);
 
   const dismiss = () => {
-    localStorage.setItem(`mkt-announcement-dismissed:${announcement.id}`, "1");
-    setDismissed(true);
+    if (!announcement) return;
+    setLeaving(true);
+    setTimeout(() => {
+      localStorage.setItem(`mkt-announcement-dismissed:${announcement.id}`, "1");
+      setDismissed(true);
+    }, 220);
   };
 
   return (
-    <div className={`mkt-banner mkt-banner--${announcement.type}`}>
+    <div className={`mkt-banner mkt-banner--${announcement.type} ${leaving ? "mkt-banner--leaving" : ""}`}>
       <div className="mkt-container mkt-banner__row">
         <span className="mkt-mono mkt-banner__tag">
           {announcement.type === "maintenance" ? "Maintenance" : announcement.type === "update" ? "Update" : "Notice"}
@@ -77,9 +82,24 @@ export default function AnnouncementBanner() {
         .mkt-banner {
           border-bottom: 1px solid var(--mkt-line);
           background: var(--mkt-ink-2);
+          overflow: hidden;
+          animation: mkt-banner-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .mkt-banner--leaving {
+          animation: mkt-banner-out 0.22s ease forwards;
+        }
+        @keyframes mkt-banner-in {
+          from { opacity: 0; transform: translateY(-100%); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes mkt-banner-out {
+          from { opacity: 1; transform: translateY(0); }
+          to { opacity: 0; transform: translateY(-100%); }
         }
         .mkt-banner--maintenance { border-bottom-color: var(--mkt-amber); }
+        .mkt-banner--maintenance .mkt-banner__tag { color: var(--mkt-amber); border-color: var(--mkt-amber); }
         .mkt-banner--update { border-bottom-color: var(--mkt-blueprint); }
+        .mkt-banner--update .mkt-banner__tag { color: var(--mkt-blueprint); border-color: var(--mkt-blueprint); }
         .mkt-banner--info { border-bottom-color: var(--mkt-line-strong); }
         .mkt-banner__row {
           display: flex;
@@ -95,6 +115,7 @@ export default function AnnouncementBanner() {
           padding: 3px 8px;
           border: 1px solid var(--mkt-line-strong);
           color: var(--mkt-paper-dim);
+          transition: color 0.2s ease, border-color 0.2s ease;
         }
         .mkt-banner__text {
           flex: 1;
@@ -111,13 +132,23 @@ export default function AnnouncementBanner() {
           cursor: pointer;
           padding: 4px 6px;
           flex-shrink: 0;
+          transition: color 0.2s ease, transform 0.15s ease;
         }
         .mkt-banner__close:hover {
           color: var(--mkt-paper);
+          transform: rotate(90deg);
         }
         @media (max-width: 700px) {
           .mkt-banner__row {
             flex-wrap: wrap;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mkt-banner,
+          .mkt-banner--leaving,
+          .mkt-banner__close:hover {
+            animation: none;
+            transform: none;
           }
         }
       `}</style>

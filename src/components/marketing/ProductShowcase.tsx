@@ -45,8 +45,9 @@ export default function ProductShowcase() {
           See what each engine actually does.
         </h2>
         <p className="mkt-body-lg" style={{ marginTop: 14, maxWidth: 560 }}>
-          Not a screenshot gallery — a live look at the six screens your
-          team will actually work in every day.
+          Not a screenshot gallery — a live look at the screens your team
+          actually works in, starting with the one that matters most: the
+          till.
         </p>
 
         <div className="mkt-showcase">
@@ -68,14 +69,14 @@ export default function ProductShowcase() {
             })}
           </div>
 
-          <div className="mkt-showcase__frame">
+          <div className="mkt-showcase__frame" style={{ "--engine-color": meta.color } as CSSProperties}>
             <div className="mkt-showcase__chrome">
               <span className="mkt-showcase__dot" />
               <span className="mkt-showcase__dot" />
               <span className="mkt-showcase__dot" />
               <span className="mkt-mono mkt-showcase__url">{URLS[active]}</span>
             </div>
-            <div className="mkt-showcase__body" style={{ "--engine-color": meta.color } as CSSProperties}>
+            <div key={active} className="mkt-showcase__body" style={{ "--engine-color": meta.color } as CSSProperties}>
               {active === "pos" && <PosMock />}
               {active === "inventory" && <InventoryMock />}
               {active === "finance" && <FinanceMock />}
@@ -110,6 +111,7 @@ export default function ProductShowcase() {
           display: flex;
           flex-direction: column;
           gap: 4px;
+          transition: background 0.2s ease, border-color 0.2s ease;
         }
         .mkt-showcase__tab:last-child { border-bottom: none; }
         .mkt-showcase__tab-label {
@@ -126,6 +128,7 @@ export default function ProductShowcase() {
         .mkt-showcase__tab--active {
           background: var(--mkt-surface);
           border-left: 2px solid var(--engine-color);
+          box-shadow: inset 0 0 24px -18px var(--engine-color);
         }
         .mkt-showcase__tab--active .mkt-showcase__tab-label {
           color: var(--engine-color);
@@ -135,6 +138,10 @@ export default function ProductShowcase() {
           min-height: 420px;
           display: flex;
           flex-direction: column;
+          border: 1px solid var(--engine-color);
+          border-color: color-mix(in srgb, var(--engine-color) 35%, transparent);
+          box-shadow: 0 0 32px -20px var(--engine-color);
+          transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
         .mkt-showcase__chrome {
           display: flex;
@@ -152,11 +159,22 @@ export default function ProductShowcase() {
         .mkt-showcase__url {
           margin-left: 10px;
           font-size: 0.6875rem;
-          color: var(--mkt-paper-faint);
+          color: var(--engine-color);
+          transition: color 0.3s ease;
         }
         .mkt-showcase__body {
           padding: 28px;
           flex: 1;
+          animation: mkt-showcase-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes mkt-showcase-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mkt-showcase__body {
+            animation: none;
+          }
         }
         @media (max-width: 820px) {
           .mkt-showcase { grid-template-columns: 1fr; }

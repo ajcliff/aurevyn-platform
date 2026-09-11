@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import RevealOnScroll from "./RevealOnScroll";
+import Wordmark from "../../../wordmark";
 
 const COLUMNS = [
   {
@@ -15,7 +15,7 @@ const COLUMNS = [
   },
   {
     heading: "Company",
-    accent: "var(--mkt-violet)",
+    accent: "var(--mkt-blueprint)",
     links: [
       { href: "/contact", label: "Contact" },
       { href: "/login", label: "Log in" },
@@ -23,7 +23,7 @@ const COLUMNS = [
   },
   {
     heading: "Legal",
-    accent: "var(--mkt-amber)",
+    accent: "var(--mkt-brass-light)",
     links: [
       { href: "/terms", label: "Terms of service" },
       { href: "/privacy", label: "Privacy policy" },
@@ -37,9 +37,10 @@ export default function MarketingFooter() {
       <div className="mkt-footer__spectrum" aria-hidden="true" />
       <div className="mkt-container mkt-footer__top">
         <div className="mkt-footer__brand">
-          <Image src="/logo.png" alt="Aurevyn" width={180} height={44} style={{ height: 32, width: "auto" }} />
+          <Wordmark size="md" />
           <p className="mkt-body" style={{ maxWidth: 280, fontSize: "0.875rem", marginTop: 14 }}>
-            The business operating system built in Africa, for African
+            The POS that runs your whole business — built in Africa, for
+            African
             operations — from the till to the balance sheet.
           </p>
           <div className="mkt-badge-live" style={{ marginTop: 18 }}>
@@ -85,17 +86,9 @@ export default function MarketingFooter() {
           position: relative;
         }
         .mkt-footer__spectrum {
-          height: 3px;
-          background: linear-gradient(
-            90deg,
-            var(--mkt-blueprint),
-            var(--mkt-signal),
-            var(--mkt-brass),
-            var(--mkt-violet),
-            var(--mkt-amber),
-            var(--mkt-alert)
-          );
-          opacity: 0.75;
+          height: 2px;
+          background: linear-gradient(90deg, var(--mkt-blueprint), var(--mkt-brass));
+          opacity: 0.8;
         }
         .mkt-footer__top {
           display: grid;

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { useScrolled } from "./interactions";
+import Wordmark from "../../../wordmark";
 
 const LINKS = [
   { href: "/#engines", label: "Engines" },
@@ -19,7 +19,7 @@ export default function MarketingNav() {
     <header className={`mkt-nav ${scrolled ? "mkt-nav--scrolled" : ""}`}>
       <div className="mkt-container mkt-nav__row">
         <Link href="/" className="mkt-nav__brand" onClick={() => setOpen(false)}>
-          <Image src="/logo.png" alt="Aurevyn" width={132} height={32} style={{ height: 26, width: "auto" }} priority />
+          <Wordmark size="sm" />
         </Link>
 
         <nav className="mkt-nav__links" aria-label="Primary">

@@ -1,17 +1,17 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRef, type MouseEvent } from "react";
 import BlueprintDiagram from "./BlueprintDiagram";
+import Wordmark from "../../../wordmark";
 import { useMagnetic, useCountUp } from "./interactions";
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, suffix = "" }: { value: string; label: string; suffix?: string }) {
   const { ref, display } = useCountUp(value);
   return (
     <div>
       <div className="mkt-num mkt-hero__stat-value">
-        <span ref={ref}>{display}</span>
+        <span ref={ref}>{display}</span>{suffix}
       </div>
       <div className="mkt-tag">{label}</div>
     </div>
@@ -42,44 +42,40 @@ export default function Hero() {
       <div className="mkt-container mkt-hero__grid">
         <div>
           <div className="mkt-hero__logo">
-            <Image
-              src="/logo.png"
-              alt="Aurevyn"
-              width={280}
-              height={68}
-              priority
-              style={{ height: "clamp(48px, 6vw, 84px)", width: "auto" }}
-            />
+            <Wordmark size="lg" />
           </div>
 
-          <div className="mkt-eyebrow mkt-hero__eyebrow">Business Operating System · Rev 2026</div>
+          <div className="mkt-eyebrow mkt-hero__eyebrow">The POS System for Africa · Rev 2026</div>
 
           <h1 className="mkt-h1 mkt-hero__headline" style={{ marginTop: 18 }}>
             <span className="mkt-hero__line">
-              <span style={{ transitionDelay: "0ms" }}>Every</span>{" "}
-              <span style={{ transitionDelay: "60ms" }}>engine</span>{" "}
-              <span style={{ transitionDelay: "120ms" }}>your</span>
+              <span style={{ transitionDelay: "0ms" }}>Not</span>{" "}
+              <span style={{ transitionDelay: "60ms" }}>an</span>{" "}
+              <span style={{ transitionDelay: "120ms" }}>ERP.</span>
             </span>
             <br />
             <span className="mkt-hero__line">
-              <span style={{ transitionDelay: "180ms" }}>business</span>{" "}
-              <span style={{ transitionDelay: "240ms" }}>runs</span>{" "}
-              <span style={{ transitionDelay: "300ms" }}>on.</span>
+              <span style={{ transitionDelay: "180ms" }}>A</span>{" "}
+              <span style={{ transitionDelay: "240ms" }}>POS</span>{" "}
+              <span style={{ transitionDelay: "300ms" }}>that</span>{" "}
+              <span style={{ transitionDelay: "360ms" }}>runs</span>
             </span>
             <br />
             <span className="mkt-hero__line">
-              <span style={{ transitionDelay: "380ms", color: "var(--mkt-brass-light)" }}>One core.</span>
+              <span style={{ transitionDelay: "440ms", color: "var(--mkt-brass-light)" }}>your whole business.</span>
             </span>
           </h1>
 
-          <p className="mkt-body-lg mkt-hero__fade-in" style={{ marginTop: 22, maxWidth: 480, transitionDelay: "460ms" }}>
-            Aurevyn is a modular operating system for African businesses —
-            point of sale, inventory, finance, CRM, payroll, and security
-            running off a single core, configured to your industry from day
-            one. No six-month rollout. No SAP consultant.
+          <p className="mkt-body-lg mkt-hero__fade-in" style={{ marginTop: 22, maxWidth: 480, transitionDelay: "520ms" }}>
+            Most African SMEs don't need twelve modules — they need to{" "}
+            <strong className="mkt-hero__core-word" style={{ color: "var(--mkt-blueprint)" }}>sell</strong>,{" "}
+            <strong className="mkt-hero__core-word" style={{ color: "var(--mkt-signal)" }}>track stock</strong>, and{" "}
+            <strong className="mkt-hero__core-word" style={{ color: "var(--mkt-brass-light)" }}>see their cash</strong>.
+            That's the 91%. Aurevyn is built around that — CRM, payroll, and
+            security come along for free, not the other way round.
           </p>
 
-          <div className="mkt-hero__ctas mkt-hero__fade-in" style={{ transitionDelay: "520ms" }}>
+          <div className="mkt-hero__ctas mkt-hero__fade-in" style={{ transitionDelay: "580ms" }}>
             <Link ref={primaryCtaRef} href="/register" className="mkt-btn mkt-btn--primary mkt-btn--magnetic">
               Start free trial
             </Link>
@@ -88,12 +84,12 @@ export default function Hero() {
             </Link>
           </div>
 
-          <div className="mkt-hero__stats mkt-hero__fade-in" style={{ transitionDelay: "580ms" }}>
-            <Stat value="6" label="Core engines" />
+          <div className="mkt-hero__stats mkt-hero__fade-in" style={{ transitionDelay: "640ms" }}>
+            <Stat value="3" label="Core engines" />
+            <div className="mkt-divider" style={{ height: "auto", width: 1 }} />
+            <Stat value="91" suffix="%" label="Of SME needs, solved" />
             <div className="mkt-divider" style={{ height: "auto", width: 1 }} />
             <Stat value="M-Pesa" label="Native payments" />
-            <div className="mkt-divider" style={{ height: "auto", width: 1 }} />
-            <Stat value="24/7" label="Threat monitoring" />
           </div>
         </div>
 
@@ -146,6 +142,9 @@ export default function Hero() {
         .mkt-hero__fade-in {
           opacity: 0;
           animation: mkt-fade-up 0.7s ease forwards;
+        }
+        .mkt-hero__core-word {
+          font-weight: 700;
         }
         @keyframes mkt-fade-up {
           from { opacity: 0; transform: translateY(14px); }

@@ -1,132 +1,229 @@
 "use client";
 
-import type { ReactNode } from "react";
-import RevealOnScroll from "./RevealOnScroll";
-import { useTilt } from "./interactions";
+import { useState } from "react";
+import Link from "next/link";
 
-function AiIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mkt-proof-icon">
-      <rect x="9" y="9" width="14" height="14" stroke="var(--mkt-brass)" strokeWidth="1.3" />
-      <circle cx="13" cy="13" r="1.4" fill="var(--mkt-brass)" />
-      <circle cx="19" cy="13" r="1.4" fill="var(--mkt-brass)" />
-      <path d="M12 19h8" stroke="var(--mkt-brass)" strokeWidth="1.3" strokeLinecap="round" />
-      <path d="M16 2v7M16 23v7M2 16h7M23 16h7" stroke="var(--mkt-brass)" strokeWidth="1" opacity="0.4" />
-    </svg>
-  );
-}
+const BLUEPRINTS = [
+  {
+    industry: "Retail",
+    detail: "POS, inventory, and pricelists tuned for multi-branch shops and franchises.",
+    accent: "var(--mkt-blueprint)",
+    accentGlow: "var(--mkt-blueprint-glow)",
+    configured: [
+      "Barcode-ready POS with split payment and M-Pesa till reconciliation",
+      "Multi-branch stock levels with automatic reorder alerts",
+      "Loyalty points and customer purchase history",
+    ],
+  },
+  {
+    industry: "Healthcare",
+    detail: "Patient records, appointments, and billing configured around clinic workflows.",
+    accent: "var(--mkt-brass-light)",
+    accentGlow: "var(--mkt-brass-glow)",
+    configured: [
+      "Patient records with visit history and prescriptions",
+      "Appointment scheduling by provider and room",
+      "Insurance and cash billing in one ledger",
+    ],
+  },
+  {
+    industry: "Education",
+    detail: "Enrollment, fees, and staff payroll set up the way a school actually runs.",
+    accent: "var(--mkt-blueprint)",
+    accentGlow: "var(--mkt-blueprint-glow)",
+    configured: [
+      "Student enrollment and term-based fee tracking",
+      "Staff payroll aligned to the academic calendar",
+      "Per-term and per-class reporting",
+    ],
+  },
+  {
+    industry: "Distribution",
+    detail: "Warehousing, transfers, and route-level reporting across multiple sites.",
+    accent: "var(--mkt-brass-light)",
+    accentGlow: "var(--mkt-brass-glow)",
+    configured: [
+      "Warehouse-to-warehouse stock transfers",
+      "Route-level delivery and sales reporting",
+      "Supplier ledger and bulk order management",
+    ],
+  },
+];
 
-function MpesaIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mkt-proof-icon">
-      <rect x="10" y="4" width="12" height="24" rx="1.5" stroke="var(--mkt-signal)" strokeWidth="1.3" />
-      <line x1="10" y1="22" x2="22" y2="22" stroke="var(--mkt-signal)" strokeWidth="1" opacity="0.5" />
-      <circle cx="16" cy="25" r="1.3" fill="var(--mkt-signal)" />
-      <path d="M13 11l2 3 4-5" stroke="var(--mkt-signal)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+export default function IndustriesSection() {
+  const [open, setOpen] = useState<string | null>(null);
 
-function ShieldIcon() {
   return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mkt-proof-icon">
-      <path d="M16 4l10 4v8c0 7-4.5 10.5-10 12-5.5-1.5-10-5-10-12V8l10-4z" stroke="var(--mkt-alert)" strokeWidth="1.3" strokeLinejoin="round" />
-      <path d="M12 16l3 3 6-6" stroke="var(--mkt-alert)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ProofCard({ children, accentGlow }: { children: ReactNode; accentGlow: string }) {
-  const ref = useTilt<HTMLDivElement>(4);
-  return (
-    <div
-      ref={ref}
-      className="mkt-card mkt-proof-card"
-      style={{ ["--proof-glow" as string]: accentGlow }}
-    >
-      <span className="mkt-proof-card__spotlight" />
-      {children}
-    </div>
-  );
-}
-
-export default function ProofSection() {
-  return (
-    <section className="mkt-section mkt-section--tight">
+    <section className="mkt-section mkt-section--tight" id="industries">
       <div className="mkt-container">
-        <div className="mkt-eyebrow">Sheet 06 / Built in</div>
-        <h2 className="mkt-h2" style={{ marginTop: 14, maxWidth: 600 }}>
-          The parts other platforms sell as add-ons.
-        </h2>
+        <div className="mkt-industries__head">
+          <div>
+            <div className="mkt-eyebrow mkt-eyebrow--brass">Sheet 02 / Blueprints</div>
+            <h2 className="mkt-h2" style={{ marginTop: 14 }}>
+              Configured for your industry, not a blank canvas.
+            </h2>
+          </div>
+          <p className="mkt-body" style={{ maxWidth: 360 }}>
+            A blueprint is a pre-wired set of engines, fields, and reports
+            for how your industry actually operates. Click one to see what's
+            already set up.
+          </p>
+        </div>
 
-        <RevealOnScroll stagger={90} className="mkt-grid mkt-cols-3 mkt-proof-grid">
-          <ProofCard accentGlow="var(--mkt-brass-glow)">
-            <AiIcon />
-            <div className="mkt-badge-live" style={{ marginTop: 14 }}>Live</div>
-            <h3 className="mkt-h3" style={{ marginTop: 12 }}>Ask Aurevyn</h3>
-            <p className="mkt-body" style={{ marginTop: 10, fontSize: "0.9375rem" }}>
-              An AI copilot that already knows your business — ask it for a
-              revenue summary, which branches need attention, or what's
-              expiring this week, in plain language.
-            </p>
-          </ProofCard>
+        <div className="mkt-industries__list">
+          {BLUEPRINTS.map((b, i) => {
+            const isOpen = open === b.industry;
+            return (
+              <div
+                key={b.industry}
+                className="mkt-industries__block"
+                style={{
+                  ["--ind-accent" as string]: b.accent,
+                  ["--ind-glow" as string]: b.accentGlow,
+                }}
+              >
+                <button
+                  className={`mkt-industries__row ${isOpen ? "mkt-industries__row--open" : ""}`}
+                  onClick={() => setOpen(isOpen ? null : b.industry)}
+                  aria-expanded={isOpen}
+                >
+                  <span className="mkt-industries__dot" />
+                  <span className="mkt-mono mkt-dim mkt-industries__index">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="mkt-h3" style={{ fontSize: "1.25rem" }}>{b.industry}</span>
+                  <span className="mkt-body" style={{ fontSize: "0.9375rem" }}>{b.detail}</span>
+                  <span className={`mkt-industries__chevron ${isOpen ? "mkt-industries__chevron--open" : ""}`}>▾</span>
+                </button>
 
-          <ProofCard accentGlow="rgba(62, 207, 142, 0.18)">
-            <MpesaIcon />
-            <div className="mkt-tag" style={{ marginTop: 14 }}>M-Pesa</div>
-            <h3 className="mkt-h3" style={{ marginTop: 12 }}>Native mobile money</h3>
-            <p className="mkt-body" style={{ marginTop: 10, fontSize: "0.9375rem" }}>
-              STK push at checkout, reconciled straight into finance. Not a
-              plugin someone bolted on — it's how the till was built to take
-              payment from day one.
-            </p>
-          </ProofCard>
-
-          <ProofCard accentGlow="rgba(255, 107, 94, 0.18)">
-            <ShieldIcon />
-            <div className="mkt-tag" style={{ marginTop: 14 }}>Security</div>
-            <h3 className="mkt-h3" style={{ marginTop: 12 }}>Threat monitoring</h3>
-            <p className="mkt-body" style={{ marginTop: 10, fontSize: "0.9375rem" }}>
-              Every organization is watched for the access patterns that
-              precede fraud and breach attempts — a security team, running
-              quietly in the background.
-            </p>
-          </ProofCard>
-        </RevealOnScroll>
+                <div className="mkt-industries__detail-wrap" style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}>
+                  <div className="mkt-industries__detail-inner">
+                    <div className="mkt-industries__detail">
+                      <div className="mkt-tag mkt-industries__tag" style={{ marginBottom: 12 }}>Pre-configured for you</div>
+                      <ul className="mkt-industries__ul">
+                        {b.configured.map((c) => (
+                          <li key={c}>{c}</li>
+                        ))}
+                      </ul>
+                      <Link href="/register" className="mkt-btn mkt-btn--ghost mkt-btn--sm" style={{ marginTop: 14 }}>
+                        Start with the {b.industry} blueprint
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <style>{`
-        .mkt-proof-grid {
+        .mkt-industries__head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 32px;
+          flex-wrap: wrap;
+        }
+        .mkt-industries__list {
           margin-top: 44px;
+          border-top: 1px solid var(--mkt-line);
         }
-        .mkt-proof-card {
-          position: relative;
+        .mkt-industries__block {
+          border-bottom: 1px solid var(--mkt-line);
+        }
+        .mkt-industries__row {
+          all: unset;
+          box-sizing: border-box;
+          width: 100%;
+          display: grid;
+          grid-template-columns: 4px 52px 200px 1fr 24px;
+          align-items: center;
+          gap: 20px;
+          padding: 22px 0;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+        .mkt-industries__row:hover,
+        .mkt-industries__row--open {
+          background: var(--ind-glow);
+        }
+        .mkt-industries__dot {
+          width: 4px;
+          height: 28px;
+          background: var(--mkt-line-strong);
+          transition: background 0.25s ease, box-shadow 0.25s ease;
+        }
+        .mkt-industries__row:hover .mkt-industries__dot,
+        .mkt-industries__row--open .mkt-industries__dot {
+          background: var(--ind-accent);
+          box-shadow: 0 0 12px var(--ind-glow);
+        }
+        .mkt-industries__index {
+          font-size: 0.8125rem;
+        }
+        .mkt-industries__chevron {
+          color: var(--mkt-paper-faint);
+          transition: transform 0.2s ease, color 0.2s ease;
+          justify-self: end;
+        }
+        .mkt-industries__chevron--open {
+          transform: rotate(180deg);
+          color: var(--ind-accent);
+        }
+        .mkt-industries__detail-wrap {
+          display: grid;
+          transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .mkt-industries__detail-inner {
           overflow: hidden;
-          transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-          transition: transform 0.15s ease-out, border-color 0.2s ease, background 0.2s ease;
         }
-        .mkt-proof-card__spotlight {
+        .mkt-industries__detail {
+          padding: 0 0 28px 96px;
+        }
+        .mkt-industries__tag {
+          color: var(--ind-accent);
+          border-color: var(--ind-accent);
+        }
+        .mkt-industries__ul {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .mkt-industries__ul li {
+          font-size: 0.875rem;
+          color: var(--mkt-paper-dim);
+          padding-left: 16px;
+          position: relative;
+        }
+        .mkt-industries__ul li::before {
+          content: "";
           position: absolute;
-          inset: 0;
-          pointer-events: none;
-          opacity: 0;
-          transition: opacity 0.25s ease;
-          background: radial-gradient(200px circle at var(--mx, 50%) var(--my, 50%), var(--proof-glow, var(--mkt-blueprint-glow)), transparent 70%);
-          mix-blend-mode: screen;
+          left: 0;
+          top: 8px;
+          width: 5px;
+          height: 5px;
+          background: var(--ind-accent);
         }
-        .mkt-proof-card:hover .mkt-proof-card__spotlight {
-          opacity: 1;
-        }
-        .mkt-proof-icon {
-          transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .mkt-proof-card:hover .mkt-proof-icon {
-          transform: scale(1.12) rotate(-4deg);
-          filter: drop-shadow(0 0 10px var(--proof-glow, transparent));
+        @media (max-width: 700px) {
+          .mkt-industries__row {
+            grid-template-columns: 4px 28px 1fr 20px;
+            grid-template-rows: auto auto;
+          }
+          .mkt-industries__row .mkt-body {
+            grid-column: 3 / -1;
+          }
+          .mkt-industries__detail {
+            padding-left: 52px;
+          }
         }
         @media (prefers-reduced-motion: reduce) {
-          .mkt-proof-card { transform: none !important; }
-          .mkt-proof-icon { transition: none; }
+          .mkt-industries__detail-wrap {
+            transition: none;
+          }
         }
       `}</style>
     </section>

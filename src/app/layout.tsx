@@ -13,8 +13,11 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "AUREVYN",
-  description: "The Business Operating System",
+  title: "AUREVYN — The POS System for Africa",
+  description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 const THEME_INIT_SCRIPT = `

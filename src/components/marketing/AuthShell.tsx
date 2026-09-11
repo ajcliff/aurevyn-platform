@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import Wordmark from "../../../wordmark";
 import MarketingShell from "./MarketingShell";
 
 export default function AuthShell({
@@ -13,10 +13,9 @@ export default function AuthShell({
     <MarketingShell>
       <div className="mkt-auth">
         <div className="mkt-auth__panel" style={{ maxWidth: width }}>
-          <Link href="/" className="mkt-auth__logo">
-            <Image src="/icon.png" alt="Aurevyn" width={32} height={32} style={{ height: 28, width: "auto" }} />
-            <span className="mkt-mono">AUREVYN</span>
-          </Link>
+         <div className="mkt-hero__logo">
+                     <Wordmark size="lg" />
+                   </div>
 
           <div className="mkt-card mkt-auth__card">{children}</div>
 
