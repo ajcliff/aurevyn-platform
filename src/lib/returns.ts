@@ -76,6 +76,23 @@ export async function approveReturn(
     returnId: string
 ) {
 
+    const { data: returnRecord } =
+        await supabase
+            .from("pos_returns")
+            .select("sale_id")
+            .eq("id", returnId)
+            .single();
+
+    let warehouseId: string | undefined;
+    if (returnRecord?.sale_id) {
+        const { data: sale } = await supabase
+            .from("pos_sales")
+            .select("warehouse_id")
+            .eq("id", returnRecord.sale_id)
+            .maybeSingle();
+        warehouseId = sale?.warehouse_id || undefined;
+    }
+
     const { data: items } =
         await supabase
             .from("pos_return_items")
@@ -94,7 +111,9 @@ export async function approveReturn(
 
             "stock_in",
 
-            "Customer Return"
+            "Customer Return",
+
+            warehouseId
 
         );
 

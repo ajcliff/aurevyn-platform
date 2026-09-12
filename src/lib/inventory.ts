@@ -148,47 +148,59 @@ export async function updateStock(
     throw new Error("No warehouse available for this org. Create a warehouse before adjusting stock.");
   }
 
-  // inventory_stock_levels is the source of truth. Apply the change at the
-  // warehouse level first, then recompute stock_quantity as the sum across
-  // every warehouse — this is what keeps the two tables from drifting apart.
-  const { data: level } = await supabase
-    .from("inventory_stock_levels")
-    .select("*")
-    .eq("product_id", productId)
-    .eq("warehouse_id", resolvedWarehouseId)
-    .maybeSingle();
+  // inventory_stock_levels is the source of truth. stock_in/stock_out apply
+  // as an atomic delta via a Postgres function (adjust_stock_level) so
+  // concurrent sales/receipts against the same product+warehouse can't lose
+  // an update to a race condition. "adjustment" sets an absolute value
+  // instead of a delta, which is a deliberate single-actor correction, so it
+  // stays as a plain read-then-write.
+  let newLevelQty: number;
 
-  const currentLevelQty = Number(level?.quantity || 0);
-  let newLevelQty = currentLevelQty;
-  if (type === "stock_in") newLevelQty = currentLevelQty + quantity;
-  if (type === "stock_out") newLevelQty = Math.max(currentLevelQty - quantity, 0);
-  if (type === "adjustment") newLevelQty = quantity;
-
-  if (level) {
-    const { error: levelError } = await supabase
+  if (type === "adjustment") {
+    const { data: level } = await supabase
       .from("inventory_stock_levels")
-      .update({ quantity: newLevelQty })
-      .eq("id", level.id);
-    if (levelError) throw levelError;
+      .select("*")
+      .eq("product_id", productId)
+      .eq("warehouse_id", resolvedWarehouseId)
+      .maybeSingle();
+
+    newLevelQty = quantity;
+
+    if (level) {
+      const { error: levelError } = await supabase
+        .from("inventory_stock_levels")
+        .update({ quantity: newLevelQty })
+        .eq("id", level.id);
+      if (levelError) throw levelError;
+    } else {
+      const { error: levelError } = await supabase
+        .from("inventory_stock_levels")
+        .insert({
+          org_id: product.org_id,
+          product_id: productId,
+          warehouse_id: resolvedWarehouseId,
+          quantity: newLevelQty,
+        });
+      if (levelError) throw levelError;
+    }
   } else {
-    const { error: levelError } = await supabase
-      .from("inventory_stock_levels")
-      .insert({
-        org_id: product.org_id,
-        product_id: productId,
-        warehouse_id: resolvedWarehouseId,
-        quantity: newLevelQty,
-      });
-    if (levelError) throw levelError;
+    const delta = type === "stock_in" ? quantity : -quantity;
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("adjust_stock_level", {
+      p_product_id: productId,
+      p_warehouse_id: resolvedWarehouseId,
+      p_org_id: product.org_id,
+      p_delta: delta,
+    });
+    if (rpcError) throw rpcError;
+    newLevelQty = Number(rpcResult);
   }
 
-  const { data: allLevels, error: sumError } = await supabase
-    .from("inventory_stock_levels")
-    .select("quantity")
-    .eq("product_id", productId);
+  const { data: sumResult, error: sumError } = await supabase.rpc("sum_stock_quantity", {
+    p_product_id: productId,
+  });
   if (sumError) throw sumError;
 
-  const newQuantity = (allLevels || []).reduce((sum, l) => sum + Number(l.quantity), 0);
+  const newQuantity = Number(sumResult);
 
   const { error: updateError } = await supabase
     .from("inventory_products")

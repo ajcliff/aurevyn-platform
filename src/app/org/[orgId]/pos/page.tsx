@@ -22,7 +22,7 @@ import {
   type PosSale,
   type PosSaleItem
 } from "@/lib/pos";
-import { getWarehouses, deductStockFromWarehouse, type Warehouse } from "@/lib/warehouses";
+import { getWarehouses, getStockLevelsMap, type Warehouse } from "@/lib/warehouses";
 import { getEffectivePrice, getPricelists, type Pricelist } from "@/lib/pricelists";
 import { type Customer } from "@/lib/customers";
 
@@ -75,6 +75,7 @@ const [promotions, setPromotions] =
 const [sales, setSales] = useState<PosSale[]>([]);
 const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+const [stockLevels, setStockLevels] = useState<Record<string, Record<string, number>>>({});
 
 const todaySales = useMemo(() => {
   const today = new Date().toDateString();
@@ -158,14 +159,16 @@ const [
   promotionsData,
   discountsData,
   warehousesData,
-  pricelistsData
+  pricelistsData,
+  stockLevelsData
 ] = await Promise.all([
   getProducts(org.id),
   getSales(org.id),
   getPromotions(org.id),
   getDiscounts(org.id),
   getWarehouses(org.id),
-  getPricelists(org.id)
+  getPricelists(org.id),
+  getStockLevelsMap(org.id)
 ]);
 
 setProducts(productsData);
@@ -174,6 +177,7 @@ setPromotions(promotionsData);
 setDiscounts(discountsData);
 setWarehouses(warehousesData);
 setPricelists(pricelistsData);
+setStockLevels(stockLevelsData);
 
 const defaultWarehouse = warehousesData.find((w) => w.is_default);
 if (defaultWarehouse) {
@@ -194,9 +198,10 @@ if (defaultWarehouse) {
       setPendingSyncCount(getQueuedSales().length);
       setSyncing(false);
       if (result.synced > 0) {
-        const [productsData, salesData] = await Promise.all([getProducts(orgId), getSales(orgId)]);
+        const [productsData, salesData, stockLevelsData] = await Promise.all([getProducts(orgId), getSales(orgId), getStockLevelsMap(orgId)]);
         setProducts(productsData);
         setSales(salesData);
+        setStockLevels(stockLevelsData);
       }
     }
 
@@ -272,11 +277,20 @@ function handleExportSalesCSV() {
   exportToCSV(`sales-${orgId}-${new Date().toISOString().slice(0, 10)}.csv`, rows);
 }
 
+  function availableStockFor(product: InventoryProduct): number {
+    if (selectedWarehouseId && stockLevels[product.id!]) {
+      const levelQty = stockLevels[product.id!][selectedWarehouseId];
+      if (levelQty !== undefined) return levelQty;
+    }
+    return Number(product.stock_quantity);
+  }
+
   async function addToCart(product: InventoryProduct) {
     const currentInCart = cart.find((i) => i.productId === product.id)?.quantity ?? 0;
+    const available = availableStockFor(product);
 
-    if (currentInCart + 1 > product.stock_quantity) {
-      alert(`Only ${product.stock_quantity} units of "${product.name}" in stock`);
+    if (currentInCart + 1 > available) {
+      alert(`Only ${available} units of "${product.name}" in stock${selectedWarehouseId ? " at this branch" : ""}`);
       return;
     }
 
@@ -325,9 +339,12 @@ function handleExportSalesCSV() {
     const product = products.find((p) => p.id === productId);
     const current = cart.find((item) => item.productId === productId);
 
-    if (product && current && current.quantity + 1 > product.stock_quantity) {
-      alert(`Only ${product.stock_quantity} units of "${product.name}" in stock`);
-      return;
+    if (product && current) {
+      const available = availableStockFor(product);
+      if (current.quantity + 1 > available) {
+        alert(`Only ${available} units of "${product.name}" in stock${selectedWarehouseId ? " at this branch" : ""}`);
+        return;
+      }
     }
 
     setCart((prev) =>
@@ -454,13 +471,9 @@ setCompletedSale({
           item.quantity,
           "stock_out",
           `POS Sale ${created.id}`,
-          undefined,
+          selectedWarehouseId || undefined,
           saleClient
         );
-
-        if (selectedWarehouseId) {
-          await deductStockFromWarehouse(item.productId, selectedWarehouseId, item.quantity, saleClient);
-        }
       }
 
 await logActivity({
@@ -476,14 +489,16 @@ await logActivity({
       setPaymentValid(false);
       setChangeDue(0);
 
-const [productsData, salesData] =
+const [productsData, salesData, stockLevelsData] =
   await Promise.all([
     getProducts(orgId),
-    getSales(orgId)
+    getSales(orgId),
+    getStockLevelsMap(orgId)
   ]);
 
 setProducts(productsData);
 setSales(salesData);
+setStockLevels(stockLevelsData);
 
      setShowReceipt(true);
     } catch (error) {

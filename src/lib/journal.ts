@@ -198,7 +198,40 @@ export async function repostExpenseJournal(expense: {
   await postExpenseJournal(expense);
 }
 
-// Posts a POS sale: cash/asset received (debit) against Sales Revenue and,
+// Posts a customer refund: reverses part of a prior sale — debit Sales
+// Revenue (reducing recognized revenue), credit the cash/asset account
+// that paid the customer back.
+export async function postRefundJournal(input: {
+  orgId: string;
+  returnId: string;
+  amount: number;
+  date: string;
+}): Promise<void> {
+  if (input.amount <= 0) return;
+  const supabase = createClient();
+
+  const assetAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1000", "Unspecified Cash", "asset");
+  const revenueAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "4000", "Sales Revenue", "income");
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "pos_return",
+      source_id: input.returnId,
+      description: "Customer return refund",
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: input.orgId, coa_id: revenueAccountId, debit: input.amount, credit: 0 },
+    { entry_id: entry.id, org_id: input.orgId, coa_id: assetAccountId, debit: 0, credit: input.amount },
+  ]);
+  if (lineError) throw lineError;
+}
 // if the sale carries VAT, VAT Payable (credit, split from the revenue
 // portion). Does not yet post COGS/inventory reduction — see scope note
 // at the top of the file inherited from the original journal design.
