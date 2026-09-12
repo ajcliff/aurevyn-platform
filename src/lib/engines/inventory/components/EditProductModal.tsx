@@ -22,6 +22,7 @@ const { organization } = useEngine();
   const [category, setCategory] = useState("");
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
   const [threshold, setThreshold] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +32,7 @@ const { organization } = useEngine();
       setCategory(product.category || "");
       setUnit(product.unit || "");
       setPrice(String(product.unit_price));
+      setCost(String(product.avg_cost ?? 0));
       setThreshold(String(product.low_stock_threshold));
     }
   }, [product]);
@@ -45,6 +47,7 @@ const { organization } = useEngine();
         category: category || undefined,
         unit: unit || undefined,
         unit_price: Number(price) || 0,
+        avg_cost: Number(cost) || 0,
         low_stock_threshold: Number(threshold) || 0,
       });
       await logActivity({
@@ -141,6 +144,15 @@ const { organization } = useEngine();
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="Unit price (KES)"
+            style={{ flex: 1 }}
+          />
+
+          <input
+            className={s.input}
+            type="number"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="Cost price (KES)"
             style={{ flex: 1 }}
           />
 

@@ -12,6 +12,7 @@ export interface InventoryProduct {
   low_stock_threshold: number;
   critical_stock_threshold?: number | null;
   unit_price: number;
+  avg_cost?: number;
   status?: string;
   created_at?: string;
 }

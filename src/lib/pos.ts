@@ -6,6 +6,7 @@ export interface PosSaleItem {
   id?: string;
   sale_id?: string;
 
+  product_id?: string;
   product_name: string;
   quantity: number;
   unit_price: number;
@@ -153,6 +154,7 @@ export async function createSale(
   if (sale.items.length > 0) {
     const rows = sale.items.map((item) => ({
       sale_id: saleData.id,
+      product_id: item.product_id ?? null,
       product_name: item.product_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
@@ -166,8 +168,28 @@ export async function createSale(
     if (itemError) throw itemError;
   }
 
+  // COGS: pull avg_cost for every sold product in one batch and post it
+  // against Inventory in the same journal entry as the sale. Items without
+  // a product_id (older callers, or manual line items with no inventory
+  // link) contribute 0 COGS rather than blocking the sale.
+  let cogsAmount = 0;
+  const productIds = sale.items.map((i) => i.product_id).filter((id): id is string => Boolean(id));
+  if (productIds.length > 0) {
+    const { data: costData } = await supabase
+      .from("inventory_products")
+      .select("id, avg_cost")
+      .in("id", productIds);
+
+    const costById = new Map((costData || []).map((p) => [p.id, Number(p.avg_cost || 0)]));
+    for (const item of sale.items) {
+      if (item.product_id && costById.has(item.product_id)) {
+        cogsAmount += item.quantity * (costById.get(item.product_id) || 0);
+      }
+    }
+  }
+
   if ((sale.status ?? "completed") === "completed") {
-    await postSaleJournal(saleData);
+    await postSaleJournal({ ...saleData, cogs_amount: cogsAmount });
   }
 
   return saleData;

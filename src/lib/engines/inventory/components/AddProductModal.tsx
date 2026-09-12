@@ -22,6 +22,7 @@ export default function AddProductModal({
   const [category, setCategory] = useState("");
   const [unit, setUnit] = useState("pcs");
   const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
   const [stock, setStock] = useState("");
   const [threshold, setThreshold] = useState("10");
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,7 @@ const [criticalThreshold, setCriticalThreshold] = useState("");
         low_stock_threshold: Number(threshold) || 0,
         critical_stock_threshold: criticalThreshold ? Number(criticalThreshold) : null,
         unit_price: Number(price) || 0,
+        avg_cost: Number(cost) || 0,
       });
 
       setName("");
@@ -54,6 +56,7 @@ const [criticalThreshold, setCriticalThreshold] = useState("");
       setCategory("");
       setUnit("pcs");
       setPrice("");
+      setCost("");
       setStock("");
       setThreshold("10");
 
@@ -138,6 +141,15 @@ await logActivity({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="Unit price (KES)"
+            style={{ flex: 1 }}
+          />
+
+          <input
+            className={s.input}
+            type="number"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="Cost price (KES, optional)"
             style={{ flex: 1 }}
           />
 

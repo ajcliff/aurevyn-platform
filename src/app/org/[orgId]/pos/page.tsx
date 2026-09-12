@@ -399,6 +399,7 @@ function handleExportSalesCSV() {
       setLoading(true);
 
       const items: PosSaleItem[] = cart.map((item) => ({
+        product_id: item.productId,
         product_name: item.name,
         quantity: item.quantity,
         unit_price: item.price,

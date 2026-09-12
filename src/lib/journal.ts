@@ -240,6 +240,7 @@ export async function postSaleJournal(sale: {
   org_id: string;
   total: number;
   tax_amount?: number;
+  cogs_amount?: number;
   created_at?: string;
 }): Promise<void> {
   const supabase = createClient();
@@ -249,6 +250,7 @@ export async function postSaleJournal(sale: {
 
   const total = Number(sale.total);
   const tax = Number(sale.tax_amount || 0);
+  const cogs = Number(sale.cogs_amount || 0);
   const net = total - tax;
   const date = (sale.created_at || new Date().toISOString()).slice(0, 10);
 
@@ -270,6 +272,12 @@ export async function postSaleJournal(sale: {
   if (tax > 0) {
     const vatPayableId = await getOrCreateDefaultAccount(supabase, sale.org_id, "2100", "VAT Payable", "liability");
     lines.push({ entry_id: entry.id, org_id: sale.org_id, coa_id: vatPayableId, debit: 0, credit: tax });
+  }
+  if (cogs > 0) {
+    const cogsAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "5000", "Cost of Goods Sold", "expense");
+    const inventoryAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "1200", "Inventory", "asset");
+    lines.push({ entry_id: entry.id, org_id: sale.org_id, coa_id: cogsAccountId, debit: cogs, credit: 0 });
+    lines.push({ entry_id: entry.id, org_id: sale.org_id, coa_id: inventoryAccountId, debit: 0, credit: cogs });
   }
 
   const { error: lineError } = await supabase.from("journal_lines").insert(lines);

@@ -303,7 +303,29 @@ export async function receivePurchaseOrderItems(input: {
       continue;
     }
 
+    // Weighted-average cost: blend the existing on-hand cost basis with this
+    // receipt's cost, weighted by quantity. This is what postSaleJournal
+    // uses to post COGS/Inventory lines when the product is later sold.
+    const { data: productBefore } = await supabase
+      .from("inventory_products")
+      .select("stock_quantity, avg_cost")
+      .eq("id", r.productId)
+      .single();
+
+    const oldQty = Number(productBefore?.stock_quantity || 0);
+    const oldAvgCost = Number(productBefore?.avg_cost || 0);
+    const unitCost = Number(item.unit_cost);
+    const totalQtyAfter = oldQty + r.receiveQty;
+    const newAvgCost = totalQtyAfter > 0
+      ? (oldQty * oldAvgCost + r.receiveQty * unitCost) / totalQtyAfter
+      : unitCost;
+
     await updateStock(r.productId, r.receiveQty, "stock_in", `Received ${input.poNumber}`, input.warehouseId);
+
+    await supabase
+      .from("inventory_products")
+      .update({ avg_cost: newAvgCost })
+      .eq("id", r.productId);
   }
 
   if (receivedValue > 0) {
