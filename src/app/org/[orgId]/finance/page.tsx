@@ -21,7 +21,7 @@ import {
 } from "@/lib/finance";
 import { exportToCSV } from "@/lib/csvExport";
 import PaymentMethodForm from "@/components/payments/PaymentMethodForm";
-import { recordPayment, methodLabel, type PaymentDetailsInput } from "@/lib/payments";
+import { recordPayment, methodLabel, type PaymentDetailsInput, type PaymentMethod } from "@/lib/payments";
 
 import { getChartOfAccounts, getCostCenters, type ChartAccount, type CostCenter } from "@/lib/chartOfAccounts";
 import EmptyState from "@/components/EmptyState";
@@ -34,7 +34,7 @@ const ACCOUNT_TYPES = [
 
 const TX_CATEGORIES = ["sales", "supplies", "rent", "salaries", "utilities", "transport", "other"];
 const EXPENSE_CATEGORIES = ["supplies", "rent", "salaries", "utilities", "transport", "maintenance", "other"];
-const EXPENSE_PAYMENT_METHODS = ["cash", "bank_transfer", "mpesa", "card", "cheque"];
+const EXPENSE_PAYMENT_METHODS: PaymentMethod[] = ["cash", "bank_transfer", "mpesa", "card", "cheque"];
 
 export default function FinancePage() {
   const { organization } = useEngine();
@@ -509,7 +509,7 @@ async function load() {
             <label style={labelStyle}>Payment Method</label>
             <select value={expPaymentMethod} onChange={(e) => setExpPaymentMethod(e.target.value)} style={inputStyle}>
               {EXPENSE_PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>{methodLabel(m as any)}</option>
+                <option key={m} value={m}>{methodLabel(m)}</option>
               ))}
             </select>
 
