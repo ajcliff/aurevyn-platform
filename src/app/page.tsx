@@ -15,12 +15,14 @@ import StorefrontBuilderDemo from "@/components/marketing/StorefrontBuilderDemo"
 import PricingPreview from "@/components/marketing/PricingPreview";
 import CtaBand from "@/components/marketing/CtaBand";
 import RevealOnScroll from "@/components/marketing/RevealOnScroll";
+import AnnouncementBanner from "@/components/marketing/AnnouncementBanner";
 
 export default function LandingPage() {
   return (
     <MarketingShell>
       <ScrollProgress />
       <MarketingNav />
+      <AnnouncementBanner />
       <Hero />
       <StatusTicker />
       <RevealOnScroll><ProductShowcase /></RevealOnScroll>

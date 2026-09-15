@@ -4,7 +4,6 @@ import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/marketing/AuthShell";
-import Wordmark from "../../../wordmark";
 
 function LoginInner() {
   const [email, setEmail] = useState("");

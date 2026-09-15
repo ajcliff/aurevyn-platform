@@ -1,6 +1,8 @@
 import Link from "next/link";
 import RevealOnScroll from "./RevealOnScroll";
+import MarketingShell from "./MarketingShell";
 import Wordmark from "../../../wordmark";
+
 
 const COLUMNS = [
   {
@@ -45,6 +47,11 @@ export default function MarketingFooter() {
           </p>
           <div className="mkt-badge-live" style={{ marginTop: 18 }}>
             All engines operational
+          </div>
+          <div className="mkt-footer__social">
+            {/* TODO: replace # with real profile URLs once these accounts exist */}
+            <a href="#" className="mkt-footer__social-link" aria-label="X (Twitter)">𝕏</a>
+            <a href="#" className="mkt-footer__social-link" aria-label="LinkedIn">in</a>
           </div>
         </div>
 
@@ -116,6 +123,27 @@ export default function MarketingFooter() {
         .mkt-footer__col-tag:hover {
           border-color: var(--col-accent);
           color: var(--col-accent);
+        }
+        .mkt-footer__social {
+          display: flex;
+          gap: 10px;
+          margin-top: 16px;
+        }
+        .mkt-footer__social-link {
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--mkt-line-strong);
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: var(--mkt-paper-faint);
+          transition: border-color 0.2s ease, color 0.2s ease;
+        }
+        .mkt-footer__social-link:hover {
+          border-color: var(--mkt-blueprint);
+          color: var(--mkt-blueprint);
         }
         .mkt-footer__link {
           font-size: 0.875rem;

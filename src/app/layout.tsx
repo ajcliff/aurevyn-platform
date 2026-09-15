@@ -18,6 +18,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "/icon.png",
   },
+  openGraph: {
+    title: "AUREVYN — The POS System for Africa",
+    description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
+    siteName: "Aurevyn",
+    type: "website",
+    // No `images` entry yet — add a real 1200x630 share image before
+    // relying on link previews (WhatsApp/LinkedIn/Twitter all use this).
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AUREVYN — The POS System for Africa",
+    description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
+    // site: "@yourhandle", — add once the account exists
+  },
 };
 
 const THEME_INIT_SCRIPT = `
