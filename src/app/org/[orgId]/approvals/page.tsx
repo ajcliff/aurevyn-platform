@@ -11,6 +11,7 @@ import {
 } from "@/lib/approvals";
 import { createPurchaseOrderFromApproval, linkPurchaseOrderDocument } from "@/lib/purchaseOrders";
 import { getProducts, type InventoryProduct } from "@/lib/inventory";
+import { getSuppliers, type Supplier } from "@/lib/suppliers";
 import { uploadDocument } from "@/lib/documents";
 import { getOrgSettings, getOrgLogoUrl } from "@/lib/orgSettings";
 import jsPDF from "jspdf";
@@ -35,6 +36,7 @@ canApproveRequests(membership);
   const [saving, setSaving] = useState(false);
 
   const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [poRequest, setPoRequest] = useState<ApprovalRequest | null>(null);
   const [poProductId, setPoProductId] = useState("");
   const [poSupplier, setPoSupplier] = useState("");
@@ -50,12 +52,14 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
 
   async function load() {
     setLoading(true);
-    const [data, productData] = await Promise.all([
+    const [data, productData, supplierData] = await Promise.all([
       getApprovalRequests(organization.id),
       getProducts(organization.id),
+      getSuppliers(organization.id),
     ]);
     setRequests(data);
     setProducts(productData);
+    setSuppliers(supplierData);
     setLoading(false);
   }
 
@@ -100,11 +104,16 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
     // Purchase requests open the PO capture modal instead of approving directly —
     // quantity, supplier, and unit cost need to be recorded before it's truly "approved"
     if (r.type === "purchase" && status === "approved") {
+      const product = products.find((p) => p.id === r.related_id);
+      const defaultSupplier = product?.default_supplier_id
+        ? suppliers.find((s) => s.id === product.default_supplier_id)
+        : null;
+
       setPoRequest(r);
       setPoProductId(r.related_id || "");
-      setPoSupplier("");
-      setPoQuantity("");
-      setPoUnitCost("");
+      setPoSupplier(defaultSupplier?.name || "");
+      setPoQuantity(product?.reorder_quantity ? String(product.reorder_quantity) : "");
+      setPoUnitCost(product?.avg_cost ? String(product.avg_cost) : "");
       return;
     }
 

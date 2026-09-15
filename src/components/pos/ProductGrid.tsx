@@ -5,11 +5,15 @@ import { InventoryProduct } from "@/lib/inventory";
 type Props = {
   products: InventoryProduct[];
   addToCart: (product: InventoryProduct) => void;
+  stockLevels?: Record<string, Record<string, number>>;
+  selectedWarehouseId?: string;
 };
 
 export default function ProductGrid({
   products,
   addToCart,
+  stockLevels,
+  selectedWarehouseId,
 }: Props) {
   return (
     <div
@@ -27,9 +31,12 @@ export default function ProductGrid({
         }}
       >
         {products.map((product) => {
-          const lowStock =
-            Number(product.stock_quantity) <=
-            Number(product.low_stock_threshold);
+          const branchStock =
+            selectedWarehouseId && stockLevels?.[product.id!]
+              ? stockLevels[product.id!][selectedWarehouseId] ?? 0
+              : Number(product.stock_quantity);
+
+          const lowStock = branchStock <= Number(product.low_stock_threshold);
 
           return (
             <div
@@ -92,7 +99,7 @@ export default function ProductGrid({
                   fontWeight: 600,
                 }}
               >
-                Stock: {product.stock_quantity}
+                Stock: {branchStock}{selectedWarehouseId ? " (this branch)" : ""}
               </div>
             </div>
           );

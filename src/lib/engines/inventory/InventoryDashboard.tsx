@@ -19,6 +19,8 @@ import EditProductModal from "./components/EditProductModal";
 import StockActions from "./components/StockActions";
 import { exportToCSV } from "@/lib/csvExport";
 import MovementHistory from "./components/MovementHistory";
+import BatchManager from "./components/BatchManager";
+import { getExpiringBatches } from "@/lib/inventoryBatches";
 import s from "@/styles/layout.module.css";
 import { getStockLevelsForProduct, type StockLevel } from "@/lib/warehouses";
 
@@ -30,6 +32,7 @@ export default function InventoryDashboard() {
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const [pricingProductId, setPricingProductId] = useState<string | null>(null);
   const [movementProductId, setMovementProductId] = useState<string | null>(null);
+  const [batchProductId, setBatchProductId] = useState<string | null>(null);
 
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
   const [pricelistOverrides, setPricelistOverrides] = useState<PricelistOverride[]>([]);
@@ -38,6 +41,7 @@ export default function InventoryDashboard() {
 
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [lowStock, setLowStock] = useState<InventoryProduct[]>([]);
+  const [expiringBatches, setExpiringBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null);
@@ -82,16 +86,18 @@ export default function InventoryDashboard() {
   async function loadInventory() {
     try {
       const orgId = organization.id;
-      const [productData, lowStockData, movementData, approvalsData] = await Promise.all([
+      const [productData, lowStockData, movementData, approvalsData, expiringData] = await Promise.all([
         getProducts(orgId),
         getLowStockProducts(orgId),
         getMovements(orgId),
         getPendingApprovalsForOrg(orgId),
+        getExpiringBatches(orgId, 30),
       ]);
       setProducts(productData);
       setLowStock(lowStockData);
       setMovements(movementData);
       setPendingApprovals(approvalsData);
+      setExpiringBatches(expiringData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,6 +250,14 @@ return (
           </div>
         </div>
       </div>
+
+      {expiringBatches.length > 0 && (
+        <div style={{ background: "#ef444414", border: "1px solid #ef444440", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#ef4444" }}>
+          ⚠️ {expiringBatches.length} batch{expiringBatches.length === 1 ? "" : "es"} expiring within 30 days:{" "}
+          {expiringBatches.slice(0, 3).map((b) => b.product_name).join(", ")}
+          {expiringBatches.length > 3 ? ` +${expiringBatches.length - 3} more` : ""}
+        </div>
+      )}
 
       <div
         style={{
@@ -446,6 +460,17 @@ return (
                     ))}
                     {productMovements.length === 0 && <div>No movements recorded yet.</div>}
                   </div>
+                )}
+
+                <div
+                  style={{ marginTop: 6, fontSize: 11, color: "var(--gold)", cursor: "pointer" }}
+                  onClick={() => setBatchProductId(batchProductId === product.id ? null : product.id!)}
+                >
+                  {batchProductId === product.id ? "▲ hide batches" : "🏷️ batches & expiry"}
+                </div>
+
+                {batchProductId === product.id && (
+                  <BatchManager productId={product.id!} orgId={organization.id} />
                 )}
 
                 <StockActions

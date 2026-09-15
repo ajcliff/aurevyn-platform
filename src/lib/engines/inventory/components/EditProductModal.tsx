@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { updateProduct, archiveProduct, type InventoryProduct } from "@/lib/inventory";
+import { getSuppliers, type Supplier } from "@/lib/suppliers";
 import s from "@/styles/layout.module.css";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import { logActivity } from "@/lib/activity";
@@ -23,7 +24,15 @@ const { organization } = useEngine();
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
   const [threshold, setThreshold] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [reorderQuantity, setReorderQuantity] = useState("");
+  const [defaultSupplierId, setDefaultSupplierId] = useState("");
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getSuppliers(organization.id).then(setSuppliers);
+  }, [organization.id]);
 
   useEffect(() => {
     if (product) {
@@ -32,6 +41,9 @@ const { organization } = useEngine();
       setUnit(product.unit || "");
       setPrice(String(product.unit_price));
       setThreshold(String(product.low_stock_threshold));
+      setBarcode(product.barcode || "");
+      setReorderQuantity(product.reorder_quantity ? String(product.reorder_quantity) : "");
+      setDefaultSupplierId(product.default_supplier_id || "");
     }
   }, [product]);
 
@@ -46,6 +58,9 @@ const { organization } = useEngine();
         unit: unit || undefined,
         unit_price: Number(price) || 0,
         low_stock_threshold: Number(threshold) || 0,
+        barcode: barcode.trim() || null,
+        reorder_quantity: reorderQuantity ? Number(reorderQuantity) : null,
+        default_supplier_id: defaultSupplierId || null,
       });
       await logActivity({
         icon: "✏️",
@@ -154,6 +169,36 @@ const { organization } = useEngine();
           />
         </div>
 
+        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+          <input
+            className={s.input}
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            placeholder="Barcode (optional)"
+            style={{ flex: 1 }}
+          />
+
+          <input
+            className={s.input}
+            type="number"
+            value={reorderQuantity}
+            onChange={(e) => setReorderQuantity(e.target.value)}
+            placeholder="Reorder quantity"
+            style={{ flex: 1 }}
+          />
+        </div>
+
+        <select
+          className={s.input}
+          value={defaultSupplierId}
+          onChange={(e) => setDefaultSupplierId(e.target.value)}
+          style={{ width: "100%", marginBottom: "16px" }}
+        >
+          <option value="">No default supplier</option>
+          {suppliers.map((sup) => (
+            <option key={sup.id} value={sup.id}>{sup.name}</option>
+          ))}
+        </select>
         <div style={{ display: "flex", gap: "10px" }}>
           <button
             className={s.btnGhost}

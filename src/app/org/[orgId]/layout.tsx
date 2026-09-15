@@ -665,6 +665,16 @@ const { header } = usePageHeader();
 
           {engines.some((e) => e.engines?.slug === "inventory") && (
             <SidebarLink
+              href={`/org/${orgId}/stock-takes`}
+              label="Stock Takes"
+              icon="📋"
+              active={pathname.startsWith(`/org/${orgId}/stock-takes`)}
+              showLabel={showLabels}
+            />
+          )}
+
+          {engines.some((e) => e.engines?.slug === "inventory") && (
+            <SidebarLink
               href={`/org/${orgId}/pricelists`}
               label="Pricelists"
               icon="🏷️"

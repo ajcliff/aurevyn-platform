@@ -12,8 +12,12 @@ export interface InventoryProduct {
   low_stock_threshold: number;
   critical_stock_threshold?: number | null;
   unit_price: number;
+  avg_cost?: number | null;
   status?: string;
   created_at?: string;
+  reorder_quantity?: number | null;
+  default_supplier_id?: string | null;
+  barcode?: string | null;
 }
 
 export interface InventoryMovement {
@@ -24,6 +28,9 @@ export interface InventoryMovement {
   quantity: number;
   note?: string;
   created_at?: string;
+  reorder_quantity?: number | null;
+  default_supplier_id?: string | null;
+  barcode?: string | null;
 }
 
 export async function getProducts(orgId: string): Promise<InventoryProduct[]> {
@@ -100,6 +107,24 @@ export async function getLowStockProducts(orgId: string) {
   );
 }
 
+
+export async function getProductByBarcode(orgId: string, barcode: string): Promise<InventoryProduct | null> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("inventory_products")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("barcode", barcode)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error looking up barcode:", error);
+    return null;
+  }
+
+  return data as InventoryProduct | null;
+}
 export function getCategories(products: InventoryProduct[]): string[] {
   const set = new Set(
     products.map((p) => p.category).filter((c): c is string => Boolean(c))
