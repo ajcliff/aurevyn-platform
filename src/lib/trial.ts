@@ -46,127 +46,69 @@ export async function getTrialInfo(orgId: string): Promise<TrialInfo> {
   };
 }
 
-export type SellablePackage = {
+export type PricedEngine = {
+  id: string;
   name: string;
   slug: string;
-  price: string;
-  features: string;
+  monthly_price: number;
 };
 
-/**
- * Only the four real sellable tiers - "Unlimited" is excluded here since it
- * has no package_module_limits data and appears to be leftover/duplicate
- * test data (priced lower than Enterprise despite offering the same
- * "everything" scope) - worth reviewing and likely removing from the
- * packages table directly.
- */
-const SELLABLE_PACKAGE_SLUGS = ["core", "growth", "professional", "enterprise"];
-
-export async function getSellablePackages(): Promise<SellablePackage[]> {
+export async function getEnginePricing(): Promise<PricedEngine[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("packages")
-    .select("name, slug, price, features")
-    .in("slug", SELLABLE_PACKAGE_SLUGS);
+    .from("engines")
+    .select("id, name, slug, monthly_price")
+    .order("monthly_price", { ascending: false });
 
   if (error || !data) return [];
-
-  const order = SELLABLE_PACKAGE_SLUGS;
-  return (data as SellablePackage[]).sort((a, b) => order.indexOf(a.slug) - order.indexOf(b.slug));
+  return data as PricedEngine[];
 }
 
 /**
- * Engines covered by package_module_limits, mapped to their engine slugs.
- * The other engines in the catalog (Attendance, Business Operations,
- * Documents, Fees, Finance, Patients, Procurement, Real Estate, SACCO
- * Members, Students) have no pricing-tier data defined yet - as an
- * interim rule until that's filled in properly, they're only included in
- * the two "everything" tiers (Professional and Enterprise), matching what
- * those tiers' feature descriptions already promise.
+ * A-la-carte plan confirmation: the org picks exactly the engines they've
+ * actually used during the trial, priced individually and summed - not
+ * mapped to a fixed package tier. This avoids forcing anyone to pay for
+ * engines bundled into a tier that they don't actually use.
  */
-const MODULE_NAME_TO_ENGINE_SLUG: Record<string, string> = {
-  "Point of Sale": "pos",
-  "Inventory Management": "inventory",
-  "HR & Payroll": "hr-payroll",
-  CRM: "crm",
-  Analytics: "analytics",
-  "AI Insights": "ai-insights",
-};
-
-const UNMAPPED_ENGINE_SLUGS = [
-  "attendance", "business-ops", "documents", "fees", "finance",
-  "patients", "procurement", "real-estate", "sacco-members", "students",
-];
-
-export async function getEngineSlugsForPackage(packageName: string): Promise<string[]> {
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("package_module_limits")
-    .select("module_name, enabled")
-    .eq("package_name", packageName)
-    .eq("enabled", true);
-
-  const slugs = (data ?? [])
-    .map((row) => MODULE_NAME_TO_ENGINE_SLUG[row.module_name])
-    .filter((slug): slug is string => Boolean(slug));
-
-  if (packageName === "Professional" || packageName === "Enterprise") {
-    slugs.push(...UNMAPPED_ENGINE_SLUGS);
-  }
-
-  return slugs;
-}
-
-/**
- * Confirms the org's chosen package after the trial: activates only the
- * engines that package includes, records the choice, unlocks the org, and
- * creates a pending platform invoice using the existing manual-payment
- * pattern (no real payment gateway needed to test this end-to-end).
- */
-export async function confirmPackageSelection(orgId: string, orgName: string, packageSlug: string): Promise<boolean> {
+export async function confirmEngineSelection(
+  orgId: string,
+  orgName: string,
+  selectedEngineIds: string[]
+): Promise<boolean> {
   const supabase = createClient();
 
-  const { data: pkg } = await supabase
-    .from("packages")
-    .select("name, price")
-    .eq("slug", packageSlug)
-    .single();
+  const { data: allEngines } = await supabase.from("engines").select("id, name, monthly_price");
+  if (!allEngines) return false;
 
-  if (!pkg) return false;
-
-  const engineSlugs = await getEngineSlugsForPackage(pkg.name);
-
-  const { data: allEngines } = await supabase.from("engines").select("id, slug");
-  const engineIdsToEnable = (allEngines ?? [])
-    .filter((e) => engineSlugs.includes(e.slug))
-    .map((e) => e.id);
+  const selectedEngines = allEngines.filter((e) => selectedEngineIds.includes(e.id));
+  const total = selectedEngines.reduce((sum, e) => sum + Number(e.monthly_price), 0);
 
   await supabase.from("organization_engines").update({ enabled: false }).eq("org_id", orgId);
 
-  if (engineIdsToEnable.length > 0) {
+  if (selectedEngineIds.length > 0) {
     await supabase
       .from("organization_engines")
-      .update({ enabled: true, subscription_tier: pkg.name })
+      .update({ enabled: true, subscription_tier: "Custom" })
       .eq("org_id", orgId)
-      .in("engine_id", engineIdsToEnable);
+      .in("engine_id", selectedEngineIds);
   }
 
   await supabase
     .from("organizations")
     .update({
-      package: pkg.name,
+      package: `Custom (${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"})`,
       trial_locked: false,
       package_confirmed_at: new Date().toISOString(),
     })
     .eq("id", orgId);
 
-  const numericAmount = parseInt(pkg.price.replace(/[^\d]/g, ""), 10) || 0;
+  const engineList = selectedEngines.map((e) => e.name).join(", ");
 
   await supabase.from("scheduled_platform_invoices").insert({
     org_id: orgId,
     org_name: orgName,
-    description: `${pkg.name} plan - monthly subscription`,
-    amount: numericAmount,
+    description: `Custom plan (${engineList || "no engines selected"})`,
+    amount: total,
     frequency: "monthly",
     next_run: new Date().toISOString().slice(0, 10),
     active: true,
@@ -174,8 +116,8 @@ export async function confirmPackageSelection(orgId: string, orgName: string, pa
 
   await logActivity({
     icon: "✅",
-    title: "Plan selected",
-    sub: `${orgName} chose the ${pkg.name} plan`,
+    title: "Plan confirmed",
+    sub: `${orgName} selected ${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"} — KES ${total.toLocaleString()}/mo`,
     org_id: orgId,
   });
 
