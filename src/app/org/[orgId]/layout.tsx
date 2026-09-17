@@ -44,20 +44,21 @@ const NAV_LABELS: Record<string, string> = {
   documents: "Documents",
   knowledge: "Knowledge Base",
   employees: "Employee Hub",
-  team: "Team",
+   team: "Team",
   settings: "Settings",
   me: "My Profile",
   warehouses: "Warehouses",
   pricelists: "Pricelists",
+  fleet: "Fleet & Delivery",
+  "stock-takes": "Stock Takes",
   user: "My Profile",
   automation: "Automation",
 };
 
 const UNGATED_SEGMENTS = new Set([
   "me", "settings", "team", "employees", "activity", "approvals",
-  "documents", "knowledge", "warehouses", "pricelists", "summary", "welcome", undefined,
-]);
-const MOBILE_BREAKPOINT = 900;
+  "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", "welcome", "stock-takes", undefined,
+]);const MOBILE_BREAKPOINT = 900;
 
 const STATUS_COLORS: Record<string, string> = {
   operational: "#3ecf8e",
