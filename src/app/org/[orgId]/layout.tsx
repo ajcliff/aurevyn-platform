@@ -49,7 +49,7 @@ const NAV_LABELS: Record<string, string> = {
   me: "My Profile",
   warehouses: "Warehouses",
   pricelists: "Pricelists",
-  fleet: "Fleet & Delivery",
+   fleet: "Fleet & Delivery",
   "stock-takes": "Stock Takes",
   user: "My Profile",
   automation: "Automation",
@@ -58,7 +58,9 @@ const NAV_LABELS: Record<string, string> = {
 const UNGATED_SEGMENTS = new Set([
   "me", "settings", "team", "employees", "activity", "approvals",
   "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", "welcome", "stock-takes", undefined,
-]);const MOBILE_BREAKPOINT = 900;
+]);
+
+const MOBILE_BREAKPOINT = 900;
 
 const STATUS_COLORS: Record<string, string> = {
   operational: "#3ecf8e",
@@ -680,6 +682,16 @@ const { header } = usePageHeader();
               label="Pricelists"
               icon="🏷️"
               active={pathname.startsWith(`/org/${orgId}/pricelists`)}
+              showLabel={showLabels}
+            />
+          )}
+
+          {engines.some((e) => e.engines?.slug === "pos" || e.engines?.slug === "inventory") && (
+            <SidebarLink
+              href={`/org/${orgId}/fleet`}
+              label="Fleet & Delivery"
+              icon="🚚"
+              active={pathname.startsWith(`/org/${orgId}/fleet`)}
               showLabel={showLabels}
             />
           )}

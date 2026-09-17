@@ -2,7 +2,6 @@ import { createClient } from "./supabase";
 import { createSale, type PosSale, type PosSaleItem } from "./pos";
 import { recordPayment, type PaymentDetailsInput } from "./payments";
 import { updateStock } from "./inventory";
-import { deductStockFromWarehouse } from "./warehouses";
 import { logActivity } from "./activity";
 
 const STORAGE_KEY = "aurevyn_pos_offline_queue";
@@ -95,11 +94,14 @@ export async function syncQueuedSales(orgId: string): Promise<{ synced: number; 
       }
 
       for (const item of entry.cartItems) {
-        const { data: level } = await client
+        const levelQuery = client
           .from("inventory_stock_levels")
           .select("quantity")
-          .eq("product_id", item.productId)
-          .maybeSingle();
+          .eq("product_id", item.productId);
+
+        const { data: level } = entry.warehouseId
+          ? await levelQuery.eq("warehouse_id", entry.warehouseId).maybeSingle()
+          : await levelQuery.maybeSingle();
 
         const available = Number(level?.quantity ?? 0);
         if (available < item.quantity) {
@@ -114,11 +116,14 @@ export async function syncQueuedSales(orgId: string): Promise<{ synced: number; 
           );
         }
 
-        await updateStock(item.productId, item.quantity, "stock_out", `POS Sale ${created.id} (synced from offline queue)`, undefined, client);
-
-        if (entry.warehouseId) {
-          await deductStockFromWarehouse(item.productId, entry.warehouseId, item.quantity, client);
-        }
+        await updateStock(
+          item.productId,
+          item.quantity,
+          "stock_out",
+          `POS Sale ${created.id} (synced from offline queue)`,
+          entry.warehouseId || undefined,
+          client
+        );
       }
 
       await logActivity(

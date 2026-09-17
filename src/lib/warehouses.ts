@@ -113,30 +113,24 @@ export async function getStockValueByWarehouse(orgId: string) {
   return data || [];
 }
 
-export async function deductStockFromWarehouse(
-  productId: string,
-  warehouseId: string,
-  quantity: number,
-  client?: ReturnType<typeof createClient>
-) {
-  const supabase = client ?? createClient();
-
-  const { data: level } = await supabase
+// Bulk stock-levels lookup keyed by product then warehouse, for UIs (like
+// POS checkout) that need to validate against a specific branch's on-hand
+// quantity rather than the cross-warehouse aggregate on inventory_products.
+export async function getStockLevelsMap(orgId: string): Promise<Record<string, Record<string, number>>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
     .from("inventory_stock_levels")
-    .select("*")
-    .eq("product_id", productId)
-    .eq("warehouse_id", warehouseId)
-    .maybeSingle();
+    .select("product_id, warehouse_id, quantity")
+    .eq("org_id", orgId);
 
-  const currentQty = Number(level?.quantity || 0);
-  const newQty = Math.max(currentQty - quantity, 0);
+  if (error) throw error;
 
-  if (level) {
-    await supabase
-      .from("inventory_stock_levels")
-      .update({ quantity: newQty })
-      .eq("id", level.id);
+  const map: Record<string, Record<string, number>> = {};
+  for (const row of data || []) {
+    if (!map[row.product_id]) map[row.product_id] = {};
+    map[row.product_id][row.warehouse_id] = Number(row.quantity);
   }
+  return map;
 }
 
 export async function getStockLevelsForProduct(productId: string): Promise<StockLevel[]> {
