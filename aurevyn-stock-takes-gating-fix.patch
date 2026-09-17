@@ -1,0 +1,20 @@
+diff --git a/src/app/org/[orgId]/layout.tsx b/src/app/org/[orgId]/layout.tsx
+index 379e453..5e1f902 100644
+--- a/src/app/org/[orgId]/layout.tsx
++++ b/src/app/org/[orgId]/layout.tsx
+@@ -50,13 +50,14 @@ const NAV_LABELS: Record<string, string> = {
+   warehouses: "Warehouses",
+   pricelists: "Pricelists",
+   fleet: "Fleet & Delivery",
++  "stock-takes": "Stock Takes",
+   user: "My Profile",
+   automation: "Automation",
+ };
+ 
+ const UNGATED_SEGMENTS = new Set([
+   "me", "settings", "team", "employees", "activity", "approvals",
+-  "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", undefined,
++  "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", "stock-takes", undefined,
+ ]);
+ 
+ const MOBILE_BREAKPOINT = 900;
