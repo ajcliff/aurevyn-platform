@@ -157,60 +157,21 @@ export async function acceptInvite(
   fullName: string,
   password: string
 ): Promise<{ orgId: string }> {
-  const supabase = createClient();
-
-  const invite = await getInviteByToken(token);
-  if (!invite) throw new Error("This invite is invalid or has already been used.");
-
-const { data: signup, error: signupError } = await supabase.auth.signUp({
-    email: invite.email,
-    password,
+  const res = await fetch("/api/team/accept-invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, fullName, password }),
   });
 
-  if (signupError) {
-    if (signupError.message.toLowerCase().includes("already registered")) {
-      throw new Error(
-        "An account with this email already exists. Please log in instead, then ask the org owner to add you as a team member."
-      );
-    }
-    throw signupError;
+  const result = await res.json();
+  if (!res.ok) {
+    throw new Error(result.error || "Failed to join.");
   }
 
-  const userId = signup.user?.id;
-  if (!userId) throw new Error("Account creation failed");
+  // Account and membership now exist server-side (pre-confirmed) — sign in
+  // here to establish the actual browser session.
+  const supabase = createClient();
+  await supabase.auth.signInWithPassword({ email: result.email, password });
 
-  const { error: memberError } = await supabase.from("org_users").insert({
-    org_id: invite.org_id,
-    user_id: userId,
-    role: invite.role,
-    full_name: fullName,
-    email: invite.email,
-    allowed_engines: invite.allowed_engines,
-  });
-  if (memberError) throw memberError;
-
-  // Every accepted invite gets a matching HR record automatically — this is
-  // what closes the "team member exists but Employee Hub is empty" gap.
-  // Salary/department/hire date default to blank and get filled in later;
-  // the point is the row exists and is linked from the start.
-  const { error: employeeError } = await supabase.from("employees").insert({
-    org_id: invite.org_id,
-    user_id: userId,
-    full_name: fullName,
-    email: invite.email,
-    phone: null,
-    role: invite.role,
-    department: null,
-    employment_status: "active",
-    salary: 0,
-    hire_date: new Date().toISOString().slice(0, 10),
-  });
-  if (employeeError) throw employeeError;
-
-  await supabase
-    .from("team_invites")
-    .update({ status: "accepted" })
-    .eq("id", invite.id);
-
-  return { orgId: invite.org_id };
+  return { orgId: result.orgId };
 }
