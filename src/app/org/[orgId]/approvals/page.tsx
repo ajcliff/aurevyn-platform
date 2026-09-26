@@ -9,6 +9,8 @@ import {
   type ApprovalRequest,
   type ApprovalType,
 } from "@/lib/approvals";
+import { disburseSalaryAdvance, rejectSalaryAdvance } from "@/lib/salaryAdvances";
+import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import { createPurchaseOrderFromApproval, linkPurchaseOrderDocument } from "@/lib/purchaseOrders";
 import { getProducts, type InventoryProduct } from "@/lib/inventory";
 import { getSuppliers, type Supplier } from "@/lib/suppliers";
@@ -44,6 +46,10 @@ canApproveRequests(membership);
   const [poUnitCost, setPoUnitCost] = useState("");
   const [creatingPo, setCreatingPo] = useState(false);
 const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(null);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [advanceRequest, setAdvanceRequest] = useState<ApprovalRequest | null>(null);
+  const [advanceFundingAccountId, setAdvanceFundingAccountId] = useState("");
+  const [disbursing, setDisbursing] = useState(false);
 
 
   useEffect(() => {
@@ -52,12 +58,14 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
 
   async function load() {
     setLoading(true);
-    const [data, productData, supplierData] = await Promise.all([
+    const [data, productData, supplierData, faData] = await Promise.all([
       getApprovalRequests(organization.id),
       getProducts(organization.id),
       getSuppliers(organization.id),
+      getFinanceAccounts(organization.id),
     ]);
     setRequests(data);
+    setFinanceAccounts(faData.filter((a) => a.status === "active"));
     setProducts(productData);
     setSuppliers(supplierData);
     setLoading(false);
@@ -117,9 +125,50 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
       return;
     }
 
+    // Salary advances need a funding account before they can actually be
+    // disbursed — open that picker instead of approving directly.
+    if (r.type === "salary_advance" && status === "approved") {
+      setAdvanceRequest(r);
+      setAdvanceFundingAccountId(financeAccounts[0]?.id || "");
+      return;
+    }
+
+    if (r.type === "salary_advance" && status === "rejected") {
+      const deciderName = membership.isFounder ? "Founder" : "Approver";
+      if (!r.related_id) return;
+      await rejectSalaryAdvance({
+        advanceId: r.related_id,
+        orgId: organization.id,
+        approvalRequestId: r.id,
+        decidedByName: deciderName,
+        title: r.title,
+      });
+      load();
+      return;
+    }
+
     const deciderName = membership.isFounder ? "Founder" : "Approver";
     await decideApprovalRequest(r.id, status, deciderName, organization.id, r.title);
     load();
+  }
+
+  async function confirmDisburseAdvance() {
+    if (!advanceRequest || !advanceRequest.related_id) return;
+    setDisbursing(true);
+    try {
+      const deciderName = membership.isFounder ? "Founder" : "Approver";
+      await disburseSalaryAdvance({
+        advanceId: advanceRequest.related_id,
+        orgId: organization.id,
+        approvalRequestId: advanceRequest.id,
+        financeAccountId: advanceFundingAccountId || undefined,
+        decidedByName: deciderName,
+      });
+      setAdvanceRequest(null);
+      load();
+    } finally {
+      setDisbursing(false);
+    }
   }
 
 async function loadImageAsDataUrl(url: string): Promise<string | null> {
@@ -328,6 +377,37 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
         </div>
       )}
        
+
+      {advanceRequest && (
+        <div style={overlayStyle}>
+          <div style={modalStyle}>
+            <h2 style={{ marginBottom: 6 }}>Disburse Salary Advance</h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+              Approving "{advanceRequest.title}" — KES {Number(advanceRequest.amount || 0).toLocaleString()}
+            </p>
+
+            <label style={labelStyle}>Paid from</label>
+            {financeAccounts.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                No bank/cash/mobile-money accounts set up — this will post to an unspecified cash bucket instead.
+              </p>
+            ) : (
+              <select value={advanceFundingAccountId} onChange={(e) => setAdvanceFundingAccountId(e.target.value)} style={inputStyle}>
+                {financeAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={ghostButton} onClick={() => setAdvanceRequest(null)}>Cancel</button>
+              <button style={{ ...buttonGold, flex: 1 }} onClick={confirmDisburseAdvance} disabled={disbursing}>
+                {disbursing ? "Disbursing..." : "Confirm & Disburse"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {poRequest && (
         <div style={overlayStyle}>

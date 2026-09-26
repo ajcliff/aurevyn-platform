@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
 
-export type ApprovalType = "expense" | "reimbursement" | "purchase";
+export type ApprovalType = "expense" | "reimbursement" | "purchase" | "salary_advance";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export type ApprovalRequest = {

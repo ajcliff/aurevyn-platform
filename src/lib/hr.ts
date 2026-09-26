@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { postPayrollJournal } from "@/lib/journal";
 
 export type EmploymentStatus = "active" | "on_leave" | "terminated";
 export type PayrollStatus = "draft" | "processed" | "paid";
@@ -94,6 +95,49 @@ export async function getPayrollItems(orgId: string, runId: string): Promise<Pay
 
 // Creates a draft payroll run and one payroll_item per active employee.
 // Monthly gross assumed = salary / 12, deductions = 20% flat.
+// Kenya statutory payroll deductions, current as of the Feb 2026 NSSF update.
+// Source-checked against KRA/NSSF/SHA guidance — these change periodically
+// (Finance Bills adjust PAYE bands, NSSF's ceiling phases in annually), so
+// revisit this block if KRA/NSSF publish new figures.
+const PAYE_BANDS = [
+  { upTo: 24000, rate: 0.10 },
+  { upTo: 32333, rate: 0.25 },
+  { upTo: 500000, rate: 0.30 },
+  { upTo: 800000, rate: 0.325 },
+  { upTo: Infinity, rate: 0.35 },
+];
+const PERSONAL_RELIEF = 2400; // monthly, subtracted from computed tax — never a refund, floors at 0
+const NSSF_RATE = 0.06; // employee side; employer matches 6% but that's a cost, not a deduction, not tracked here yet
+const NSSF_PENSIONABLE_CAP = 108000; // Tier I+II combined ceiling, effective Feb 2026
+const SHIF_RATE = 0.0275;
+const SHIF_MIN = 300;
+const AHL_RATE = 0.015; // Affordable Housing Levy, employee side
+
+function calculatePaye(taxablePay: number): number {
+  let remaining = taxablePay;
+  let tax = 0;
+  let lowerBound = 0;
+  for (const band of PAYE_BANDS) {
+    if (remaining <= 0) break;
+    const taxableInBand = Math.min(remaining, band.upTo - lowerBound);
+    tax += taxableInBand * band.rate;
+    remaining -= taxableInBand;
+    lowerBound = band.upTo;
+  }
+  return Math.max(tax - PERSONAL_RELIEF, 0);
+}
+
+// NSSF, SHIF, and AHL are all pre-tax deductions — they reduce taxable pay
+// before PAYE bands are applied, then PAYE stacks on top as the last cut.
+function calculateStatutoryDeductions(gross: number) {
+  const nssf = Math.min(gross, NSSF_PENSIONABLE_CAP) * NSSF_RATE;
+  const shif = Math.max(gross * SHIF_RATE, SHIF_MIN);
+  const ahl = gross * AHL_RATE;
+  const taxablePay = Math.max(gross - nssf - shif - ahl, 0);
+  const paye = calculatePaye(taxablePay);
+  return { nssf, shif, ahl, paye, totalDeductions: nssf + shif + ahl + paye };
+}
+
 export async function runPayroll(orgId: string, periodStart: string, periodEnd: string) {
   const supabase = createClient();
 
@@ -105,11 +149,35 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
   if (empErr) throw empErr;
 
   const active = (emps ?? []) as Employee[];
+
+  const { data: advances, error: advErr } = await supabase
+    .from("salary_advances")
+    .select("id, employee_id, outstanding_balance")
+    .eq("org_id", orgId)
+    .eq("status", "disbursed")
+    .gt("outstanding_balance", 0);
+  if (advErr) throw advErr;
+  const advanceByEmployee = new Map((advances ?? []).map((a) => [a.employee_id, a]));
+
   const items = active.map((e) => {
     const gross = Number(e.salary || 0) / 12;
-    const deductions = gross * 0.2;
-    const net = gross - deductions;
-    return { gross_pay: gross, deductions, net_pay: net, employee_id: e.id };
+    const { totalDeductions } = calculateStatutoryDeductions(gross);
+    const postDeductionPay = gross - totalDeductions;
+    const advance = advanceByEmployee.get(e.id);
+    // Capped at 50% of that period's post-statutory pay, deliberately not the
+    // full outstanding balance in one shot — avoids zeroing out a paycheck.
+    // Remainder carries to the next run.
+    const advanceRepayment = advance
+      ? Math.min(Number(advance.outstanding_balance), postDeductionPay * 0.5)
+      : 0;
+    const net = postDeductionPay - advanceRepayment;
+    return {
+      gross_pay: gross,
+      deductions: totalDeductions,
+      advance_repayment: advanceRepayment,
+      net_pay: net,
+      employee_id: e.id,
+    };
   });
   const total = items.reduce((s, i) => s + i.net_pay, 0);
 
@@ -135,13 +203,54 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
   return run as PayrollRun;
 }
 
-export async function updatePayrollRunStatus(id: string, status: PayrollStatus) {
+export async function updatePayrollRunStatus(id: string, status: PayrollStatus, financeAccountId?: string) {
   const supabase = createClient();
   const patch: Partial<PayrollRun> = { status };
   if (status === "processed") patch.processed_at = new Date().toISOString();
   const { data, error } = await supabase.from("payroll_runs").update(patch).eq("id", id).select().single();
   if (error) throw error;
-  return data as PayrollRun;
+
+  const run = data as PayrollRun;
+  if (status === "paid") {
+    await postPayrollJournal({
+      orgId: run.org_id,
+      runId: run.id,
+      periodLabel: `${run.period_start} to ${run.period_end}`,
+      date: run.period_end,
+      financeAccountId,
+    });
+
+    const { data: repaidItems } = await supabase
+      .from("payroll_items")
+      .select("employee_id, advance_repayment")
+      .eq("payroll_run_id", run.id)
+      .gt("advance_repayment", 0);
+
+    for (const item of repaidItems ?? []) {
+      const { data: advance } = await supabase
+        .from("salary_advances")
+        .select("id, outstanding_balance")
+        .eq("org_id", run.org_id)
+        .eq("employee_id", item.employee_id)
+        .eq("status", "disbursed")
+        .gt("outstanding_balance", 0)
+        .order("requested_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!advance) continue;
+
+      const newBalance = Math.max(Number(advance.outstanding_balance) - Number(item.advance_repayment), 0);
+      await supabase
+        .from("salary_advances")
+        .update({
+          outstanding_balance: newBalance,
+          status: newBalance === 0 ? "repaid" : "disbursed",
+        })
+        .eq("id", advance.id);
+    }
+  }
+
+  return run;
 }
 
 export async function getLeaveRequests(orgId: string): Promise<LeaveRequest[]> {

@@ -36,7 +36,7 @@ async function getOrCreateDefaultAccount(
 // Chart of Accounts row the first time it's needed for posting, so every
 // bank/cash/mobile-money account gets its own asset line over time instead
 // of everything piling into one bucket.
-async function getAssetAccountId(
+export async function getAssetAccountId(
   supabase: SupabaseClientType,
   orgId: string,
   financeAccountId: string | null
@@ -242,10 +242,11 @@ export async function postSaleJournal(sale: {
   tax_amount?: number;
   cogs_amount?: number;
   created_at?: string;
+  financeAccountId?: string | null;
 }): Promise<void> {
   const supabase = createClient();
 
-  const assetAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "1000", "Unspecified Cash", "asset");
+  const assetAccountId = await getAssetAccountId(supabase, sale.org_id, sale.financeAccountId ?? null);
   const revenueAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "4000", "Sales Revenue", "income");
 
   const total = Number(sale.total);
@@ -284,6 +285,141 @@ export async function postSaleJournal(sale: {
   if (lineError) throw lineError;
 }
 
+// Posts a payroll run as it moves to "paid": debit Salaries & Wages Expense
+// (gross), credit Statutory Deductions Payable (withheld amounts — owed to
+// KRA/NSSF, not vanished), credit the cash/asset account for what was
+// actually disbursed (net). Sums payroll_items for the run rather than
+// taking pre-computed totals, so it's always consistent with what's
+// actually on the payslips.
+// Posts a salary advance disbursement: debit Employee Advances (an asset —
+// it's money owed back to the company), credit whichever account funded it.
+export async function postSalaryAdvanceDisbursementJournal(input: {
+  orgId: string;
+  advanceId: string;
+  amount: number;
+  date: string;
+  financeAccountId?: string | null;
+}): Promise<void> {
+  if (input.amount <= 0) return;
+  const supabase = createClient();
+
+  const advancesAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1300", "Employee Advances", "asset");
+  const assetAccountId = await getAssetAccountId(supabase, input.orgId, input.financeAccountId ?? null);
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "salary_advance",
+      source_id: input.advanceId,
+      description: "Salary advance disbursed",
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: input.orgId, coa_id: advancesAccountId, debit: input.amount, credit: 0 },
+    { entry_id: entry.id, org_id: input.orgId, coa_id: assetAccountId, debit: 0, credit: input.amount },
+  ]);
+  if (lineError) throw lineError;
+}
+
+export async function postPayrollJournal(input: {
+  orgId: string;
+  runId: string;
+  periodLabel: string;
+  date: string;
+  financeAccountId?: string;
+}): Promise<void> {
+  const supabase = createClient();
+
+  const { data: items, error: itemsError } = await supabase
+    .from("payroll_items")
+    .select("gross_pay, deductions, net_pay, advance_repayment")
+    .eq("payroll_run_id", input.runId);
+  if (itemsError) throw itemsError;
+  if (!items || items.length === 0) return;
+
+  const gross = items.reduce((s, i) => s + Number(i.gross_pay), 0);
+  const deductions = items.reduce((s, i) => s + Number(i.deductions), 0);
+  const net = items.reduce((s, i) => s + Number(i.net_pay), 0);
+  const advanceRepayments = items.reduce((s, i) => s + Number(i.advance_repayment || 0), 0);
+  if (gross <= 0) return;
+
+  const expenseAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "5100", "Salaries & Wages Expense", "expense");
+  const assetAccountId = await getAssetAccountId(supabase, input.orgId, input.financeAccountId ?? null);
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "payroll_run",
+      source_id: input.runId,
+      description: `Payroll - ${input.periodLabel}`,
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const lines = [{ entry_id: entry.id, org_id: input.orgId, coa_id: expenseAccountId, debit: gross, credit: 0 }];
+  if (deductions > 0) {
+    const deductionsPayableId = await getOrCreateDefaultAccount(supabase, input.orgId, "2200", "Statutory Deductions Payable", "liability");
+    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: deductionsPayableId, debit: 0, credit: deductions });
+  }
+  if (advanceRepayments > 0) {
+    const advancesAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1300", "Employee Advances", "asset");
+    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: advancesAccountId, debit: 0, credit: advanceRepayments });
+  }
+  if (net > 0) {
+    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: assetAccountId, debit: 0, credit: net });
+  }
+
+  const { error: lineError } = await supabase.from("journal_lines").insert(lines);
+  if (lineError) throw lineError;
+}
+
+// Posts a supplier payment against Accounts Payable: debit AP (reducing
+// what's owed), credit the cash/asset account that paid it — a specific
+// finance_accounts row when one's picked, otherwise the generic
+// "Unspecified Cash" bucket. Only called for completed payments — a
+// pending cheque doesn't reduce AP until it clears (see updateChequeStatus
+// in payments.ts).
+export async function postPayablePaymentJournal(input: {
+  orgId: string;
+  poId: string;
+  amount: number;
+  date: string;
+  financeAccountId?: string;
+}): Promise<void> {
+  if (input.amount <= 0) return;
+  const supabase = createClient();
+
+  const apAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "2000", "Accounts Payable", "liability");
+  const assetAccountId = await getAssetAccountId(supabase, input.orgId, input.financeAccountId ?? null);
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "purchase_order_payment",
+      source_id: input.poId,
+      description: "Supplier payment",
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: input.orgId, coa_id: apAccountId, debit: input.amount, credit: 0 },
+    { entry_id: entry.id, org_id: input.orgId, coa_id: assetAccountId, debit: 0, credit: input.amount },
+  ]);
+  if (lineError) throw lineError;
+}
+
 // Posts the value of goods received against a purchase order: Inventory
 // asset (debit) against Accounts Payable (credit) for the received value.
 // Called per-receipt, so partial receipts post their own partial entry.
@@ -318,4 +454,96 @@ export async function postPurchaseReceiptJournal(input: {
     { entry_id: entry.id, org_id: input.orgId, coa_id: apAccountId, debit: 0, credit: input.receivedValue },
   ]);
   if (lineError) throw lineError;
+}
+
+export type LedgerPnL = {
+  totalIncome: number;
+  totalExpenses: number;
+  netProfit: number;
+};
+
+// Sums journal_lines by chart-of-accounts type to get the real P&L —
+// income/expense account_type is set consistently by every posting
+// function in this file, so this reflects POS, payroll, PO, and manual
+// finance_transactions/finance_expenses postings alike, not just the
+// manually-entered ones.
+export async function getLedgerPnL(orgId: string): Promise<LedgerPnL> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("journal_lines")
+    .select("debit, credit, chart_of_accounts(account_type)")
+    .eq("org_id", orgId);
+  if (error) throw error;
+
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  for (const line of data ?? []) {
+    const accountType = (line as any).chart_of_accounts?.account_type;
+    const debit = Number(line.debit) || 0;
+    const credit = Number(line.credit) || 0;
+    if (accountType === "income") totalIncome += credit - debit;
+    else if (accountType === "expense") totalExpenses += debit - credit;
+  }
+
+  return { totalIncome, totalExpenses, netProfit: totalIncome - totalExpenses };
+}
+
+export type CashPosition = {
+  total: number;
+  // finance_accounts.id -> live balance (opening balance + its own ledger movement)
+  byAccountId: Record<string, number>;
+  // Money POS/payroll/PO have moved that isn't tied to any specific
+  // finance_accounts row yet (posted to the generic "Unspecified Cash"
+  // bucket) — included in total, surfaced separately so it isn't silently
+  // hidden inside one account's number.
+  unattributed: number;
+};
+
+// finance_accounts.balance is a manually-set opening balance, never
+// updated by any posting flow — the running total since then lives in
+// journal_lines against whichever chart-of-accounts row the account is
+// lazily linked to (coa_id, set the first time money actually posts to
+// it). This adds the two together per account, the same way a real bank
+// statement would.
+export async function getCashPosition(orgId: string): Promise<CashPosition> {
+  const supabase = createClient();
+
+  const { data: accounts, error: accError } = await supabase
+    .from("finance_accounts")
+    .select("id, balance, coa_id")
+    .eq("org_id", orgId)
+    .eq("status", "active")
+    .in("type", ["bank", "cash", "mobile_money"]);
+  if (accError) throw accError;
+
+  const unspecifiedCoaId = await getOrCreateDefaultAccount(supabase, orgId, "1000", "Unspecified Cash", "asset");
+  const coaIds = Array.from(
+    new Set([unspecifiedCoaId, ...(accounts ?? []).map((a) => a.coa_id).filter(Boolean) as string[]])
+  );
+
+  const { data: lines, error: lineError } = await supabase
+    .from("journal_lines")
+    .select("debit, credit, coa_id")
+    .eq("org_id", orgId)
+    .in("coa_id", coaIds);
+  if (lineError) throw lineError;
+
+  const movementByCoa: Record<string, number> = {};
+  for (const l of lines ?? []) {
+    movementByCoa[l.coa_id] = (movementByCoa[l.coa_id] || 0) + (Number(l.debit) - Number(l.credit));
+  }
+
+  const byAccountId: Record<string, number> = {};
+  let total = 0;
+  for (const a of accounts ?? []) {
+    const movement = a.coa_id ? movementByCoa[a.coa_id] || 0 : 0;
+    const live = Number(a.balance || 0) + movement;
+    byAccountId[a.id] = live;
+    total += live;
+  }
+
+  const unattributed = movementByCoa[unspecifiedCoaId] || 0;
+  total += unattributed;
+
+  return { total, byAccountId, unattributed };
 }

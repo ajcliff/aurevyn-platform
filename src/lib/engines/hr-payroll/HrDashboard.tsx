@@ -15,6 +15,8 @@ import {
   updateLeaveStatus,
   updatePayrollRunStatus,
 } from "@/lib/hr";
+import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
+import { requestSalaryAdvance } from "@/lib/salaryAdvances";
 import { exportToCSV } from "@/lib/csvExport";
 import { logActivity } from "@/lib/activity";
 
@@ -70,14 +72,23 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
   const [dept, setDept] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | EmploymentStatus>("all");
   const [showNew, setShowNew] = useState(false);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [payingRun, setPayingRun] = useState<PayrollRun | null>(null);
+  const [advancingEmployee, setAdvancingEmployee] = useState<Employee | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [e, r, l] = await Promise.all([getEmployees(orgId), getPayrollRuns(orgId), getLeaveRequests(orgId)]);
+      const [e, r, l, fa] = await Promise.all([
+        getEmployees(orgId),
+        getPayrollRuns(orgId),
+        getLeaveRequests(orgId),
+        getFinanceAccounts(orgId),
+      ]);
       setEmployees(e);
       setRuns(r);
       setLeaves(l);
+      setFinanceAccounts(fa);
       setLoading(false);
     })();
   }, [orgId]);
@@ -159,9 +170,26 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
   }
 
   async function advanceRun(r: PayrollRun) {
-    const next: PayrollRun["status"] = r.status === "draft" ? "processed" : r.status === "processed" ? "paid" : "paid";
+    if (r.status === "processed") {
+      setPayingRun(r);
+      return;
+    }
+    const next: PayrollRun["status"] = r.status === "draft" ? "processed" : "paid";
     const updated = await updatePayrollRunStatus(r.id, next);
     setRuns((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+  }
+
+  async function confirmPayRun(financeAccountId?: string) {
+    if (!payingRun) return;
+    const updated = await updatePayrollRunStatus(payingRun.id, "paid", financeAccountId);
+    setRuns((prev) => prev.map((x) => (x.id === payingRun.id ? updated : x)));
+    await logActivity({
+      icon: "💸",
+      title: "Payroll paid",
+      sub: `KES ${Number(updated.total_amount).toLocaleString()}`,
+      org_id: orgId,
+    });
+    setPayingRun(null);
   }
 
   async function decideLeave(l: LeaveRequest, status: LeaveStatus) {
@@ -244,6 +272,7 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
                   <th style={styles.th}>Dept</th>
                   <th style={styles.th}>Salary</th>
                   <th style={styles.th}>Status</th>
+                  <th style={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -254,11 +283,16 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
                     <td style={styles.td}>{e.department ?? "—"}</td>
                     <td style={styles.td}>KES {Number(e.salary).toLocaleString()}</td>
                     <td style={styles.td}>{empStatusBadge(e.employment_status)}</td>
+                    <td style={styles.td}>
+                      <button style={styles.ghost} onClick={() => setAdvancingEmployee(e)}>
+                        Request advance
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {!filtered.length && (
                   <tr>
-                    <td style={styles.td} colSpan={5}>
+                    <td style={styles.td} colSpan={6}>
                       No employees.
                     </td>
                   </tr>
@@ -391,6 +425,141 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
       </aside>
 
       {showNew && <NewEmployeeModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+      {payingRun && (
+        <PayRunFundingModal
+          run={payingRun}
+          accounts={financeAccounts}
+          onClose={() => setPayingRun(null)}
+          onConfirm={confirmPayRun}
+        />
+      )}
+      {advancingEmployee && (
+        <RequestAdvanceModal
+          employee={advancingEmployee}
+          orgId={orgId}
+          onClose={() => setAdvancingEmployee(null)}
+          onSubmitted={() => setAdvancingEmployee(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RequestAdvanceModal({
+  employee,
+  orgId,
+  onClose,
+  onSubmitted,
+}: {
+  employee: Employee;
+  orgId: string;
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const numeric = Number(amount);
+    if (!numeric || numeric <= 0) {
+      setError("Enter an amount greater than zero.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await requestSalaryAdvance({
+        orgId,
+        employeeId: employee.id,
+        employeeName: employee.full_name,
+        amount: numeric,
+        reason: reason || undefined,
+        requestedByUserId: null,
+        requestedByName: "HR",
+      });
+      onSubmitted();
+    } catch (e) {
+      setError("Couldn't submit the request. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={styles.modalBackdrop} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ marginTop: 0 }}>Request Salary Advance</h3>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{employee.full_name}</p>
+        <div style={styles.field}>
+          <label style={styles.label}>Amount (KES)</label>
+          <input style={styles.input} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="10000" />
+        </div>
+        <div style={styles.field}>
+          <label style={styles.label}>Reason (optional)</label>
+          <input style={styles.input} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="School fees" />
+        </div>
+        {error && <div style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 8 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+          <button style={styles.ghost} onClick={onClose}>
+            Cancel
+          </button>
+          <button style={styles.primary} onClick={submit} disabled={saving}>
+            {saving ? "Submitting..." : "Submit Request"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PayRunFundingModal({
+  run,
+  accounts,
+  onClose,
+  onConfirm,
+}: {
+  run: PayrollRun;
+  accounts: FinanceAccount[];
+  onClose: () => void;
+  onConfirm: (financeAccountId?: string) => void;
+}) {
+  const active = accounts.filter((a) => a.status === "active");
+  const [accountId, setAccountId] = useState(active[0]?.id || "");
+
+  return (
+    <div style={styles.modalBackdrop} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ marginTop: 0 }}>Mark Payroll Paid</h3>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          {run.period_start} to {run.period_end} — KES {Number(run.total_amount).toLocaleString()}
+        </p>
+        <div style={styles.field}>
+          <label style={styles.label}>Paid from</label>
+          {active.length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              No bank/cash/mobile-money accounts set up — this will post to an unspecified cash bucket instead.
+            </div>
+          ) : (
+            <select style={styles.select} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              {active.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+          <button style={styles.ghost} onClick={onClose}>
+            Cancel
+          </button>
+          <button style={styles.primary} onClick={() => onConfirm(accountId || undefined)}>
+            Confirm Payment
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
