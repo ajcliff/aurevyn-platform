@@ -4,10 +4,12 @@ export type Package = {
   id: string;
   name: string;
   slug: string;
-  price: string;
-  features: string;
+  price: number;
   orgs: number;
   created_at: string;
+  engine_slugs: string[];
+  requires_any_of: string[] | null;
+  is_bundle: boolean;
 };
 
 export async function getPackages(): Promise<Package[]> {
@@ -31,12 +33,20 @@ function slugify(name: string): string {
 }
 
 export async function createPackage(
-  pkg: Omit<Package, "id" | "created_at" | "slug">
+  pkg: { name: string; price: number; orgs?: number; engine_slugs?: string[]; requires_any_of?: string[] | null; is_bundle?: boolean }
 ) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("packages")
-    .insert([{ ...pkg, slug: slugify(pkg.name) }])
+    .insert([{
+      name: pkg.name,
+      price: pkg.price,
+      orgs: pkg.orgs ?? 0,
+      engine_slugs: pkg.engine_slugs ?? [],
+      requires_any_of: pkg.requires_any_of ?? null,
+      is_bundle: pkg.is_bundle ?? false,
+      slug: slugify(pkg.name),
+    }])
     .select()
     .single();
 
@@ -50,7 +60,7 @@ export async function createPackage(
 
 export async function updatePackage(
   id: string,
-  updates: Partial<Pick<Package, "price" | "features" | "name">>
+  updates: Partial<Pick<Package, "price" | "name" | "engine_slugs" | "is_bundle">>
 ) {
   const supabase = createClient();
   const { data, error } = await supabase

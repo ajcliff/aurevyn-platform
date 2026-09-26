@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { getInvoices, updateInvoiceStatus, createInvoice, type Invoice } from "@/lib/invoices";
 import { getOrganizations, type Organization } from "@/lib/organizations";
 import { getPackages, type Package } from "@/lib/packages";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase";
-import s from "@/styles/layout.module.css";
 import DashboardDrawer, { DrawerFieldList } from "@/components/DashboardDrawer";
-import PageHeader from "@/components/PageHeader";
-const statusColor: Record<string, string> = {
-  paid: "#3dd68c", pending: "#f59e0b", overdue: "#ef4444",
-};
+import Modal from "@/components/founder/Modal";
+import f from "@/styles/founder.module.css";
+
+const statusVar: Record<string, string> = { paid: "var(--green)", pending: "var(--amber)", overdue: "var(--red)" };
+
+const toNumber = (v: string | number) => (typeof v === "number" ? v : parseInt(v.replace(/[^0-9]/g, "")) || 0);
+const kes = (n: number) => `KES ${n.toLocaleString("en-KE")}`;
+const date = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const emptyInvoice = () => ({ org_name: "", amount: "", status: "pending" as Invoice["status"], due_date: "", paid_date: null as string | null, description: "" });
 
 export default function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -22,10 +25,8 @@ export default function BillingPage() {
   const [search, setSearch] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newInvoice, setNewInvoice] = useState({
-    org_name: "", amount: "", status: "pending" as Invoice["status"],
-    due_date: "", paid_date: null as string | null, description: "",
-  });
+  const [newInvoice, setNewInvoice] = useState(emptyInvoice);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     getInvoices().then(setInvoices);
@@ -40,16 +41,24 @@ export default function BillingPage() {
   }, []);
 
   const filtered = invoices.filter(inv => {
-    const matchSearch = inv.org_name.toLowerCase().includes(search.toLowerCase()) ||
-      inv.description.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || inv.status === statusFilter;
-    return matchSearch && matchStatus;
+    const q = search.toLowerCase();
+    const matchSearch = inv.org_name.toLowerCase().includes(q) || inv.description.toLowerCase().includes(q);
+    return matchSearch && (statusFilter === "all" || inv.status === statusFilter);
   });
 
-  const totalPaid = invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (parseInt(i.amount.replace(/[^0-9]/g, "")) || 0), 0);
-  const totalPending = invoices.filter(i => i.status === "pending").reduce((sum, i) => sum + (parseInt(i.amount.replace(/[^0-9]/g, "")) || 0), 0);
-  const totalOverdue = invoices.filter(i => i.status === "overdue").reduce((sum, i) => sum + (parseInt(i.amount.replace(/[^0-9]/g, "")) || 0), 0);
-  const totalMRR = packages.reduce((sum, p) => sum + (parseInt(p.price.replace(/[^0-9]/g, "")) || 0) * p.orgs, 0);
+  const sum = (status: Invoice["status"]) => invoices.filter(i => i.status === status).reduce((t, i) => t + toNumber(i.amount), 0);
+  const count = (status: Invoice["status"]) => invoices.filter(i => i.status === status).length;
+  const totalPaid = sum("paid");
+  const totalPending = sum("pending");
+  const totalOverdue = sum("overdue");
+  const totalMRR = packages.reduce((t, p) => t + toNumber(p.price) * p.orgs, 0);
+  const subscriptions = packages.reduce((t, p) => t + p.orgs, 0);
+
+  const headline =
+    invoices.length === 0 ? "No invoices yet."
+    : count("overdue") > 0 ? `${kes(totalOverdue)} is overdue across ${count("overdue")} ${count("overdue") === 1 ? "invoice" : "invoices"}.`
+    : count("pending") > 0 ? `${kes(totalPending)} is waiting to be paid.`
+    : "Every invoice is paid.";
 
   const handleMarkPaid = async (invoice: Invoice) => {
     const updated = await updateInvoiceStatus(invoice.id, "paid");
@@ -68,206 +77,186 @@ export default function BillingPage() {
   };
 
   const handleCreate = async () => {
-    if (!newInvoice.org_name || !newInvoice.amount) return;
+    if (!newInvoice.org_name || !newInvoice.amount.trim()) {
+      setFormError("Choose an organization and enter an amount.");
+      return;
+    }
+    setFormError(null);
     const created = await createInvoice(newInvoice);
     if (created) {
       await logActivity({ icon: "🧾", title: "Invoice created", sub: `${created.amount} — ${created.org_name}` });
       setShowCreate(false);
-      setNewInvoice({ org_name: "", amount: "", status: "pending", due_date: "", paid_date: null, description: "" });
+      setNewInvoice(emptyInvoice());
+    } else {
+      setFormError("The invoice couldn't be saved. Check the details and try again.");
     }
   };
 
   return (
-        <div className="page-shell">
+    <div className={`page-shell ${f.root}`}>
+      <main className={selectedInvoice ? "page-main-drawer" : "page-main"}>
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Billing</p>
+              <h1 className={`${f.headline} ${f.headlineWide}`}>{headline}</h1>
+            </div>
+            <div className={f.actions}>
+              <button className={f.primary} onClick={() => { setFormError(null); setNewInvoice(emptyInvoice()); setShowCreate(true); }}>New invoice</button>
+            </div>
+          </div>
 
-          <div className={s.body}>
+          <div className={f.vitals}>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Monthly recurring revenue</span>
+              <span className={f.vitalValue}>{kes(totalMRR)}</span>
+              <span className={f.vitalSub}>{subscriptions} subscriptions</span>
+            </div>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Collected</span>
+              <span className={f.vitalValue}>{kes(totalPaid)}</span>
+              <span className={f.vitalSub}>{count("paid")} paid</span>
+            </div>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Pending</span>
+              <span className={f.vitalValue}>{kes(totalPending)}</span>
+              <span className={f.vitalSub}>{count("pending")} invoices</span>
+            </div>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Overdue</span>
+              <span className={`${f.vitalValue} ${totalOverdue > 0 ? f.owed : ""}`}>{kes(totalOverdue)}</span>
+              <span className={f.vitalSub}>{count("overdue")} invoices</span>
+            </div>
+          </div>
 
-     
-      
-        
-        <main className={selectedInvoice ? "page-main-drawer" : "page-main"}>
-
-          {/* Header */}
-          <PageHeader
-  title="Billing"
-  subtitle={`${invoices.length} invoices · ${invoices.filter(i => i.status === "overdue").length} overdue`}
-  actions={<button className={s.btnGold} onClick={() => setShowCreate(true)}>+ New Invoice</button>}
-/>
-
-          {/* Financial summary */}
-          <div className={s.summaryCards}>
-            {[
-              { label: "Monthly MRR", value: `KES ${totalMRR.toLocaleString()}`, color: "var(--gold)", sub: `${packages.reduce((s, p) => s + p.orgs, 0)} subscriptions` },
-              { label: "Collected", value: `KES ${totalPaid.toLocaleString()}`, color: "#3dd68c", sub: `${invoices.filter(i => i.status === "paid").length} paid` },
-              { label: "Pending", value: `KES ${totalPending.toLocaleString()}`, color: "#f59e0b", sub: `${invoices.filter(i => i.status === "pending").length} invoices` },
-              { label: "Overdue", value: `KES ${totalOverdue.toLocaleString()}`, color: "#ef4444", sub: `${invoices.filter(i => i.status === "overdue").length} invoices` },
-            ].map((card, i) => (
-              <div key={i} className={s.card} style={{ flex: 1 }}>
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>{card.label}</div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: card.color }}>{card.value}</div>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>{card.sub}</div>
+          {packages.length > 0 && (
+            <section aria-labelledby="by-package">
+              <div className={f.sectionHead}>
+                <h2 id="by-package" className={f.sectionTitle}>Revenue by package</h2>
               </div>
-            ))}
-          </div>
+              <div className={f.tableWrap}>
+                <table className={f.ledger}>
+                  <thead><tr><th>Package</th><th>Price</th><th>Organizations</th><th className={f.num}>Monthly revenue</th></tr></thead>
+                  <tbody>
+                    {packages.map(pkg => (
+                      <tr key={pkg.id}>
+                        <td className={f.cellMain} style={{ textTransform: "capitalize" }}>{pkg.name}</td>
+                       <td className={f.cellMuted}>{kes(toNumber(pkg.price))}</td>
+                        <td className={f.cellMuted}>{pkg.price}</td>
+                        <td className={f.cellMuted}>{pkg.orgs}</td>
+                        <td className={f.num}>{kes(toNumber(pkg.price) * pkg.orgs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
-          {/* Revenue by package */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
-            {packages.map((pkg, i) => {
-              const colors: Record<string, string> = { core: "#3dd68c", growth: "#c9a84c", professional: "#a78bfa", enterprise: "#38bdf8" };
-              const color = colors[pkg.name] ?? "var(--gold)";
-              const revenue = (parseInt(pkg.price.replace(/[^0-9]/g, "")) || 0) * pkg.orgs;
-              return (
-                <div key={i} style={{ background: "var(--bg-card)", border: `1px solid ${color}30`, borderRadius: "12px", padding: "14px" }}>
-                  <div style={{ fontSize: "11px", color, fontWeight: 700, marginBottom: "4px" }}>{pkg.name}</div>
-                  <div style={{ fontSize: "16px", fontWeight: 700, color }}>{pkg.price}</div>
-                  <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>{pkg.orgs} orgs · KES {revenue.toLocaleString()}/mo</div>
-                </div>
-              );
-            })}
-          </div>
+          <section aria-labelledby="invoices-title">
+            <div className={f.sectionHead}>
+              <h2 id="invoices-title" className={f.sectionTitle}>Invoices</h2>
+              <span className={f.sectionSub}>{filtered.length} shown</span>
+            </div>
+            <div className={f.toolbar} style={{ padding: "16px 0" }}>
+              <input className={`${f.input} ${f.search}`} type="search" aria-label="Search invoices" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by organization or description" />
+              <div className={f.segmented} role="group" aria-label="Filter by status">
+                {["all", "paid", "pending", "overdue"].map(s => (
+                  <button key={s} className={f.segBtn} aria-pressed={statusFilter === s} onClick={() => setStatusFilter(s)} style={{ textTransform: "capitalize" }}>{s}</button>
+                ))}
+              </div>
+            </div>
 
-{/* Filters */}
-          <div className={s.filters}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoices..." className={s.input} style={{ width: "240px" }} />
-            {["all", "paid", "pending", "overdue"].map(f => (
-              <button key={f} onClick={() => setStatusFilter(f)} className={statusFilter === f ? s.filterBtnActive : s.filterBtn}>{f}</button>
-            ))}
-          </div>
-
-          {/* Invoice cards */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>No invoices found</div>
-            ) : filtered.map((inv) => (
-              <div
-                key={inv.id}
-                onClick={() => setSelectedInvoice(inv)}
-                style={{
-                  background: selectedInvoice?.id === inv.id ? "var(--bg-elevated)" : "var(--bg-card)",
-                  border: `1px solid ${selectedInvoice?.id === inv.id ? statusColor[inv.status] + "60" : "var(--border)"}`,
-                  borderRadius: "12px",
-                  padding: "14px 16px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "14px",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {/* Status indicator */}
-                <div style={{
-                  width: "4px",
-                  height: "36px",
-                  borderRadius: "2px",
-                  background: statusColor[inv.status],
-                  flexShrink: 0,
-                }} />
-
-                {/* Org + description */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{inv.org_name}</div>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{inv.description}</div>
-                </div>
-
-                {/* Amount */}
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: statusColor[inv.status] }}>{inv.amount}</div>
-                  <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
-                    {inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-KE") : "—"}
-                  </div>
-                </div>
-
-                {/* Status badge */}
-                <div style={{
-                  padding: "4px 10px",
-                  borderRadius: "20px",
-                  background: `${statusColor[inv.status]}15`,
-                  border: `1px solid ${statusColor[inv.status]}40`,
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  color: statusColor[inv.status],
-                  textTransform: "capitalize",
-                  flexShrink: 0,
-                }}>
-                  {inv.status}
-                </div>
+              <div className={f.empty}>
+                <strong>{invoices.length === 0 ? "No invoices yet." : "No invoices match."}</strong>
+                {invoices.length === 0 ? "Create one to start tracking what organizations owe." : "Try a different search or status."}
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className={f.tableWrap}>
+                <table className={f.ledger}>
+                  <thead><tr><th>Organization</th><th>Due</th><th>Status</th><th className={f.num}>Amount</th></tr></thead>
+                  <tbody>
+                    {filtered.map(inv => (
+                      <tr key={inv.id} className={`${f.clickable} ${selectedInvoice?.id === inv.id ? f.selected : ""}`} onClick={() => setSelectedInvoice(inv)}>
+                        <td>
+                          <button className={f.cellBtn} onClick={e => { e.stopPropagation(); setSelectedInvoice(inv); }}>{inv.org_name}</button>
+                          <div className={f.cellSub}>{inv.description}</div>
+                        </td>
+                        <td className={f.cellMuted}>{date(inv.due_date)}</td>
+                        <td><span className={f.pill} data-status={inv.status}>{inv.status}</span></td>
+                        <td className={f.num}>{inv.amount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
 
-         
-        </main>
-      </div>
-
-      {/* Invoice drawer */}
       {selectedInvoice && (
-  <DashboardDrawer
-    title="Invoice Details"
-    statusColor={statusColor[selectedInvoice.status]}
-    onClose={() => setSelectedInvoice(null)}
-  >
-    <DrawerFieldList
-      items={[
-        { label: "Organization", value: selectedInvoice.org_name },
-        { label: "Amount", value: selectedInvoice.amount },
-        { label: "Description", value: selectedInvoice.description },
-        { label: "Status", value: selectedInvoice.status, accent: statusColor[selectedInvoice.status] },
-        { label: "Due Date", value: selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString("en-KE") : "—" },
-        { label: "Paid Date", value: selectedInvoice.paid_date ? new Date(selectedInvoice.paid_date).toLocaleDateString("en-KE") : "—" },
-      ]}
-    />
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
-      {selectedInvoice.status !== "paid" && (
-        <button onClick={() => handleMarkPaid(selectedInvoice)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "none", background: "#3dd68c", color: "#07070f", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>✓ Mark as Paid</button>
+        <DashboardDrawer title="Invoice" statusColor={statusVar[selectedInvoice.status]} onClose={() => setSelectedInvoice(null)}>
+          <DrawerFieldList
+            items={[
+              { label: "Organization", value: selectedInvoice.org_name },
+              { label: "Amount", value: selectedInvoice.amount },
+              { label: "Description", value: selectedInvoice.description },
+              { label: "Status", value: selectedInvoice.status, accent: statusVar[selectedInvoice.status] },
+              { label: "Due date", value: date(selectedInvoice.due_date) },
+              { label: "Paid on", value: date(selectedInvoice.paid_date) },
+            ]}
+          />
+          <div className={f.stack} style={{ marginTop: 16 }}>
+            {selectedInvoice.status !== "paid" && (
+              <button className={`${f.primary} ${f.block}`} onClick={() => handleMarkPaid(selectedInvoice)}>Mark as paid</button>
+            )}
+            {selectedInvoice.status === "pending" && (
+              <button className={f.dangerBtn} onClick={() => handleMarkOverdue(selectedInvoice)}>Mark as overdue</button>
+            )}
+          </div>
+        </DashboardDrawer>
       )}
-      {selectedInvoice.status === "pending" && (
-        <button onClick={() => handleMarkOverdue(selectedInvoice)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.4)", background: "transparent", color: "#ef4444", fontSize: "12px", cursor: "pointer", fontFamily: "inherit" }}>Mark as Overdue</button>
-      )}
-    </div>
-  </DashboardDrawer>
-)}
 
-      {/* Create modal */}
       {showCreate && (
-        <div className={s.modal} onClick={() => setShowCreate(false)}>
-          <div className={s.modalBox} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "15px", fontWeight: 700 }}>New Invoice</div>
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>ORGANIZATION</label>
-              <select value={newInvoice.org_name} onChange={e => setNewInvoice(p => ({ ...p, org_name: e.target.value }))} className={s.input}>
-                <option value="">Select organization</option>
-                {orgs.map((o, i) => <option key={i}>{o.name}</option>)}
-              </select>
+        <Modal title="New invoice" onClose={() => setShowCreate(false)}>
+          <div className={f.field}>
+            <label htmlFor="inv-org">Organization</label>
+            <select id="inv-org" className={f.input} autoFocus value={newInvoice.org_name} onChange={e => setNewInvoice(p => ({ ...p, org_name: e.target.value }))}>
+              <option value="">Choose an organization</option>
+              {orgs.map(o => <option key={o.id}>{o.name}</option>)}
+            </select>
+          </div>
+          <div className={f.field}>
+            <label htmlFor="inv-amount">Amount</label>
+            <input id="inv-amount" className={f.input} value={newInvoice.amount} onChange={e => setNewInvoice(p => ({ ...p, amount: e.target.value }))} placeholder="KES 8,000" />
+          </div>
+          <div className={f.field}>
+            <label htmlFor="inv-desc">Description</label>
+            <input id="inv-desc" className={f.input} value={newInvoice.description} onChange={e => setNewInvoice(p => ({ ...p, description: e.target.value }))} placeholder="Growth package, July 2026" />
+          </div>
+          <div className={f.fieldRow}>
+            <div className={f.field}>
+              <label htmlFor="inv-due">Due date</label>
+              <input id="inv-due" className={f.input} type="date" value={newInvoice.due_date} onChange={e => setNewInvoice(p => ({ ...p, due_date: e.target.value }))} />
             </div>
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>AMOUNT</label>
-              <input value={newInvoice.amount} onChange={e => setNewInvoice(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. KES 8,000" className={s.input} />
-            </div>
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>DESCRIPTION</label>
-              <input value={newInvoice.description} onChange={e => setNewInvoice(p => ({ ...p, description: e.target.value }))} placeholder="e.g. growth Package — July 2026" className={s.input} />
-            </div>
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>DUE DATE</label>
-              <input type="date" value={newInvoice.due_date} onChange={e => setNewInvoice(p => ({ ...p, due_date: e.target.value }))} className={s.input} />
-            </div>
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>STATUS</label>
-              <select value={newInvoice.status} onChange={e => setNewInvoice(p => ({ ...p, status: e.target.value as Invoice["status"] }))} className={s.input}>
+            <div className={f.field}>
+              <label htmlFor="inv-status">Status</label>
+              <select id="inv-status" className={f.input} value={newInvoice.status} onChange={e => setNewInvoice(p => ({ ...p, status: e.target.value as Invoice["status"] }))}>
                 <option value="pending">Pending</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
               </select>
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={handleCreate} className={s.btnGold} style={{ flex: 1 }}>Create Invoice</button>
-              <button onClick={() => setShowCreate(false)} className={s.btnGhost} style={{ flex: 1 }}>Cancel</button>
-            </div>
           </div>
-        </div>
+          {formError && <div className={f.formError} role="alert">{formError}</div>}
+          <div className={f.dialogActions}>
+            <button className={f.secondary} onClick={() => setShowCreate(false)}>Cancel</button>
+            <button className={f.primary} onClick={handleCreate}>Create invoice</button>
+          </div>
+        </Modal>
       )}
-
-
     </div>
   );
 }

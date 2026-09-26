@@ -5,13 +5,8 @@ import { getPackages, createPackage, updatePackage, deletePackage, type Package 
 import { getEngines, updateEnginePrice, type Engine } from "@/lib/engines";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase";
-import s from "@/styles/layout.module.css";
-import PageHeader from "@/components/PageHeader";
-
-const tierColors: Record<string, string> = {
-  core: "#3dd68c", growth: "#c9a84c",
-  professional: "#a78bfa", enterprise: "#38bdf8",
-};
+import Modal from "@/components/founder/Modal";
+import f from "@/styles/founder.module.css";
 
 const tierFeatures: Record<string, string[]> = {
   core: ["POS", "1 User", "500 transactions/mo"],
@@ -20,11 +15,13 @@ const tierFeatures: Record<string, string[]> = {
   enterprise: ["Everything", "AI Systems", "API Access", "Unlimited Users", "White-label"],
 };
 
+const COMPARISON_MODULES = ["Point of Sale", "Inventory Management", "HR & Payroll", "CRM", "Analytics", "AI Insights"];
+const toNumber = (v: string | number) => (typeof v === "number" ? v : parseInt(v.replace(/[^0-9]/g, "")) || 0);const kes = (n: number) => `KES ${n.toLocaleString("en-KE")}`;
+
 export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newPackage, setNewPackage] = useState({ name: "", price: "", features: "", orgs: 0 });
+const [newPackage, setNewPackage] = useState({ name: "", price: 0, orgs: 0 });  const [formError, setFormError] = useState<string | null>(null);
   const [limits, setLimits] = useState<any[]>([]);
   const [engines, setEngines] = useState<Engine[]>([]);
   const [editingPackagePrice, setEditingPackagePrice] = useState<string | null>(null);
@@ -47,25 +44,26 @@ export default function PackagesPage() {
   }, []);
 
   const handleCreate = async () => {
-    if (!newPackage.name.trim()) return;
+    if (!newPackage.name.trim()) {
+      setFormError("Give the package a name.");
+      return;
+    }
+    setFormError(null);
     const created = await createPackage(newPackage);
     if (created) {
       await logActivity({ icon: "📦", title: "New package created", sub: created.name });
       setShowCreate(false);
       setNewPackage({ name: "", price: "", features: "", orgs: 0 });
+    } else {
+      setFormError("The package couldn't be created. Check the details and try again.");
     }
   };
 
-  const startEditPackagePrice = (pkg: Package) => {
-    setEditingPackagePrice(pkg.id);
-    setPriceDraft(pkg.price);
-  };
-
-  const savePackagePrice = async (pkg: Package) => {
-    const updated = await updatePackage(pkg.id, { price: priceDraft });
+    const savePackagePrice = async (pkg: Package) => {
+    const updated = await updatePackage(pkg.id, { price: Number(priceDraft) || 0 });
     if (updated) {
       setPackages((prev) => prev.map((p) => (p.id === pkg.id ? updated : p)));
-      await logActivity({ icon: "💲", title: "Package price updated", sub: `${pkg.name}: ${priceDraft}` });
+      await logActivity({ icon: "💲", title: "Package price updated", sub: `${pkg.name}: ${kes(Number(priceDraft) || 0)}` });
     }
     setEditingPackagePrice(null);
   };
@@ -73,15 +71,7 @@ export default function PackagesPage() {
   const handleDeletePackage = async (pkg: Package) => {
     if (!confirm(`Delete the "${pkg.name}" package? This can't be undone.`)) return;
     const ok = await deletePackage(pkg.id);
-    if (ok) {
-      setPackages((prev) => prev.filter((p) => p.id !== pkg.id));
-      if (selectedPackage?.id === pkg.id) setSelectedPackage(null);
-    }
-  };
-
-  const startEditEnginePrice = (engine: Engine) => {
-    setEditingEnginePrice(engine.id);
-    setEnginePriceDraft(String(engine.monthly_price));
+    if (ok) setPackages((prev) => prev.filter((p) => p.id !== pkg.id));
   };
 
   const saveEnginePrice = async (engine: Engine) => {
@@ -98,243 +88,191 @@ export default function PackagesPage() {
     setEditingEnginePrice(null);
   };
 
-  const totalMRR = packages.reduce((sum, p) => {
-    const price = parseInt(p.price.replace(/[^0-9]/g, "")) || 0;
-    return sum + price * p.orgs;
-  }, 0);
-
+  const totalMRR = packages.reduce((sum, p) => sum + toNumber(p.price) * p.orgs, 0);
   const totalSubscriptions = packages.reduce((sum, p) => sum + p.orgs, 0);
 
   return (
-    <div className="page-shell">
-      
-      <div className={s.body}>
-           <main className="page-main">
-
-          {/* Header */}
-         <PageHeader
-  title="Packages"
-  subtitle={`${packages.length} tiers · ${totalSubscriptions} subscriptions · KES ${totalMRR.toLocaleString()} MRR`}
-  actions={<button className={s.btnGold} onClick={() => setShowCreate(true)}>+ New Package</button>}
-/>
-
-          {/* MRR Summary */}
-          <div className={s.summaryCards}>
-            {[
-              { label: "Total MRR", value: `KES ${totalMRR.toLocaleString()}`, color: "var(--gold)" },
-              { label: "Total Subscriptions", value: totalSubscriptions, color: "#3dd68c" },
-              { label: "Active Tiers", value: packages.length, color: "#a78bfa" },
-              { label: "Avg per Org", value: totalSubscriptions > 0 ? `KES ${Math.round(totalMRR / totalSubscriptions).toLocaleString()}` : "—", color: "#38bdf8" },
-            ].map((card, i) => (
-              <div key={i} className={s.card} style={{ flex: 1 }}>
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>{card.label}</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: card.color }}>{card.value}</div>
-              </div>
-            ))}
+    <div className={`page-shell ${f.root}`}>
+      <main className="page-main">
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Packages</p>
+              <h1 className={`${f.headline} ${f.headlineWide}`}>
+                {packages.length === 0 ? "No packages yet." : `${kes(totalMRR)} a month from ${totalSubscriptions} ${totalSubscriptions === 1 ? "subscription" : "subscriptions"}.`}
+              </h1>
+            </div>
+            <div className={f.actions}>
+              <button className={f.primary} onClick={() => { setFormError(null); setShowCreate(true); }}>New package</button>
+            </div>
           </div>
 
-          {/* Package cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
-            {packages.map((pkg) => {
-              const tierKey = pkg.name.toLowerCase();
-              const color = tierColors[tierKey] ?? "var(--gold)";
-              const revenue = (parseInt(pkg.price.replace(/[^0-9]/g, "")) || 0) * pkg.orgs;
-              const features = tierFeatures[tierKey] ?? pkg.features.split(" · ");
-              const pkgLimits = limits.filter(l => l.package_name === pkg.name);
-              const enabledModules = pkgLimits.filter(l => l.enabled);
+          <div className={`${f.vitals} ${f.vitalsThree}`}>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Subscriptions</span>
+              <span className={f.vitalValue}>{totalSubscriptions}</span>
+              <span className={f.vitalSub}>Across all packages</span>
+            </div>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Packages</span>
+              <span className={f.vitalValue}>{packages.length}</span>
+              <span className={f.vitalSub}>Tiers on offer</span>
+            </div>
+            <div className={`${f.vital} ${f.vitalStatic}`}>
+              <span className={f.vitalLabel}>Average per organization</span>
+              <span className={f.vitalValue}>{totalSubscriptions > 0 ? kes(Math.round(totalMRR / totalSubscriptions)) : "—"}</span>
+              <span className={f.vitalSub}>Per month</span>
+            </div>
+          </div>
 
-              return (
-                <div
-                  key={pkg.id}
-                  style={{
-                    background: "var(--bg-card)",
-                    border: `2px solid ${selectedPackage?.id === pkg.id ? color : "var(--border)"}`,
-                    borderRadius: "16px", padding: "20px", cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <div
-                    onClick={() => setSelectedPackage(selectedPackage?.id === pkg.id ? null : pkg)}
-                    style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "16px", fontWeight: 700, color, marginBottom: "2px" }}>{pkg.name}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{pkg.orgs} organizations subscribed</div>
+          {packages.length === 0 ? (
+            <div className={f.empty}>
+              <strong>Create your first package.</strong>
+              Packages set the price and modules an organization gets.
+              <div><button className={f.secondary} onClick={() => setShowCreate(true)}>New package</button></div>
+            </div>
+          ) : (
+            <div className={f.plans}>
+              {packages.map((pkg) => {
+                const tierKey = pkg.name.toLowerCase();
+                const revenue = toNumber(pkg.price) * pkg.orgs;
+                const features = tierFeatures[tierKey] ?? (pkg.engine_slugs ?? []).map((s) => s.replace(/-/g, " "));                const enabledModules = limits.filter(l => l.package_name === pkg.name && l.enabled);
+
+                return (
+                  <article key={pkg.id} className={f.plan}>
+                    <div className={f.planHead}>
+                      <div>
+                        <h2 className={f.planName}>{pkg.name}</h2>
+                        <div className={f.rowSub}>{pkg.orgs} {pkg.orgs === 1 ? "organization" : "organizations"} subscribed</div>
+                      </div>
+                      <div className={f.planPrice}>
+                        {editingPackagePrice === pkg.id ? (
+                          <input
+                            autoFocus
+                            aria-label={`Price for ${pkg.name}`}
+                            className={`${f.input} ${f.priceInput}`}
+                            value={priceDraft}
+                            onChange={(e) => setPriceDraft(e.target.value)}
+                            onBlur={() => savePackagePrice(pkg)}
+                            onKeyDown={(e) => e.key === "Enter" && savePackagePrice(pkg)}
+                          />
+                                              ) : (
+                          <button className={f.priceBtn} title="Edit price" onClick={() => { setEditingPackagePrice(pkg.id); setPriceDraft(String(pkg.price)); }}>
+                            {kes(pkg.price)}
+                          </button>
+                        )}
+                        <div className={f.rowSub}>{kes(revenue)} a month</div>
+                      </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      {editingPackagePrice === pkg.id ? (
-                        <input
-                          autoFocus
-                          value={priceDraft}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setPriceDraft(e.target.value)}
-                          onBlur={() => savePackagePrice(pkg)}
-                          onKeyDown={(e) => e.key === "Enter" && savePackagePrice(pkg)}
-                          style={{
-                            fontSize: "16px", fontWeight: 700, color, background: "var(--bg-elevated)",
-                            border: `1px solid ${color}`, borderRadius: 6, padding: "2px 6px", width: 130, textAlign: "right",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          onClick={(e) => { e.stopPropagation(); startEditPackagePrice(pkg); }}
-                          style={{ fontSize: "18px", fontWeight: 700, color, cursor: "text" }}
-                          title="Click to edit price"
-                        >
-                          {pkg.price} ✎
-                        </div>
-                      )}
-                      <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>MRR: KES {revenue.toLocaleString()}</div>
-                    </div>
-                  </div>
 
-                  {/* Features */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
-                    {features.map((f, i) => (
-                      <span key={i} style={{
-                        padding: "3px 8px", borderRadius: "20px", fontSize: "10px",
-                        background: `${color}15`, border: `1px solid ${color}30`, color,
-                      }}>{f}</span>
-                    ))}
-                  </div>
+                    <p className={f.featureText}>{features.join(", ")}</p>
 
-                  {/* Module access */}
-                  {enabledModules.length > 0 && (
-                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "8px", letterSpacing: "0.05em" }}>MODULES INCLUDED</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {enabledModules.length > 0 && (
+                      <div>
                         {enabledModules.map((l, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px" }}>
-                            <span style={{ color: "var(--text-secondary)" }}>✓ {l.module_name}</span>
-                            <span style={{ color: "var(--text-muted)" }}>
-                              {l.max_users === -1 ? "∞ users" : `${l.max_users} user${l.max_users !== 1 ? "s" : ""}`}
-                              {l.ai_enabled ? " · AI ✦" : ""}
+                          <div key={i} className={f.moduleRow}>
+                            <span>{l.module_name}</span>
+                            <span>
+                              {l.max_users === -1 ? "Unlimited users" : `${l.max_users} ${l.max_users === 1 ? "user" : "users"}`}
+                              {l.ai_enabled ? ", AI included" : ""}
                             </span>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeletePackage(pkg); }}
-                    style={{
-                      marginTop: 12, width: "100%", padding: "6px 0", borderRadius: 8,
-                      border: "1px solid #ef444440", background: "transparent", color: "#ef4444",
-                      fontSize: 11, cursor: "pointer",
-                    }}
-                  >
-                    Delete package
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Package comparison table */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)", fontSize: "13px", fontWeight: 600 }}>
-              Package Comparison
+                    <div><button className={f.linkBtn} style={{ color: "var(--red)" }} onClick={() => handleDeletePackage(pkg)}>Delete package</button></div>
+                  </article>
+                );
+              })}
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: "var(--bg-elevated)" }}>
-                    <th style={{ padding: "10px 16px", textAlign: "left", fontSize: "10px", color: "var(--text-muted)", fontWeight: 600 }}>MODULE</th>
-                    {packages.map(p => (
-                      <th key={p.id} style={{ padding: "10px 16px", textAlign: "center", fontSize: "10px", color: tierColors[p.name] ?? "var(--gold)", fontWeight: 700 }}>{p.name}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {["Point of Sale", "Inventory Management", "HR & Payroll", "CRM", "Analytics", "AI Insights"].map((mod, i) => (
-                    <tr key={mod} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--bg-card)" : "transparent" }}>
-                      <td style={{ padding: "10px 16px", fontSize: "12px", fontWeight: 600 }}>{mod}</td>
-                      {packages.map(pkg => {
-                        const limit = limits.find(l => l.package_name === pkg.name && l.module_name === mod);
-                        const color = tierColors[pkg.name] ?? "var(--gold)";
-                        return (
-                          <td key={pkg.id} style={{ padding: "10px 16px", textAlign: "center" }}>
-                            {limit?.enabled
-                              ? <span style={{ color, fontSize: "14px" }}>✓</span>
-                              : <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>—</span>
-                            }
-                          </td>
-                        );
-                      })}
+          )}
+
+          {packages.length > 0 && (
+            <section aria-labelledby="compare-title">
+              <div className={f.sectionHead}><h2 id="compare-title" className={f.sectionTitle}>What each package includes</h2></div>
+              <div className={f.tableWrap}>
+                <table className={f.ledger}>
+                  <thead>
+                    <tr>
+                      <th>Module</th>
+                      {packages.map(p => <th key={p.id} style={{ textTransform: "capitalize", textAlign: "center" }}>{p.name}</th>)}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Engine pricing - used for a-la-carte plan selection after the free trial */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)", fontSize: "13px", fontWeight: 600 }}>
-              Engine Pricing (a-la-carte)
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, background: "var(--border)" }}>
-              {engines.map((engine) => (
-                <div
-                  key={engine.id}
-                  style={{
-                    background: "var(--bg-card)", padding: "12px 20px",
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}
-                >
-                  <span style={{ fontSize: 12 }}>{engine.icon} {engine.name}</span>
-                  {editingEnginePrice === engine.id ? (
-                    <input
-                      autoFocus
-                      type="number"
-                      value={enginePriceDraft}
-                      onChange={(e) => setEnginePriceDraft(e.target.value)}
-                      onBlur={() => saveEnginePrice(engine)}
-                      onKeyDown={(e) => e.key === "Enter" && saveEnginePrice(engine)}
-                      style={{
-                        fontSize: 12, fontWeight: 700, color: "var(--gold)", background: "var(--bg-elevated)",
-                        border: "1px solid var(--gold)", borderRadius: 6, padding: "2px 6px", width: 90, textAlign: "right",
-                      }}
-                    />
-                  ) : (
-                    <span
-                      onClick={() => startEditEnginePrice(engine)}
-                      style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", cursor: "text" }}
-                      title="Click to edit price"
-                    >
-                      KES {Number(engine.monthly_price).toLocaleString()}/mo ✎
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-      </div>
-
-      {showCreate && (
-        <div className={s.modal} onClick={() => setShowCreate(false)}>
-          <div className={s.modalBox} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "15px", fontWeight: 700 }}>New Package</div>
-            {[
-              { label: "NAME", key: "name", placeholder: "e.g. Professional" },
-              { label: "PRICE", key: "price", placeholder: "e.g. KES 15,000/mo" },
-              { label: "FEATURES", key: "features", placeholder: "e.g. 10 Modules · 30 Users" },
-            ].map(field => (
-              <div key={field.key}>
-                <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>{field.label}</label>
-                <input value={newPackage[field.key as keyof typeof newPackage] as string} onChange={e => setNewPackage(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} className={s.input} />
+                  </thead>
+                  <tbody>
+                    {COMPARISON_MODULES.map(mod => (
+                      <tr key={mod}>
+                        <td className={f.cellMain}>{mod}</td>
+                        {packages.map(pkg => {
+                          const included = limits.find(l => l.package_name === pkg.name && l.module_name === mod)?.enabled;
+                          return (
+                            <td key={pkg.id} style={{ textAlign: "center" }}>
+                              {included ? <span className={f.check} role="img" aria-label="Included">✓</span> : <span className={f.dash} role="img" aria-label="Not included">—</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={handleCreate} className={s.btnGold} style={{ flex: 1 }}>Create Package</button>
-              <button onClick={() => setShowCreate(false)} className={s.btnGhost} style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+            </section>
+          )}
 
+          <section aria-labelledby="engines-title">
+            <div className={f.sectionHead}>
+              <h2 id="engines-title" className={f.sectionTitle}>Engine pricing</h2>
+              <span className={f.sectionSub}>For organizations that pick engines one by one after the free trial</span>
+            </div>
+            {engines.length === 0 ? (
+              <div className={f.empty}><strong>No engines found.</strong>Engines appear here once they are set up.</div>
+            ) : (
+              <div className={f.enginePrices}>
+                {engines.map((engine) => (
+                  <div key={engine.id} className={f.engineRow}>
+                    <span>{engine.name}</span>
+                    {editingEnginePrice === engine.id ? (
+                      <input
+                        autoFocus
+                        type="number"
+                        aria-label={`Monthly price for ${engine.name}`}
+                        className={`${f.input} ${f.priceInput}`}
+                        style={{ width: 110, fontSize: 13 }}
+                        value={enginePriceDraft}
+                        onChange={(e) => setEnginePriceDraft(e.target.value)}
+                        onBlur={() => saveEnginePrice(engine)}
+                        onKeyDown={(e) => e.key === "Enter" && saveEnginePrice(engine)}
+                      />
+                    ) : (
+                      <button className={f.priceBtn} title="Edit price" onClick={() => { setEditingEnginePrice(engine.id); setEnginePriceDraft(String(engine.monthly_price)); }}>
+                        {kes(Number(engine.monthly_price))} a month
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+
+            {showCreate && (
+        <Modal title="New package" onClose={() => setShowCreate(false)}>
+          <div className={f.field}>
+            <label htmlFor="pkg-name">Name</label>
+            <input id="pkg-name" className={f.input} autoFocus value={newPackage.name} onChange={e => setNewPackage(p => ({ ...p, name: e.target.value }))} placeholder="Professional" />
+          </div>
+          <div className={f.field}>
+            <label htmlFor="pkg-price">Price (KES/mo)</label>
+            <input id="pkg-price" type="number" className={f.input} value={newPackage.price} onChange={e => setNewPackage(p => ({ ...p, price: Number(e.target.value) || 0 }))} placeholder="15000" />
+          </div>
+          {formError && <div className={f.formError} role="alert">{formError}</div>}
+          <div className={f.dialogActions}>
+            <button className={f.secondary} onClick={() => setShowCreate(false)}>Cancel</button>
+            <button className={f.primary} onClick={handleCreate}>Create package</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
