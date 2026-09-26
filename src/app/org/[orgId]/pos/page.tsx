@@ -10,6 +10,7 @@ import { logActivity } from "@/lib/activity";
 import CustomerSelector from "@/components/pos/CustomerSelector";
 import SplitPaymentEditor from "@/components/payments/SplitPaymentEditor";
 import { recordPayment, methodLabel, type PaymentDetailsInput } from "@/lib/payments";
+import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import {
   getProducts,
   updateStock,
@@ -74,6 +75,7 @@ const [promotions, setPromotions] =
   const [products, setProducts] = useState<InventoryProduct[]>([]);
 const [sales, setSales] = useState<PosSale[]>([]);
 const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
 const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
 const [stockLevels, setStockLevels] = useState<Record<string, Record<string, number>>>({});
 
@@ -160,7 +162,8 @@ const [
   discountsData,
   warehousesData,
   pricelistsData,
-  stockLevelsData
+  stockLevelsData,
+  financeAccountsData
 ] = await Promise.all([
   getProducts(org.id),
   getSales(org.id),
@@ -168,7 +171,8 @@ const [
   getDiscounts(org.id),
   getWarehouses(org.id),
   getPricelists(org.id),
-  getStockLevelsMap(org.id)
+  getStockLevelsMap(org.id),
+  getFinanceAccounts(org.id)
 ]);
 
 setProducts(productsData);
@@ -178,6 +182,7 @@ setDiscounts(discountsData);
 setWarehouses(warehousesData);
 setPricelists(pricelistsData);
 setStockLevels(stockLevelsData);
+setFinanceAccounts(financeAccountsData);
 
 const defaultWarehouse = warehousesData.find((w) => w.is_default);
 if (defaultWarehouse) {
@@ -380,6 +385,15 @@ function handleExportSalesCSV() {
     );
   }
 
+  // Maps a payment method to this org's matching bank/cash/mobile-money
+  // account. Picks the first active match — fine for the common case of one
+  // till/account per type; orgs with more than one of the same type won't
+  // get a specific match here and fall back to Unspecified Cash.
+  function resolveFinanceAccountId(method: PaymentDetailsInput["method"]): string | undefined {
+    const wantType = method === "mpesa" ? "mobile_money" : method === "cash" ? "cash" : "bank";
+    return financeAccounts.find((a) => a.type === wantType && a.status === "active")?.id;
+  }
+
   async function handleCompleteSale() {
    if (!orgId) return;
 
@@ -407,6 +421,15 @@ function handleExportSalesCSV() {
       }));
 
       const methodSummary = paymentLines.map((l) => methodLabel(l.method)).join(" + ");
+
+      // Only attribute to a specific bank/mobile-money/cash account when the
+      // whole sale used one payment method — a split-tender sale (part cash,
+      // part M-Pesa) would need the ledger entry itself split by line to
+      // attribute correctly, which postSaleJournal doesn't do yet. Falls
+      // back to the generic "Unspecified Cash" bucket in that case, same as
+      // before this change.
+      const financeAccountId =
+        paymentLines.length === 1 ? resolveFinanceAccountId(paymentLines[0].method) : undefined;
 
       sale = {
         customer_name:
@@ -449,7 +472,7 @@ function handleExportSalesCSV() {
       // no-op there), so behavior is unchanged outside of small screens.
       const saleClient = isMobileViewport() ? createClient({ allowMobileWrites: true }) : createClient();
 
-      const created = await createSale(sale, saleClient);
+      const created = await createSale(sale, saleClient, financeAccountId);
 setCompletedSale({
   ...created,
   id: created.id!,
@@ -463,6 +486,7 @@ setCompletedSale({
           sourceType: "pos_sale",
           sourceId: created.id,
           details: line,
+          financeAccountId,
         }, saleClient);
       }
 

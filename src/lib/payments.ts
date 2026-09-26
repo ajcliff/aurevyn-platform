@@ -1,5 +1,6 @@
 import { createClient } from "./supabase";
 import { logActivity } from "@/lib/activity";
+import { postPayablePaymentJournal } from "./journal";
 
 export type PaymentMethod = "mpesa" | "cash" | "card" | "bank_transfer" | "cheque";
 export type PaymentStatus = "completed" | "pending" | "cleared" | "bounced";
@@ -29,6 +30,7 @@ export type Payment = {
   cheque_bank: string | null;
   cheque_date: string | null;
 
+  finance_account_id: string | null;
   recorded_by_name: string | null;
   created_at: string;
 };
@@ -108,6 +110,7 @@ export async function recordPayment(
     sourceId: string;
     details: PaymentDetailsInput;
     recordedByName?: string;
+    financeAccountId?: string;
   },
   client?: ReturnType<typeof createClient>
 ): Promise<Payment | null> {
@@ -141,6 +144,7 @@ export async function recordPayment(
       cheque_bank: details.chequeBank || null,
       cheque_date: details.chequeDate || null,
 
+      finance_account_id: input.financeAccountId || null,
       recorded_by_name: input.recordedByName || null,
     })
     .select()
@@ -149,6 +153,16 @@ export async function recordPayment(
   if (error) {
     console.error(error);
     return null;
+  }
+
+  if (input.sourceType === "purchase_order" && status === "completed") {
+    await postPayablePaymentJournal({
+      orgId: input.orgId,
+      poId: input.sourceId,
+      amount: details.amount,
+      date: (data.created_at as string).slice(0, 10),
+      financeAccountId: input.financeAccountId,
+    });
   }
 
   await logActivity({
@@ -224,6 +238,16 @@ export async function updateChequeStatus(id: string, orgId: string, status: "cle
   if (error) {
     console.error(error);
     return null;
+  }
+
+  if (status === "cleared" && data.source_type === "purchase_order") {
+    await postPayablePaymentJournal({
+      orgId,
+      poId: data.source_id,
+      amount: data.amount,
+      date: new Date().toISOString().slice(0, 10),
+      financeAccountId: data.finance_account_id || undefined,
+    });
   }
 
   await logActivity({

@@ -6,6 +6,7 @@ import { getPayables, getPayablesAgingBuckets, recordSupplierPayment, type Payab
 import { updatePurchaseOrderDueDate } from "@/lib/purchaseOrders";
 import PaymentMethodForm from "@/components/payments/PaymentMethodForm";
 import { type PaymentDetailsInput } from "@/lib/payments";
+import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import EmptyState from "@/components/EmptyState";
 
 export default function CreditorsPage() {
@@ -19,6 +20,8 @@ export default function CreditorsPage() {
   const [payingPo, setPayingPo] = useState<PayableOrder | null>(null);
   const [payDetails, setPayDetails] = useState<PaymentDetailsInput | null>(null);
   const [paySaving, setPaySaving] = useState(false);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [fundingAccountId, setFundingAccountId] = useState("");
 
   useEffect(() => {
     load();
@@ -26,8 +29,9 @@ export default function CreditorsPage() {
 
   async function load() {
     setLoading(true);
-    const p = await getPayables(organization.id);
+    const [p, fa] = await Promise.all([getPayables(organization.id), getFinanceAccounts(organization.id)]);
     setPayables(p);
+    setFinanceAccounts(fa.filter((a) => a.status === "active"));
     setLoading(false);
   }
 
@@ -58,9 +62,11 @@ export default function CreditorsPage() {
         orgId: organization.id,
         poId: payingPo.id,
         details: { ...payDetails, amount: payDetails.amount || payingPo.amount_owed },
+        financeAccountId: fundingAccountId || undefined,
       });
       setPayingPo(null);
       setPayDetails(null);
+      setFundingAccountId("");
       load();
     } finally {
       setPaySaving(false);
@@ -122,7 +128,7 @@ export default function CreditorsPage() {
             <span style={{ fontWeight: 600, color: "#ef4444", textAlign: "right" }}>
               KES {po.amount_owed.toLocaleString()}
             </span>
-            <button style={buttonGold} onClick={() => { setPayingPo(po); setPayDetails(null); }}>
+            <button style={buttonGold} onClick={() => { setPayingPo(po); setPayDetails(null); setFundingAccountId(financeAccounts[0]?.id || ""); }}>
               Pay
             </button>
           </div>
@@ -145,8 +151,23 @@ export default function CreditorsPage() {
               onChange={setPayDetails}
             />
 
+            <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginTop: 10, marginBottom: 4 }}>
+              Paid from
+            </label>
+            {financeAccounts.length === 0 ? (
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                No bank/cash/mobile-money accounts set up — this will post to an unspecified cash bucket instead.
+              </div>
+            ) : (
+              <select value={fundingAccountId} onChange={(e) => setFundingAccountId(e.target.value)} style={smallInputStyle}>
+                {financeAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            )}
+
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button style={ghostButton} onClick={() => { setPayingPo(null); setPayDetails(null); }}>Cancel</button>
+              <button style={ghostButton} onClick={() => { setPayingPo(null); setPayDetails(null); setFundingAccountId(""); }}>Cancel</button>
               <button style={{ ...buttonGold, flex: 1 }} onClick={handlePay} disabled={paySaving}>
                 {paySaving ? "Saving..." : "Record Payment"}
               </button>

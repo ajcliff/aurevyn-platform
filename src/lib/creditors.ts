@@ -76,6 +76,7 @@ export async function recordSupplierPayment(input: {
   poId: string;
   details: PaymentDetailsInput;
   recordedByName?: string;
+  financeAccountId?: string;
 }): Promise<Payment | null> {
   return recordPayment({
     orgId: input.orgId,
@@ -83,5 +84,6 @@ export async function recordSupplierPayment(input: {
     sourceId: input.poId,
     details: input.details,
     recordedByName: input.recordedByName,
+    financeAccountId: input.financeAccountId,
   });
 }
