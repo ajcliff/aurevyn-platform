@@ -24,6 +24,7 @@ import PaymentMethodForm from "@/components/payments/PaymentMethodForm";
 import { recordPayment, methodLabel, type PaymentDetailsInput, type PaymentMethod } from "@/lib/payments";
 
 import { getChartOfAccounts, getCostCenters, type ChartAccount, type CostCenter } from "@/lib/chartOfAccounts";
+import { getLedgerPnL, getCashPosition, type LedgerPnL, type CashPosition } from "@/lib/journal";
 import EmptyState from "@/components/EmptyState";
 
 const ACCOUNT_TYPES = [
@@ -87,6 +88,8 @@ const [txPaymentDetails, setTxPaymentDetails] = useState<PaymentDetailsInput | n
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [txCoaId, setTxCoaId] = useState("");
   const [txCostCenterId, setTxCostCenterId] = useState("");
+  const [pnl, setPnl] = useState<LedgerPnL>({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
+  const [cashPosition, setCashPosition] = useState<CashPosition>({ total: 0, byAccountId: {}, unattributed: 0 });
 
   useEffect(() => {
     load();
@@ -94,25 +97,29 @@ const [txPaymentDetails, setTxPaymentDetails] = useState<PaymentDetailsInput | n
 
 async function load() {
     setLoading(true);
-    const [a, t, e, coa, cc] = await Promise.all([
+    const [a, t, e, coa, cc, p, cp] = await Promise.all([
       getFinanceAccounts(organization.id),
       getFinanceTransactions(organization.id),
       getFinanceExpenses(organization.id),
       getChartOfAccounts(organization.id),
       getCostCenters(organization.id),
+      getLedgerPnL(organization.id),
+      getCashPosition(organization.id),
     ]);
     setAccounts(a);
     setTransactions(t);
     setExpenses(e);
     setChartAccounts(coa);
     setCostCenters(cc);
+    setPnl(p);
+    setCashPosition(cp);
     setLoading(false);
   }
 
-  const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
-  const totalExpenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
-  const netPosition = totalIncome - totalExpenses;
-  const totalCashPosition = accounts.reduce((s, a) => s + Number(a.balance), 0);
+  const totalIncome = pnl.totalIncome;
+  const totalExpenses = pnl.totalExpenses;
+  const netPosition = pnl.netProfit;
+  const totalCashPosition = cashPosition.total;
 
   const bankers = accounts.filter((a) => a.type === "bank" || a.type === "mobile_money");
   const cashInHand = accounts.filter((a) => a.type === "cash");
@@ -394,6 +401,11 @@ async function load() {
         <div className="card" style={cardStyle}>
           <div style={labelSmall}>Cash Position (All Accounts)</div>
           <div style={valueStyle}>KES {totalCashPosition.toLocaleString()}</div>
+          {cashPosition.unattributed !== 0 && (
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
+              Includes KES {cashPosition.unattributed.toLocaleString()} not tied to a specific account (POS/payroll/PO sales with no account picked)
+            </div>
+          )}
         </div>
       </div>
 
@@ -406,7 +418,7 @@ async function load() {
           {bankers.map((a) => (
             <div key={a.id} style={{ ...rowStyle, gridTemplateColumns: "1fr auto auto" }}>
               <span>{a.name}</span>
-              <span style={{ fontWeight: 600 }}>KES {Number(a.balance).toLocaleString()}</span>
+              <span style={{ fontWeight: 600 }}>KES {Number(cashPosition.byAccountId[a.id] ?? a.balance).toLocaleString()}</span>
               <span style={{ display: "flex", gap: 6 }}>
                 <button style={iconBtn} onClick={() => handleOpenEditAccount(a)} title="Edit">✏️</button>
                 <button style={iconBtn} onClick={() => handleArchiveAccount(a)} title="Archive">🗄️</button>
@@ -420,7 +432,7 @@ async function load() {
           {cashInHand.map((a) => (
             <div key={a.id} style={{ ...rowStyle, gridTemplateColumns: "1fr auto auto" }}>
               <span>{a.name}</span>
-              <span style={{ fontWeight: 600 }}>KES {Number(a.balance).toLocaleString()}</span>
+              <span style={{ fontWeight: 600 }}>KES {Number(cashPosition.byAccountId[a.id] ?? a.balance).toLocaleString()}</span>
               <span style={{ display: "flex", gap: 6 }}>
                 <button style={iconBtn} onClick={() => handleOpenEditAccount(a)} title="Edit">✏️</button>
                 <button style={iconBtn} onClick={() => handleArchiveAccount(a)} title="Archive">🗄️</button>
