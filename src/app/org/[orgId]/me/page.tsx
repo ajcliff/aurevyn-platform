@@ -7,7 +7,7 @@ import {
   getPayrollHistoryForEmployee,
   getLeaveHistoryForEmployee,
   requestLeave,
-  ensureFounderEmployeeRecord,
+  ensureEmployeeRecord,
   type EmployeeProfile,
   type PayrollHistoryItem,
   type LeaveHistoryItem,
@@ -49,9 +49,7 @@ export default function MyProfilePage() {
       return;
     }
     const emp = await getMyEmployeeRecord(organization.id, membership.userId)
-      ?? (membership.isFounder
-        ? await ensureFounderEmployeeRecord(organization.id, membership.userId, membership.userEmail)
-        : null);
+      ?? await ensureEmployeeRecord(organization.id, membership.userId, membership.userEmail, membership.role);
     setEmployee(emp);
     if (emp) {
       const [payroll, leave] = await Promise.all([

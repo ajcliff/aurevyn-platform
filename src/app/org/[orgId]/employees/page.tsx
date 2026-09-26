@@ -10,6 +10,7 @@ import {
   getPayrollHistoryForEmployee,
   getLeaveHistoryForEmployee,
   getMyEmployeeRecord,
+  ensureEmployeeRecord,
   getMyBroadcasts,
   requestLeave,
   sendBroadcast,
@@ -79,7 +80,8 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
     }
 
     if (membership.userId) {
-      const mine = await getMyEmployeeRecord(organization.id, membership.userId);
+      const mine = await getMyEmployeeRecord(organization.id, membership.userId)
+        ?? await ensureEmployeeRecord(organization.id, membership.userId, membership.userEmail, membership.role);
       setMyRecord(mine);
 
       if (mine) {

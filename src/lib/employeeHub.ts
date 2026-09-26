@@ -220,14 +220,18 @@ export async function sendBroadcast(
 
 // ---- Self-facing ----
 
-// The founder account is identified purely by email match, never gets an
-// org_users row, and so was never covered by the org_users-driven backfill.
-// Called lazily from /me the first time a founder visits a given org's
-// profile page, rather than trying to pre-create a row in every org upfront.
-export async function ensureFounderEmployeeRecord(
+// Auto-creates a matching employees row for anyone who reaches /me without
+// one — org creators (registration never inserts one for whoever signs up)
+// and the platform founder (identified by email match, never gets an
+// org_users row, so is never covered by acceptInvite's employee-creation
+// step). Invited team members already get one at accept-invite time; this
+// is the fallback for everyone else, called lazily the first time they
+// visit a given org's profile page rather than pre-creating rows upfront.
+export async function ensureEmployeeRecord(
   orgId: string,
   userId: string,
-  email: string | null
+  email: string | null,
+  role: string
 ): Promise<EmployeeProfile> {
   const supabase = createClient();
 
@@ -245,10 +249,10 @@ export async function ensureFounderEmployeeRecord(
     .insert({
       org_id: orgId,
       user_id: userId,
-      full_name: email || "Founder",
+      full_name: email || "Team Member",
       email,
       phone: null,
-      role: "owner",
+      role,
       department: null,
       employment_status: "active",
       salary: 0,
