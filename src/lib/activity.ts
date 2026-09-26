@@ -11,11 +11,16 @@ export type Activity = {
   created_at: string;
 };
 
+// Platform-level events only (org creation/deletion, pricing changes,
+// billing) — not the flood of routine per-org business activity (POS
+// sales, payroll runs, leave requests, etc.) that every org logs via
+// logActivity with its own org_id. Use getOrgActivity for that.
 export async function getActivity(): Promise<Activity[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("activity")
     .select("*")
+    .is("org_id", null)
     .order("created_at", { ascending: false })
     .limit(10);
 
