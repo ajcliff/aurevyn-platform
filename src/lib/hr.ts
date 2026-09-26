@@ -135,7 +135,22 @@ function calculateStatutoryDeductions(gross: number) {
   const ahl = gross * AHL_RATE;
   const taxablePay = Math.max(gross - nssf - shif - ahl, 0);
   const paye = calculatePaye(taxablePay);
-  return { nssf, shif, ahl, paye, totalDeductions: nssf + shif + ahl + paye };
+
+  // Employer matches NSSF and AHL at the same rate the employee pays —
+  // that's a real cost to the company, not a deduction from the employee's
+  // pay, and gets remitted to the same bodies (NSSF, KRA's Housing Levy)
+  // alongside what was withheld. SHIF has no employer match.
+  const employerNssf = Math.min(gross, NSSF_PENSIONABLE_CAP) * NSSF_RATE;
+  const employerAhl = gross * AHL_RATE;
+
+  return {
+    nssf,
+    shif,
+    ahl,
+    paye,
+    totalDeductions: nssf + shif + ahl + paye,
+    employerContributions: employerNssf + employerAhl,
+  };
 }
 
 export async function runPayroll(orgId: string, periodStart: string, periodEnd: string) {
@@ -161,7 +176,7 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
 
   const items = active.map((e) => {
     const gross = Number(e.salary || 0) / 12;
-    const { totalDeductions } = calculateStatutoryDeductions(gross);
+    const { totalDeductions, employerContributions } = calculateStatutoryDeductions(gross);
     const postDeductionPay = gross - totalDeductions;
     const advance = advanceByEmployee.get(e.id);
     // Capped at 50% of that period's post-statutory pay, deliberately not the
@@ -174,6 +189,7 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
     return {
       gross_pay: gross,
       deductions: totalDeductions,
+      employer_contributions: employerContributions,
       advance_repayment: advanceRepayment,
       net_pay: net,
       employee_id: e.id,

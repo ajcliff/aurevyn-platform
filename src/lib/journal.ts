@@ -337,7 +337,7 @@ export async function postPayrollJournal(input: {
 
   const { data: items, error: itemsError } = await supabase
     .from("payroll_items")
-    .select("gross_pay, deductions, net_pay, advance_repayment")
+    .select("gross_pay, deductions, net_pay, advance_repayment, employer_contributions")
     .eq("payroll_run_id", input.runId);
   if (itemsError) throw itemsError;
   if (!items || items.length === 0) return;
@@ -346,6 +346,7 @@ export async function postPayrollJournal(input: {
   const deductions = items.reduce((s, i) => s + Number(i.deductions), 0);
   const net = items.reduce((s, i) => s + Number(i.net_pay), 0);
   const advanceRepayments = items.reduce((s, i) => s + Number(i.advance_repayment || 0), 0);
+  const employerContributions = items.reduce((s, i) => s + Number(i.employer_contributions || 0), 0);
   if (gross <= 0) return;
 
   const expenseAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "5100", "Salaries & Wages Expense", "expense");
@@ -365,9 +366,15 @@ export async function postPayrollJournal(input: {
   if (error) throw error;
 
   const lines = [{ entry_id: entry.id, org_id: input.orgId, coa_id: expenseAccountId, debit: gross, credit: 0 }];
-  if (deductions > 0) {
+  let deductionsPayableTotal = deductions;
+  if (employerContributions > 0) {
+    const employerExpenseId = await getOrCreateDefaultAccount(supabase, input.orgId, "5120", "Employer Statutory Contributions", "expense");
+    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: employerExpenseId, debit: employerContributions, credit: 0 });
+    deductionsPayableTotal += employerContributions;
+  }
+  if (deductionsPayableTotal > 0) {
     const deductionsPayableId = await getOrCreateDefaultAccount(supabase, input.orgId, "2200", "Statutory Deductions Payable", "liability");
-    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: deductionsPayableId, debit: 0, credit: deductions });
+    lines.push({ entry_id: entry.id, org_id: input.orgId, coa_id: deductionsPayableId, debit: 0, credit: deductionsPayableTotal });
   }
   if (advanceRepayments > 0) {
     const advancesAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1300", "Employee Advances", "asset");
