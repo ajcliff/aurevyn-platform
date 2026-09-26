@@ -75,49 +75,24 @@ export async function confirmEngineSelection(
   orgName: string,
   selectedEngineIds: string[]
 ): Promise<boolean> {
-  const supabase = createClient();
+  const res = await fetch("/api/trial/confirm-selection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId, orgName, selectedEngineIds }),
+  });
 
-  const { data: allEngines } = await supabase.from("engines").select("id, name, monthly_price");
-  if (!allEngines) return false;
-
-  const selectedEngines = allEngines.filter((e) => selectedEngineIds.includes(e.id));
-  const total = selectedEngines.reduce((sum, e) => sum + Number(e.monthly_price), 0);
-
-  await supabase.from("organization_engines").update({ enabled: false }).eq("org_id", orgId);
-
-  if (selectedEngineIds.length > 0) {
-    await supabase
-      .from("organization_engines")
-      .update({ enabled: true, subscription_tier: "Custom" })
-      .eq("org_id", orgId)
-      .in("engine_id", selectedEngineIds);
+  if (!res.ok) {
+    const { error } = await res.json().catch(() => ({ error: "Failed to confirm plan." }));
+    console.error("confirmEngineSelection failed:", error);
+    return false;
   }
 
-  await supabase
-    .from("organizations")
-    .update({
-      package: `Custom (${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"})`,
-      trial_locked: false,
-      package_confirmed_at: new Date().toISOString(),
-    })
-    .eq("id", orgId);
-
-  const engineList = selectedEngines.map((e) => e.name).join(", ");
-
-  await supabase.from("scheduled_platform_invoices").insert({
-    org_id: orgId,
-    org_name: orgName,
-    description: `Custom plan (${engineList || "no engines selected"})`,
-    amount: total,
-    frequency: "monthly",
-    next_run: new Date().toISOString().slice(0, 10),
-    active: true,
-  });
+  const result = await res.json();
 
   await logActivity({
     icon: "✅",
     title: "Plan confirmed",
-    sub: `${orgName} selected ${selectedEngines.length} engine${selectedEngines.length === 1 ? "" : "s"} — KES ${total.toLocaleString()}/mo`,
+    sub: `${orgName} selected ${result.engineCount} engine${result.engineCount === 1 ? "" : "s"} — KES ${result.total.toLocaleString()}/mo`,
     org_id: orgId,
   });
 
