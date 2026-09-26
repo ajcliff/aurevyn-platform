@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase";
 import { getPackages, type Package } from "@/lib/packages";
 import { isValidEmail, isValidPhone, isStrongEnoughPassword } from "@/lib/validation";
 import { PACKAGE_ENGINES } from "@/lib/packageEngines";
-import { createNotification } from "@/lib/notifications";
 import { COUNTRIES, OTHER_OPTION } from "@/lib/locations";
 import AuthShell from "@/components/marketing/AuthShell";
 
@@ -240,12 +239,6 @@ export default function RegisterPage() {
 
       const orgId = organization.id;
 
-      await createNotification(
-        "new_org",
-        "New organization registered",
-        `${form.companyName} signed up on the ${form.packageSlug} plan`
-      );
-
       const { error: membershipError } = await supabase.from("org_users").insert({
         org_id: orgId,
         user_id: userId,
@@ -260,16 +253,21 @@ export default function RegisterPage() {
       // which package they picked at signup - that choice just becomes their
       // pre-selected default once the mandatory plan-selection screen shows
       // up after the trial ends (see src/components/PackageSelectionGate.tsx).
-      const { data: allEngines } = await supabase.from("engines").select("id, slug");
-      if (allEngines?.length) {
-        const engineRows = allEngines.map((engine) => ({
-          org_id: orgId,
-          engine_id: engine.id,
-          engine_slug: engine.slug,
-          enabled: true,
-          subscription_tier: form.packageSlug,
-        }));
-        await supabase.from("organization_engines").insert(engineRows);
+      // organization_engines and the founder notification are both writes a
+      // regular org member can't make themselves (RLS), so this runs
+      // server-side with the service role instead.
+      const finalizeRes = await fetch("/api/register/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgId,
+          orgName: form.companyName.trim(),
+          packageSlug: form.packageSlug,
+        }),
+      });
+      if (!finalizeRes.ok) {
+        const { error: finalizeError } = await finalizeRes.json().catch(() => ({ error: "Failed to finish setting up your organization." }));
+        throw new Error(finalizeError);
       }
 
       fetch("/api/notify", {
