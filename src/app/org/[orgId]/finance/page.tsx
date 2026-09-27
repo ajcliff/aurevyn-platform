@@ -380,6 +380,15 @@ async function load() {
           <a href={`/org/${organization.id}/finance/reports/vat`} style={ghostButton}>
             VAT Summary →
           </a>
+          <a href={`/org/${organization.id}/finance/statutory`} style={ghostButton}>
+            Statutory Remittance →
+          </a>
+          <a href={`/org/${organization.id}/finance/unattributed`} style={ghostButton}>
+            Unattributed Cash →
+          </a>
+          <a href={`/org/${organization.id}/finance/trial-balance`} style={ghostButton}>
+            Trial Balance →
+          </a>
         </div>
       </div>
 

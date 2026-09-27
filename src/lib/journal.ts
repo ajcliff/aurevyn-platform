@@ -7,7 +7,7 @@ type SupabaseClientType = ReturnType<typeof createClient>;
 // one yet. Used for the catch-all accounts a transaction posts against when
 // it has no specific Bankers/Cash account or Chart of Accounts category
 // selected — a journal line always needs an account on both sides.
-async function getOrCreateDefaultAccount(
+export async function getOrCreateDefaultAccount(
   supabase: SupabaseClientType,
   orgId: string,
   code: string,
@@ -553,4 +553,76 @@ export async function getCashPosition(orgId: string): Promise<CashPosition> {
   total += unattributed;
 
   return { total, byAccountId, unattributed };
+}
+
+export type TrialBalanceRow = {
+  accountId: string;
+  code: string;
+  name: string;
+  accountType: string;
+  debit: number;
+  credit: number;
+  balance: number; // debit - credit, signed by the account's natural balance side
+};
+
+export type TrialBalance = {
+  rows: TrialBalanceRow[];
+  totalDebits: number;
+  totalCredits: number;
+  balanced: boolean;
+};
+
+// The basic double-entry sanity check: every journal_line's debits should
+// equal its credits, in aggregate, across the whole ledger. If they don't,
+// something posted an unbalanced entry — a real bug, not a business
+// situation. Grouped by account so a discrepancy can actually be traced to
+// where it came from, not just "off by X somewhere".
+export async function getTrialBalance(orgId: string): Promise<TrialBalance> {
+  const supabase = createClient();
+
+  const { data: lines, error } = await supabase
+    .from("journal_lines")
+    .select("coa_id, debit, credit, chart_of_accounts(code, name, account_type)")
+    .eq("org_id", orgId);
+  if (error || !lines) {
+    return { rows: [], totalDebits: 0, totalCredits: 0, balanced: true };
+  }
+
+  const byAccount: Record<string, TrialBalanceRow> = {};
+  let totalDebits = 0;
+  let totalCredits = 0;
+
+  for (const l of lines as any[]) {
+    const coa = l.chart_of_accounts;
+    if (!coa) continue;
+    const debit = Number(l.debit) || 0;
+    const credit = Number(l.credit) || 0;
+    totalDebits += debit;
+    totalCredits += credit;
+
+    if (!byAccount[l.coa_id]) {
+      byAccount[l.coa_id] = {
+        accountId: l.coa_id,
+        code: coa.code,
+        name: coa.name,
+        accountType: coa.account_type,
+        debit: 0,
+        credit: 0,
+        balance: 0,
+      };
+    }
+    byAccount[l.coa_id].debit += debit;
+    byAccount[l.coa_id].credit += credit;
+  }
+
+  const rows = Object.values(byAccount)
+    .map((r) => ({ ...r, balance: r.debit - r.credit }))
+    .sort((a, b) => a.code.localeCompare(b.code));
+
+  return {
+    rows,
+    totalDebits,
+    totalCredits,
+    balanced: Math.abs(totalDebits - totalCredits) < 0.01,
+  };
 }

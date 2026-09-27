@@ -38,6 +38,12 @@ export type PayrollItem = {
   employee_id: string;
   gross_pay: number;
   deductions: number;
+  nssf: number;
+  shif: number;
+  ahl: number;
+  paye: number;
+  employer_contributions: number;
+  advance_repayment: number;
   net_pay: number;
 };
 
@@ -91,6 +97,36 @@ export async function getPayrollItems(orgId: string, runId: string): Promise<Pay
     .eq("payroll_run_id", runId);
   if (error) { console.error(error); return []; }
   return data as PayrollItem[];
+}
+
+export type Payslip = {
+  item: PayrollItem;
+  employee: Pick<Employee, "id" | "full_name" | "role" | "department">;
+  run: Pick<PayrollRun, "id" | "period_start" | "period_end" | "status">;
+};
+
+// A single payslip: the payroll_item plus enough employee/run context to
+// render or print it standalone. The NSSF/SHIF/AHL/PAYE figures come
+// straight from what was actually calculated and stored at run time, not
+// recomputed from current rates — so a payslip always matches what was
+// really withheld even if tax bands change later.
+export async function getPayslip(orgId: string, itemId: string): Promise<Payslip | null> {
+  const supabase = createClient();
+  const { data: item, error } = await supabase
+    .from("payroll_items")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("id", itemId)
+    .maybeSingle();
+  if (error || !item) return null;
+
+  const [{ data: employee }, { data: run }] = await Promise.all([
+    supabase.from("employees").select("id, full_name, role, department").eq("id", item.employee_id).maybeSingle(),
+    supabase.from("payroll_runs").select("id, period_start, period_end, status").eq("id", item.payroll_run_id).maybeSingle(),
+  ]);
+  if (!employee || !run) return null;
+
+  return { item: item as PayrollItem, employee, run };
 }
 
 // Creates a draft payroll run and one payroll_item per active employee.
@@ -176,7 +212,7 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
 
   const items = active.map((e) => {
     const gross = Number(e.salary || 0) / 12;
-    const { totalDeductions, employerContributions } = calculateStatutoryDeductions(gross);
+    const { nssf, shif, ahl, paye, totalDeductions, employerContributions } = calculateStatutoryDeductions(gross);
     const postDeductionPay = gross - totalDeductions;
     const advance = advanceByEmployee.get(e.id);
     // Capped at 50% of that period's post-statutory pay, deliberately not the
@@ -189,6 +225,10 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
     return {
       gross_pay: gross,
       deductions: totalDeductions,
+      nssf,
+      shif,
+      ahl,
+      paye,
       employer_contributions: employerContributions,
       advance_repayment: advanceRepayment,
       net_pay: net,

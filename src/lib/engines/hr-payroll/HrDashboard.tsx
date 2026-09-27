@@ -1,20 +1,23 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useState } from "react";
+import { CSSProperties, Fragment, useEffect, useMemo, useState } from "react";
 import {
   Employee,
   EmploymentStatus,
   LeaveRequest,
   LeaveStatus,
   PayrollRun,
+  PayrollItem,
   createEmployee,
   getEmployees,
   getLeaveRequests,
   getPayrollRuns,
+  getPayrollItems,
   runPayroll,
   updateLeaveStatus,
   updatePayrollRunStatus,
 } from "@/lib/hr";
+import Link from "next/link";
 import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import { requestSalaryAdvance } from "@/lib/salaryAdvances";
 import { exportToCSV } from "@/lib/csvExport";
@@ -75,6 +78,20 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [payingRun, setPayingRun] = useState<PayrollRun | null>(null);
   const [advancingEmployee, setAdvancingEmployee] = useState<Employee | null>(null);
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [runItems, setRunItems] = useState<Record<string, PayrollItem[]>>({});
+
+  async function togglePayslips(runId: string) {
+    if (expandedRunId === runId) {
+      setExpandedRunId(null);
+      return;
+    }
+    setExpandedRunId(runId);
+    if (!runItems[runId]) {
+      const items = await getPayrollItems(orgId, runId);
+      setRunItems((prev) => ({ ...prev, [runId]: items }));
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -326,7 +343,8 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
             </thead>
             <tbody>
               {runs.map((r) => (
-                <tr key={r.id}>
+                <Fragment key={r.id}>
+                <tr>
                   <td style={styles.td}>
                     {r.period_start} → {r.period_end}
                   </td>
@@ -334,6 +352,9 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
                   <td style={styles.td}>{payrollStatusBadge(r.status)}</td>
                   <td style={styles.td}>{r.processed_at ? new Date(r.processed_at).toLocaleDateString() : "—"}</td>
                   <td style={styles.td}>
+                    <button style={styles.ghost} onClick={() => togglePayslips(r.id)}>
+                      {expandedRunId === r.id ? "Hide payslips" : "Payslips"}
+                    </button>{" "}
                     {r.status !== "paid" && (
                       <button style={styles.ghost} onClick={() => advanceRun(r)}>
                         Mark {r.status === "draft" ? "processed" : "paid"}
@@ -341,6 +362,35 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
                     )}
                   </td>
                 </tr>
+                {expandedRunId === r.id && (
+                  <tr key={`${r.id}-payslips`}>
+                    <td colSpan={5} style={{ ...styles.td, background: "rgba(255,255,255,0.02)" }}>
+                      {!runItems[r.id] ? (
+                        "Loading..."
+                      ) : runItems[r.id].length === 0 ? (
+                        "No payslips for this run."
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {runItems[r.id].map((item) => {
+                            const emp = employees.find((e) => e.id === item.employee_id);
+                            return (
+                              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                                <span>{emp?.full_name ?? "Unknown employee"}</span>
+                                <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                  <span>Net: KES {Number(item.net_pay).toLocaleString()}</span>
+                                  <Link href={`/org/${orgId}/hr-payroll/payslip/${item.id}`} style={{ color: "var(--accent, #e8b923)" }}>
+                                    View payslip
+                                  </Link>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
               {!runs.length && (
                 <tr>
