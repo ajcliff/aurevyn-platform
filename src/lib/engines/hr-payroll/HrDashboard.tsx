@@ -378,7 +378,7 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
                                 <span>{emp?.full_name ?? "Unknown employee"}</span>
                                 <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
                                   <span>Net: KES {Number(item.net_pay).toLocaleString()}</span>
-                                  <Link href={`/org/${orgId}/hr-payroll/payslip/${item.id}`} style={{ color: "var(--accent, #e8b923)" }}>
+                                  <Link href={`/org/${orgId}/me/payslip/${item.id}`} style={{ color: "var(--accent, #e8b923)" }}>
                                     View payslip
                                   </Link>
                                 </span>

@@ -6,140 +6,178 @@ import { getOrganizations, type Organization } from "@/lib/organizations";
 import { getPackages, type Package } from "@/lib/packages";
 import { formatError } from "@/lib/errorFormat";
 import ErrorBanner from "@/components/ErrorBanner";
-import s from "@/styles/layout.module.css";
+import ConfirmDialog from "@/components/founder/ConfirmDialog";
+import TypedConfirmDialog from "@/components/founder/TypedConfirmDialog";
 import SystemHealthSection from "@/components/SystemHealthSection";
+import f from "@/styles/founder.module.css";
 
 type Section = "overview" | "packages" | "organizations" | "modules" | "health" | "danger";
+type ModuleLimit = {
+  id: string;
+  package_name: string;
+  module_name: string;
+  enabled: boolean;
+  ai_enabled: boolean;
+  max_users: number;
+  max_records: number;
+  max_branches: number;
+};
+
+const TABS: { id: Section; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "packages", label: "Packages & limits" },
+  { id: "organizations", label: "Organizations" },
+  { id: "modules", label: "Module access" },
+  { id: "health", label: "System health" },
+  { id: "danger", label: "Danger zone" },
+];
+
+const MODULES = ["Point of Sale", "Inventory Management", "HR & Payroll", "CRM", "Analytics", "AI Insights"];
+const kes = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
 
 export default function ControlPage() {
   const [section, setSection] = useState<Section>("overview");
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
-  const [limits, setLimits] = useState<any[]>([]);
+  const [limits, setLimits] = useState<ModuleLimit[]>([]);
   const [stats, setStats] = useState({ orgs: 0, invoices: 0, modules: 0, notifications: 0, movements: 0 });
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [confirmWipe, setConfirmWipe] = useState<{ table: string; label: string } | null>(null);
+  const [confirmWipeAll, setConfirmWipeAll] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const loadData = async () => {
+  async function loadData() {
     setPageLoading(true);
     setPageError(null);
     try {
       const supabase = createClient();
-
-      const [orgData, packageData, limitsRes, invoiceRes, moduleRes, notifRes] = await Promise.all([
+      const [orgData, packageData, limitsRes, invoiceRes, moduleRes, notifRes, movementRes] = await Promise.all([
         getOrganizations(),
         getPackages(),
         supabase.from("package_module_limits").select("*").order("package_name"),
         supabase.from("invoices").select("*", { count: "exact", head: true }),
         supabase.from("modules").select("*", { count: "exact", head: true }),
         supabase.from("notifications").select("*", { count: "exact", head: true }),
+        supabase.from("inventory_movements").select("*", { count: "exact", head: true }),
       ]);
 
       if (limitsRes.error) throw limitsRes.error;
       if (invoiceRes.error) throw invoiceRes.error;
       if (moduleRes.error) throw moduleRes.error;
       if (notifRes.error) throw notifRes.error;
+      if (movementRes.error) throw movementRes.error;
 
       setOrgs(orgData);
       setPackages(packageData);
-      setLimits(limitsRes.data ?? []);
+      setLimits((limitsRes.data ?? []) as ModuleLimit[]);
       setStats({
         orgs: orgData.length,
         invoices: invoiceRes.count ?? 0,
         modules: moduleRes.count ?? 0,
         notifications: notifRes.count ?? 0,
-        movements: 0,
+        movements: movementRes.count ?? 0,
       });
     } catch (err) {
       setPageError(formatError(err));
     } finally {
       setPageLoading(false);
     }
-  };
+  }
 
-  const notify = (msg: string) => {
+  function notify(msg: string) {
     setMessage(msg);
     setTimeout(() => setMessage(""), 3000);
-  };
+  }
 
-  const handleAssignPackage = async (orgId: string, packageName: string) => {
+  async function handleAssignPackage(orgId: string, packageName: string) {
     setActionError(null);
     try {
       const supabase = createClient();
       const { error } = await supabase.from("organizations").update({ package: packageName }).eq("id", orgId);
       if (error) throw error;
-      await loadData();
-      notify(`Package updated successfully`);
+      setOrgs(prev => prev.map(o => o.id === orgId ? { ...o, package: packageName } : o));
+      notify("Package updated.");
     } catch (err) {
       setActionError(formatError(err));
     }
-  };
+  }
 
-  const handleUpdateOrgStatus = async (orgId: string, status: string) => {
+  async function handleUpdateOrgStatus(orgId: string, status: string) {
     setActionError(null);
     try {
       const supabase = createClient();
       const { error } = await supabase.from("organizations").update({ status }).eq("id", orgId);
       if (error) throw error;
-      await loadData();
-      notify(`Organization status updated`);
+      setOrgs(prev => prev.map(o => o.id === orgId ? { ...o, status: status as Organization["status"] } : o));
+      notify("Status updated.");
     } catch (err) {
       setActionError(formatError(err));
     }
-  };
+  }
 
-  const handleToggleLimit = async (id: string, enabled: boolean) => {
+  async function handleToggleLimit(limit: ModuleLimit) {
     setActionError(null);
     try {
       const supabase = createClient();
-      const { error } = await supabase.from("package_module_limits").update({ enabled: !enabled }).eq("id", id);
+      const { error } = await supabase.from("package_module_limits").update({ enabled: !limit.enabled }).eq("id", limit.id);
       if (error) throw error;
-      await loadData();
-      notify(`Module limit updated`);
+      setLimits(prev => prev.map(l => l.id === limit.id ? { ...l, enabled: !limit.enabled } : l));
     } catch (err) {
       setActionError(formatError(err));
     }
-  };
+  }
 
-  const handleUpdateLimit = async (id: string, field: string, value: string) => {
+  async function handleToggleAi(limit: ModuleLimit) {
     setActionError(null);
     try {
       const supabase = createClient();
-      const numVal = value === "-1" || value === "" ? -1 : parseInt(value) || 0;
-      const { error } = await supabase.from("package_module_limits").update({ [field]: numVal }).eq("id", id);
+      const { error } = await supabase.from("package_module_limits").update({ ai_enabled: !limit.ai_enabled }).eq("id", limit.id);
       if (error) throw error;
-      notify(`Limit updated`);
+      setLimits(prev => prev.map(l => l.id === limit.id ? { ...l, ai_enabled: !limit.ai_enabled } : l));
     } catch (err) {
       setActionError(formatError(err));
     }
-  };
+  }
 
-  const handleWipeTable = async (table: string) => {
+  async function handleUpdateLimitField(limit: ModuleLimit, field: "max_users" | "max_records" | "max_branches", value: string) {
     setActionError(null);
-    setLoading(true);
+    const numVal = value === "-1" || value.trim() === "" ? -1 : parseInt(value, 10) || 0;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("package_module_limits").update({ [field]: numVal }).eq("id", limit.id);
+      if (error) throw error;
+      setLimits(prev => prev.map(l => l.id === limit.id ? { ...l, [field]: numVal } : l));
+      notify("Limit updated.");
+    } catch (err) {
+      setActionError(formatError(err));
+    }
+  }
+
+  async function handleWipeTable(table: string) {
+    setActionError(null);
+    setBusy(true);
     try {
       const supabase = createClient();
       const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
       if (error) throw error;
       await loadData();
-      notify(`${table} wiped successfully`);
+      notify(`${table} wiped.`);
     } catch (err) {
       setActionError(formatError(err));
     } finally {
-      setLoading(false);
+      setBusy(false);
+      setConfirmWipe(null);
     }
-  };
+  }
 
-  const handleWipeAll = async () => {
+  async function handleWipeAll() {
     setActionError(null);
-    setLoading(true);
+    setBusy(true);
     try {
       const supabase = createClient();
       const tables = ["inventory_movements", "inventory_products", "notifications", "activity", "invoices", "organizations"];
@@ -148,337 +186,246 @@ export default function ControlPage() {
         if (error) throw error;
       }
       await loadData();
-      notify("Platform reset complete");
+      notify("Platform reset complete.");
     } catch (err) {
       setActionError(formatError(err));
     } finally {
-      setLoading(false);
+      setBusy(false);
+      setConfirmWipeAll(false);
     }
-  };
+  }
 
-  const inputStyle: React.CSSProperties = {
-    padding: "6px 10px", borderRadius: "6px",
-    border: "1px solid var(--border)", background: "var(--bg-base)",
-    color: "var(--text-primary)", fontSize: "11px", outline: "none",
-    fontFamily: "inherit", width: "100%",
-  };
-
-  const packageColors: Record<string, string> = {
-    core: "#3dd68c", growth: "#c9a84c",
-    professional: "#a78bfa", enterprise: "#38bdf8",
-  };
-
-  const navItems: { id: Section; label: string; icon: string }[] = [
-    { id: "overview", label: "Overview", icon: "⊞" },
-    { id: "packages", label: "Packages & Limits", icon: "📦" },
-    { id: "organizations", label: "Organizations", icon: "🏢" },
-    { id: "modules", label: "Module Access", icon: "⬡" },
-    { id: "health", label: "System Health", icon: "⚡" },
-    { id: "danger", label: "Danger Zone", icon: "⚠" },
+  const wipeItems = [
+    { label: "Wipe all notifications", table: "notifications", desc: "Clears all notification history.", tone: "warn" as const },
+    { label: "Wipe all activity logs", table: "activity", desc: "Clears every entry in the platform activity feed.", tone: "warn" as const },
+    { label: "Wipe all invoices", table: "invoices", desc: "Deletes every invoice record on the platform.", tone: "bad" as const },
+    { label: "Wipe all organizations", table: "organizations", desc: "Removes every organization from the platform.", tone: "bad" as const },
   ];
 
   return (
-    <div className="page-shell">
-    
-      <div className={s.body}>
-        
-        
-        <main className={s.settingsMain}>
-
-          {/* Left nav */}
-          <div style={{ width: "200px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
-            <div style={{ fontSize: "11px", color: "var(--gold)", marginBottom: "8px", letterSpacing: "0.08em", fontWeight: 700 }}>
-              ⚡ CONTROL CENTER
+    <div className={`page-shell ${f.root}`}>
+      <main className="page-main">
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Control center</p>
+              <h1 className={f.headline}>{pageLoading ? "Loading control center" : "Platform-wide settings and safeguards."}</h1>
             </div>
-            {navItems.map(item => (
-              <button key={item.id} onClick={() => setSection(item.id)} style={{
-                padding: "9px 14px", borderRadius: "8px", border: "none",
-                background: section === item.id ? "var(--bg-elevated)" : "transparent",
-                color: section === item.id
-                  ? item.id === "danger" ? "#ef4444" : "var(--gold)"
-                  : item.id === "danger" ? "#ef444480" : "var(--text-secondary)",
-                fontSize: "12px", cursor: "pointer", textAlign: "left",
-                fontWeight: section === item.id ? 600 : 400,
-                borderLeft: section === item.id
-                  ? `2px solid ${item.id === "danger" ? "#ef4444" : "var(--gold)"}`
-                  : "2px solid transparent",
-                transition: "all 0.15s ease", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: "8px",
-              }}>
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-
-            {message && (
-              <div style={{
-                marginTop: "16px", padding: "10px 12px", borderRadius: "8px",
-                background: "rgba(61,214,140,0.1)", border: "1px solid rgba(61,214,140,0.3)",
-                fontSize: "11px", color: "var(--green)",
-              }}>
-                ✓ {message}
-              </div>
-            )}
+            {message && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ {message}</span>}
           </div>
 
-          {/* Content */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", maxHeight: "calc(100vh - 80px)" }}>
+          {pageError && <ErrorBanner message={pageError} source="dashboard/control" onRetry={loadData} />}
 
-            {pageError && (
-              <ErrorBanner message={pageError} source="dashboard/control" onRetry={loadData} />
-            )}
+          <div className={f.tabs} role="tablist" aria-label="Control center sections">
+            {TABS.map(t => (
+              <button key={t.id} role="tab" id={`ctl-tab-${t.id}`} aria-selected={section === t.id} aria-controls="ctl-panel" className={f.tab} onClick={() => setSection(t.id)} style={t.id === "danger" ? { color: section === t.id ? "var(--red)" : undefined } : undefined}>
+                {t.label}
+              </button>
+            ))}
+          </div>
 
+          <div id="ctl-panel" role="tabpanel" aria-labelledby={`ctl-tab-${section}`} className={f.tabPanel} style={{ paddingTop: 8 }}>
             {pageLoading ? (
-              <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
-                Loading control center...
-              </div>
+              <p className={f.status} role="status">Loading control center…</p>
             ) : (
-            <>
-            {/* OVERVIEW */}
-            {section === "overview" && (
               <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Founder Control Center</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Full platform control — no Supabase needed</p>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-                  {[
-                    { label: "Organizations", value: stats.orgs, color: "var(--gold)", icon: "🏢" },
-                    { label: "Invoices", value: stats.invoices, color: "#3dd68c", icon: "💳" },
-                    { label: "Modules", value: stats.modules, color: "#a78bfa", icon: "⬡" },
-                    { label: "Notifications", value: stats.notifications, color: "#f59e0b", icon: "🔔" },
-                    { label: "Packages", value: packages.length, color: "#38bdf8", icon: "📦" },
-                    { label: "Limits Defined", value: limits.length, color: "#3dd68c", icon: "⚙" },
-                  ].map((s, i) => (
-                    <div key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{s.label}</span>
-                        <span style={{ fontSize: "16px" }}>{s.icon}</span>
-                      </div>
-                      <div style={{ fontSize: "24px", fontWeight: 700, color: s.color }}>{s.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>Quick Actions</div>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    {[
-                      { label: "Manage Packages", action: () => setSection("packages") },
-                      { label: "Manage Orgs", action: () => setSection("organizations") },
-                      { label: "Module Access", action: () => setSection("modules") },
-                      { label: "Danger Zone", action: () => setSection("danger") },
-                    ].map((a, i) => (
-                      <button key={i} onClick={a.action} className={s.btnGold} style={{ fontSize: "11px", padding: "7px 14px" }}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* PACKAGES & LIMITS */}
-            {section === "packages" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Packages & Limits</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Define what each package unlocks</p>
-                </div>
-
-                {["core", "growth", "professional", "enterprise"].map(pkgName => {
-                  const pkg = packages.find(p => p.name === pkgName);
-                  const pkgLimits = limits.filter(l => l.package_name === pkgName);
-                  const color = packageColors[pkgName] ?? "var(--gold)";
-                  return (
-                    <div key={pkgName} style={{ background: "var(--bg-card)", border: `1px solid ${color}30`, borderRadius: "12px", overflow: "hidden" }}>
-                      <div style={{ padding: "14px 16px", background: `${color}10`, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <span style={{ fontSize: "14px", fontWeight: 700, color }}>{pkgName}</span>
-                          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{pkg?.price ?? "—"}</span>
+                {section === "overview" && (
+                  <div className={f.stack}>
+                    <div className={f.statGrid}>
+                      {[
+                        { label: "Organizations", value: stats.orgs },
+                        { label: "Invoices", value: stats.invoices },
+                        { label: "Modules", value: stats.modules },
+                        { label: "Notifications", value: stats.notifications },
+                        { label: "Inventory movements", value: stats.movements },
+                        { label: "Packages", value: packages.length },
+                        { label: "Limits defined", value: limits.length },
+                      ].map((s, i) => (
+                        <div key={i} className={f.stat}>
+                          <div className={f.statTop}><span className={f.statLabel}>{s.label}</span></div>
+                          <div className={f.statValue}>{s.value}</div>
                         </div>
-                        <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{pkg?.orgs ?? 0} orgs</span>
-                      </div>
-                      <div style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                          {["Module", "Enabled", "Max Users", "Max Records", "Max Branches", "AI"].map(h => (
-                            <span key={h} style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.05em" }}>{h}</span>
-                          ))}
-                        </div>
-                        {pkgLimits.map(limit => (
-                          <div key={limit.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr", gap: "8px", padding: "6px 0", borderBottom: "1px solid var(--border)", alignItems: "center" }}>
-                            <span style={{ fontSize: "11px", color: "var(--text-primary)" }}>{limit.module_name}</span>
-                            <div onClick={() => handleToggleLimit(limit.id, limit.enabled)} style={{
-                              width: "32px", height: "18px", borderRadius: "9px",
-                              background: limit.enabled ? color : "var(--bg-elevated)",
-                              border: "1px solid var(--border)", cursor: "pointer",
-                              position: "relative", transition: "background 0.2s ease",
-                            }}>
-                              <div style={{ position: "absolute", top: "2px", left: limit.enabled ? "14px" : "2px", width: "12px", height: "12px", borderRadius: "50%", background: "#fff", transition: "left 0.2s ease" }} />
-                            </div>
-                            {["max_users", "max_records", "max_branches"].map(field => (
-                              <input key={field} defaultValue={limit[field]} onBlur={e => handleUpdateLimit(limit.id, field, e.target.value)}
-                                style={{ ...inputStyle, width: "60px" }} placeholder="-1=∞" />
-                            ))}
-                            <div onClick={async () => {
-                              const supabase = createClient();
-                              await supabase.from("package_module_limits").update({ ai_enabled: !limit.ai_enabled }).eq("id", limit.id);
-                              await loadData();
-                            }} style={{
-                              width: "32px", height: "18px", borderRadius: "9px",
-                              background: limit.ai_enabled ? "#a78bfa" : "var(--bg-elevated)",
-                              border: "1px solid var(--border)", cursor: "pointer",
-                              position: "relative", transition: "background 0.2s ease",
-                            }}>
-                              <div style={{ position: "absolute", top: "2px", left: limit.ai_enabled ? "14px" : "2px", width: "12px", height: "12px", borderRadius: "50%", background: "#fff", transition: "left 0.2s ease" }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-
-            {/* ORGANIZATIONS */}
-            {section === "organizations" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Organizations</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Assign packages and manage org status</p>
-                </div>
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", overflow: "hidden", overflowY: "auto", maxHeight: "calc(100vh - 220px)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
-                    {["Organization", "Package", "Status", "Actions"].map(h => (
-                      <span key={h} style={{ fontSize: "10px", color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.05em" }}>{h}</span>
-                    ))}
-                  </div>
-                  {orgs.map((org, i) => (
-                    <div key={org.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "12px 16px", borderBottom: i < orgs.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", gap: "8px" }}>
-                      <div>
-                        <div style={{ fontSize: "12px", fontWeight: 600 }}>{org.name}</div>
-                        <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{org.location}</div>
-                      </div>
-                      <select defaultValue={org.package} onChange={e => handleAssignPackage(org.id, e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-                        {["core", "growth", "professional", "enterprise"].map(p => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                      <select defaultValue={org.status} onChange={e => handleUpdateOrgStatus(org.id, e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-                        {["operational", "warning", "critical"].map(st => (
-                          <option key={st} value={st}>{st}</option>
-                        ))}
-                      </select>
-                      <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>{org.revenue}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* MODULE ACCESS */}
-            {section === "modules" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Module Access</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>See which modules each package unlocks</p>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ background: "var(--bg-elevated)" }}>
-                        <th style={{ padding: "10px 16px", textAlign: "left", fontSize: "10px", color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.05em" }}>MODULE</th>
-                        {["core", "growth", "professional", "enterprise"].map(p => (
-                          <th key={p} style={{ padding: "10px 16px", textAlign: "center", fontSize: "10px", color: packageColors[p], fontWeight: 600, letterSpacing: "0.05em" }}>{p.toUpperCase()}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {["Point of Sale", "Inventory Management", "HR & Payroll", "CRM", "Analytics", "AI Insights"].map((mod, i) => (
-                        <tr key={mod} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "var(--bg-card)" : "transparent" }}>
-                          <td style={{ padding: "10px 16px", fontSize: "12px", fontWeight: 600 }}>{mod}</td>
-                          {["core", "growth", "professional", "enterprise"].map(pkg => {
-                            const limit = limits.find(l => l.package_name === pkg && l.module_name === mod);
-                            return (
-                              <td key={pkg} style={{ padding: "10px 16px", textAlign: "center" }}>
-                                {limit?.enabled
-                                  ? <span style={{ color: packageColors[pkg], fontSize: "14px" }}>✓</span>
-                                  : <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>—</span>
-                                }
-                              </td>
-                            );
-                          })}
-                        </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {/* SYSTEM HEALTH */}
-{section === "health" && (
-  <>
-    <div>
-      <h2 style={{ fontSize: "18px", fontWeight: 700 }}>System Health</h2>
-      <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Live service status across the platform</p>
-    </div>
-    <SystemHealthSection />
-  </>
-)}
-
-            {/* DANGER ZONE */}
-            {section === "danger" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#ef4444" }}>Danger Zone</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Irreversible actions — no confirmation dialogs, use with caution</p>
-                </div>
-
-                {[
-                  { label: "Wipe All Notifications", table: "notifications", color: "#f59e0b", desc: "Clear all notification history" },
-                  { label: "Wipe All Activity Logs", table: "activity", color: "#f59e0b", desc: "Clear all activity feed entries" },
-                  { label: "Wipe All Invoices", table: "invoices", color: "#ef4444", desc: "Delete all invoice records" },
-                  { label: "Wipe All Organizations", table: "organizations", color: "#ef4444", desc: "Remove all orgs from the platform" },
-                ].map((item, i) => (
-                  <div key={i} style={{ background: "var(--bg-card)", border: `1px solid ${item.color}30`, borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
-                    <div>
-                      <div style={{ fontSize: "13px", fontWeight: 600, color: item.color }}>{item.label}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>{item.desc}</div>
                     </div>
-                    <button
-                      onClick={() => handleWipeTable(item.table)}
-                      disabled={loading}
-                      style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${item.color}60`, background: "transparent", color: item.color, fontSize: "12px", cursor: loading ? "not-allowed" : "pointer", whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}
-                    >
-                      {loading ? "Working..." : "Wipe"}
-                    </button>
-                  </div>
-                ))}
 
-                <div style={{ background: "var(--bg-card)", border: "1px solid #ef444460", borderRadius: "12px", padding: "16px" }}>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#ef4444", marginBottom: "4px" }}>⚠ Full Platform Reset</div>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
-                    Wipes organizations, invoices, activity, notifications and inventory. Packages and module limits are preserved. Use this to start fresh before going live.
+                    <div>
+                      <div className={f.sectionSub} style={{ marginBottom: 10 }}>Quick actions</div>
+                      <div className={f.actions}>
+                        <button className={f.secondary} onClick={() => setSection("packages")}>Manage packages</button>
+                        <button className={f.secondary} onClick={() => setSection("organizations")}>Manage orgs</button>
+                        <button className={f.secondary} onClick={() => setSection("modules")}>Module access</button>
+                        <button className={f.secondary} style={{ color: "var(--red)" }} onClick={() => setSection("danger")}>Danger zone</button>
+                      </div>
+                    </div>
                   </div>
-                  <button onClick={handleWipeAll} disabled={loading} style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: "#ef4444", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                    {loading ? "Resetting..." : "Reset Entire Platform"}
-                  </button>
-                </div>
+                )}
 
-                {actionError && (
-                  <div style={{ fontSize: 12, color: "#ef4444", background: "#ef44441a", border: "1px solid #ef444440", borderRadius: 8, padding: "10px 12px" }}>
-                    {actionError}
+                {section === "packages" && (
+                  packages.length === 0 ? (
+                    <div className={f.empty}><strong>No packages yet.</strong>Create one from Quick actions or the Packages page.</div>
+                  ) : (
+                    <div className={f.stack}>
+                      {packages.map(pkg => {
+                        const key = pkg.name.toLowerCase();
+                        const pkgLimits = limits.filter(l => l.package_name === key);
+                        return (
+                          <div key={pkg.id} style={{ border: "1px solid var(--rule-strong)", borderRadius: 12, overflow: "hidden" }}>
+                            <div style={{ padding: "14px 16px", background: "var(--tint)", borderBottom: "1px solid var(--rule)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 14, fontWeight: 700, textTransform: "capitalize" }}>{pkg.name}</span>
+                                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{kes(pkg.price)}/mo</span>
+                              </div>
+                              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{pkg.orgs} orgs</span>
+                            </div>
+                            {pkgLimits.length === 0 ? (
+                              <div className={f.empty} style={{ padding: 16 }}>No module limits defined for this package yet.</div>
+                            ) : (
+                              <div style={{ padding: "8px 16px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr", gap: 8, padding: "8px 0", fontSize: 10, color: "var(--text-secondary)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                                  <span>MODULE</span><span>ENABLED</span><span>MAX USERS</span><span>MAX RECORDS</span><span>MAX BRANCHES</span><span>AI</span>
+                                </div>
+                                {pkgLimits.map(limit => (
+                                  <div key={limit.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr", gap: 8, padding: "8px 0", borderTop: "1px solid var(--rule)", alignItems: "center" }}>
+                                    <span style={{ fontSize: 12 }}>{limit.module_name}</span>
+                                    <button className={f.switch} role="switch" aria-checked={limit.enabled} aria-label={`${limit.module_name} enabled for ${pkg.name}`} onClick={() => handleToggleLimit(limit)} />
+                                    {(["max_users", "max_records", "max_branches"] as const).map(field => (
+                                      <input key={field} className={`${f.input} ${f.selectSm}`} defaultValue={limit[field]} onBlur={e => handleUpdateLimitField(limit, field, e.target.value)} placeholder="-1=∞" style={{ width: 64 }} />
+                                    ))}
+                                    <button className={f.switch} role="switch" aria-checked={limit.ai_enabled} aria-label={`AI for ${limit.module_name} on ${pkg.name}`} onClick={() => handleToggleAi(limit)} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+
+                {section === "organizations" && (
+                  orgs.length === 0 ? (
+                    <div className={f.empty}><strong>No organizations yet.</strong></div>
+                  ) : (
+                    <div className={f.tableWrap}>
+                      <table className={f.ledger}>
+                        <thead><tr><th>Organization</th><th>Package</th><th>Status</th><th>Revenue</th></tr></thead>
+                        <tbody>
+                          {orgs.map(org => (
+                            <tr key={org.id}>
+                              <td><div className={f.cellMain}>{org.name}</div><div className={f.cellSub}>{org.location}</div></td>
+                              <td>
+                                <select className={`${f.select} ${f.selectSm}`} defaultValue={org.package} onChange={e => handleAssignPackage(org.id, e.target.value)}>
+                                  {packages.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                </select>
+                              </td>
+                              <td>
+                                <select className={`${f.select} ${f.selectSm}`} defaultValue={org.status} onChange={e => handleUpdateOrgStatus(org.id, e.target.value)}>
+                                  <option value="operational">Operational</option>
+                                  <option value="warning">Warning</option>
+                                  <option value="critical">Critical</option>
+                                </select>
+                              </td>
+                              <td className={f.cellMuted}>{org.revenue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                )}
+
+                {section === "modules" && (
+                  packages.length === 0 ? (
+                    <div className={f.empty}><strong>No packages yet.</strong>Module access compares packages against each other — create packages first.</div>
+                  ) : (
+                    <div className={f.tableWrap}>
+                      <table className={f.ledger}>
+                        <thead>
+                          <tr>
+                            <th>Module</th>
+                            {packages.map(p => <th key={p.id} style={{ textTransform: "capitalize", textAlign: "center" }}>{p.name}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {MODULES.map(mod => (
+                            <tr key={mod}>
+                              <td className={f.cellMain}>{mod}</td>
+                              {packages.map(p => {
+                                const limit = limits.find(l => l.package_name === p.name.toLowerCase() && l.module_name === mod);
+                                return (
+                                  <td key={p.id} style={{ textAlign: "center" }}>
+                                    {limit?.enabled ? <span className={f.check} role="img" aria-label="Included">✓</span> : <span className={f.dash} role="img" aria-label="Not included">—</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                )}
+
+                {section === "health" && <SystemHealthSection />}
+
+                {section === "danger" && (
+                  <div className={f.stack}>
+                    <p className={f.hint} style={{ color: "var(--red)" }}>
+                      Every action below permanently deletes data and asks you to confirm first — there is no undo after that.
+                    </p>
+
+                    {wipeItems.map(item => (
+                      <div key={item.table} className={f.notice}>
+                        <div className={f.noticeMain}>
+                          <div className={f.noticeTitle} style={{ color: item.tone === "bad" ? "var(--red)" : "var(--amber)" }}>{item.label}</div>
+                          <div className={f.noticeDesc}>{item.desc}</div>
+                        </div>
+                        <button className={f.dangerBtn} style={{ width: "auto" }} disabled={busy} onClick={() => setConfirmWipe({ table: item.table, label: item.label })}>
+                          {busy ? "Working…" : "Wipe"}
+                        </button>
+                      </div>
+                    ))}
+
+                    <div style={{ border: "1px solid var(--red)", borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)", marginBottom: 4 }}>⚠ Full platform reset</div>
+                      <div className={f.hint} style={{ marginBottom: 12 }}>
+                        Wipes organizations, invoices, activity, notifications, and inventory. Packages and module limits are kept. Use this to start fresh before going live.
+                      </div>
+                      <button className={f.dangerSolid} style={{ flex: "none" }} disabled={busy} onClick={() => setConfirmWipeAll(true)}>
+                        {busy ? "Resetting…" : "Reset entire platform"}
+                      </button>
+                    </div>
+
+                    {actionError && <div className={f.formError} role="alert">{actionError}</div>}
                   </div>
                 )}
               </>
             )}
-            </>
-            )}
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
+
+      {confirmWipe && (
+        <ConfirmDialog
+          title={confirmWipe.label + "?"}
+          message={`Every row in "${confirmWipe.table}" will be permanently deleted. This can't be undone.`}
+          confirmLabel={busy ? "Wiping…" : "Wipe"}
+          onConfirm={() => handleWipeTable(confirmWipe.table)}
+          onCancel={() => setConfirmWipe(null)}
+        />
+      )}
+
+      {confirmWipeAll && (
+        <TypedConfirmDialog
+          title="Reset the entire platform?"
+          message="Organizations, invoices, activity, notifications, and inventory will all be permanently deleted. Packages and module limits are kept. This can't be undone."
+          phrase="RESET PLATFORM"
+          confirmLabel={busy ? "Resetting…" : "Reset platform"}
+          onConfirm={handleWipeAll}
+          onCancel={() => setConfirmWipeAll(false)}
+        />
+      )}
     </div>
   );
 }

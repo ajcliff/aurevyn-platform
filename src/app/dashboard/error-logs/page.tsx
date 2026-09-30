@@ -1,21 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Drawer from "@/components/Drawer";
-import EmptyState from "@/components/EmptyState";
+import DashboardDrawer, { DrawerFieldList } from "@/components/DashboardDrawer";
+import ConfirmDialog from "@/components/founder/ConfirmDialog";
 import { getErrorLogs, deleteErrorLog, clearErrorLogs, type ErrorLogEntry } from "@/lib/errorLog";
 import { getOrganizations, type Organization } from "@/lib/organizations";
-import PageHeader from "@/components/PageHeader";
+import f from "@/styles/founder.module.css";
 
 function timeAgo(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 export default function ErrorLogsPage() {
@@ -31,10 +29,10 @@ export default function ErrorLogsPage() {
   const [selected, setSelected] = useState<ErrorLogEntry | null>(null);
   const [copied, setCopied] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
@@ -51,42 +49,41 @@ export default function ErrorLogsPage() {
     }
   }
 
-  const orgName = (orgId: string | null) => orgs.find((o) => o.id === orgId)?.name ?? null;
-
-  const sources = useMemo(() => Array.from(new Set(logs.map((l) => l.source))).sort(), [logs]);
+  const orgName = (orgId: string | null) => orgs.find(o => o.id === orgId)?.name ?? null;
+  const sources = useMemo(() => Array.from(new Set(logs.map(l => l.source))).sort(), [logs]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return logs.filter((l) => {
+    return logs.filter(l => {
       const matchSource = sourceFilter === "all" || l.source === sourceFilter;
       const matchOrg = orgFilter === "all" || l.org_id === orgFilter;
-      const matchSearch =
-        !q || l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q);
+      const matchSearch = !q || l.message.toLowerCase().includes(q) || l.source.toLowerCase().includes(q);
       return matchSource && matchOrg && matchSearch;
     });
   }, [logs, search, sourceFilter, orgFilter]);
 
   const last24h = useMemo(() => {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    return logs.filter((l) => new Date(l.created_at).getTime() > cutoff).length;
+    const cutoff = Date.now() - 24 * 3600000;
+    return logs.filter(l => new Date(l.created_at).getTime() > cutoff).length;
   }, [logs]);
 
   async function handleClearAll() {
-    if (!confirm(`Delete all ${logs.length} error logs? This can't be undone.`)) return;
+    setClearing(true);
     try {
-      setClearing(true);
       await clearErrorLogs();
       setLogs([]);
       setSelected(null);
     } finally {
       setClearing(false);
+      setConfirmClear(false);
     }
   }
 
   async function handleDelete(id: string) {
     await deleteErrorLog(id);
-    setLogs((prev) => prev.filter((l) => l.id !== id));
+    setLogs(prev => prev.filter(l => l.id !== id));
     if (selected?.id === id) setSelected(null);
+    setConfirmDeleteId(null);
   }
 
   function copyDetails(entry: ErrorLogEntry) {
@@ -97,253 +94,153 @@ export default function ErrorLogsPage() {
       entry.org_id ? `Org: ${orgName(entry.org_id) ?? entry.org_id}` : null,
       `Time: ${new Date(entry.created_at).toLocaleString()}`,
       entry.context ? `Context: ${JSON.stringify(entry.context, null, 2)}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
+    ].filter(Boolean).join("\n");
     navigator.clipboard.writeText(details);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (loading) return <div style={{ padding: 20, fontSize: 13, color: "var(--text-muted)" }}>Loading error logs...</div>;
-
-  if (loadFailed) {
-    return (
-      <div style={{ padding: 20 }}>
-        <EmptyState icon="⚠️" message="Couldn't load error logs." actionLabel="Retry" onAction={load} />
-      </div>
-    );
-  }
-
   return (
-    <div style={{ overflowY: "auto", height: "100%" }}>
-      <PageHeader
-  title="Error Logs"
-  subtitle="Every failure your pages catch gets written here — nothing silently disappears anymore."
-  actions={
-    <>
-      <button style={ghostButton} onClick={load}>Refresh</button>
-      <button style={dangerButton} onClick={handleClearAll} disabled={clearing || logs.length === 0}>
-        {clearing ? "Clearing..." : "Clear All"}
-      </button>
-    </>
-  }
-/>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
-        <StatCard label="Total logged" value={logs.length} />
-        <StatCard label="Last 24 hours" value={last24h} accent={last24h > 0 ? "#ef4444" : undefined} />
-        <StatCard label="Distinct sources" value={sources.length} />
-        <StatCard label="Most recent" value={logs[0] ? timeAgo(logs[0].created_at) : "—"} small />
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <input
-          placeholder="Search message or source..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ ...inputStyle, flex: "1 1 220px", marginBottom: 0 }}
-        />
-        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={selectStyle}>
-          <option value="all">All sources</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} style={selectStyle}>
-          <option value="all">All orgs</option>
-          {orgs.map((o) => (
-            <option key={o.id} value={o.id}>{o.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="card" style={cardStyle}>
-        {filtered.length === 0 ? (
-          <EmptyState
-            icon="🧯"
-            message={logs.length === 0 ? "No errors logged yet — clean slate." : "No logs match these filters."}
-          />
-        ) : (
-          <>
-            <div style={{ ...rowStyle, ...gridCols, borderBottom: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }}>
-              <span>TIME</span>
-              <span>SOURCE</span>
-              <span>ORG</span>
-              <span>MESSAGE</span>
+    <div className={`page-shell ${f.root}`}>
+      <main className={selected ? "page-main-drawer" : "page-main"}>
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Error logs</p>
+              <h1 className={`${f.headline} ${f.headlineWide}`}>
+                {loading ? "Loading error logs" : logs.length === 0 ? "Nothing has failed — clean slate." : last24h > 0 ? `${last24h} ${last24h === 1 ? "error" : "errors"} in the last 24 hours.` : "Nothing in the last 24 hours."}
+              </h1>
             </div>
-            {filtered.map((log) => (
-              <div
-                key={log.id}
-                onClick={() => setSelected(log)}
-                style={{ ...rowStyle, ...gridCols, cursor: "pointer" }}
-              >
-                <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                  {timeAgo(log.created_at)}
-                </span>
-                <span style={{ fontSize: 11 }}>
-                  {log.severity === "critical" && (
-                    <span style={{ ...sourceTagStyle, background: "#dc262620", color: "#dc2626", marginRight: 6 }}>
-                      Critical
-                    </span>
-                  )}
-                  <span style={sourceTagStyle}>{log.source}</span>
-                </span>
-                <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {orgName(log.org_id) ?? (log.org_id ? "—" : "Platform")}
-                </span>
-                <span style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {log.message}
-                </span>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
+            <div className={f.actions}>
+              <button className={f.secondary} onClick={load}>Refresh</button>
+              <button className={f.secondary} style={{ color: "var(--red)" }} onClick={() => setConfirmClear(true)} disabled={logs.length === 0}>Clear all</button>
+            </div>
+          </div>
 
-      <Drawer open={!!selected} onClose={() => setSelected(null)} title="Error Detail" width={460}>
-        {selected && (
-          <>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>MESSAGE</div>
-            <div
-              style={{
-                fontSize: 13,
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                marginBottom: 14,
-                wordBreak: "break-word",
-                fontFamily: "monospace",
-              }}
-            >
+          {loadFailed && (
+            <div className={f.empty}><strong>Couldn&apos;t load error logs.</strong><div><button className={f.secondary} onClick={load}>Retry</button></div></div>
+          )}
+
+          {loading ? (
+            <p className={f.status} role="status">Loading error logs…</p>
+          ) : (
+            <>
+              <div className={f.vitals}>
+                <div className={`${f.vital} ${f.vitalStatic}`}>
+                  <span className={f.vitalLabel}>Total logged</span>
+                  <span className={f.vitalValue}>{logs.length}</span>
+                </div>
+                <div className={`${f.vital} ${f.vitalStatic}`}>
+                  <span className={f.vitalLabel}>Last 24 hours</span>
+                  <span className={`${f.vitalValue} ${last24h > 0 ? f.owed : ""}`}>{last24h}</span>
+                </div>
+                <div className={`${f.vital} ${f.vitalStatic}`}>
+                  <span className={f.vitalLabel}>Distinct sources</span>
+                  <span className={f.vitalValue}>{sources.length}</span>
+                </div>
+                <div className={`${f.vital} ${f.vitalStatic}`}>
+                  <span className={f.vitalLabel}>Most recent</span>
+                  <span className={f.vitalValue}>{logs[0] ? timeAgo(logs[0].created_at) : "—"}</span>
+                </div>
+              </div>
+
+              <div className={f.toolbar}>
+                <input className={`${f.input} ${f.search}`} type="search" placeholder="Search message or source" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search logs" />
+                <div className={f.actions}>
+                  <select className={`${f.select} ${f.selectSm}`} value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} aria-label="Filter by source">
+                    <option value="all">All sources</option>
+                    {sources.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select className={`${f.select} ${f.selectSm}`} value={orgFilter} onChange={e => setOrgFilter(e.target.value)} aria-label="Filter by organization">
+                    <option value="all">All orgs</option>
+                    {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {filtered.length === 0 ? (
+                <div className={f.empty}>
+                  <strong>{logs.length === 0 ? "No errors logged yet." : "No logs match these filters."}</strong>
+                  {logs.length === 0 ? "Every failure your pages catch gets written here — nothing silently disappears." : "Try a different search or filter."}
+                </div>
+              ) : (
+                <div className={f.tableWrap}>
+                  <table className={f.ledger}>
+                    <thead><tr><th>Time</th><th>Source</th><th>Org</th><th>Message</th><th /></tr></thead>
+                    <tbody>
+                      {filtered.map(log => (
+                        <tr key={log.id} className={`${f.clickable} ${selected?.id === log.id ? f.selected : ""}`} onClick={() => setSelected(log)}>
+                          <td className={f.cellMuted}>{timeAgo(log.created_at)}</td>
+                          <td>
+                            {log.severity === "critical" && <span className={f.pill} data-status="critical" style={{ marginRight: 8 }}>Critical</span>}
+                            <span className={f.tag}>{log.source}</span>
+                          </td>
+                          <td className={f.cellMuted}>{orgName(log.org_id) ?? (log.org_id ? "—" : "Platform")}</td>
+                          <td className={f.cellSub} style={{ maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.message}</td>
+                          <td className={f.cellMuted}>
+                            <button className={f.linkBtn} style={{ color: "var(--text-secondary)" }} onClick={e => { e.stopPropagation(); setConfirmDeleteId(log.id); }}>Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
+
+      {selected && (
+        <DashboardDrawer title="Error detail" onClose={() => setSelected(null)}>
+          <div className={f.field} style={{ marginBottom: 16 }}>
+            <label>Message</label>
+            <div className={f.hint} style={{ background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: "10px 12px", fontFamily: "monospace", wordBreak: "break-word" }}>
               {selected.message}
             </div>
-
-            <DetailRow label="Source" value={selected.source} />
-            <DetailRow label="Org" value={orgName(selected.org_id) ?? (selected.org_id ? selected.org_id : "Platform")} />
-            {selected.code && <DetailRow label="Code" value={selected.code} />}
-            <DetailRow label="Time" value={new Date(selected.created_at).toLocaleString()} />
-
-            {selected.context && (
-              <>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", margin: "14px 0 4px" }}>CONTEXT</div>
-                <pre
-                  style={{
-                    fontSize: 11,
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    overflowX: "auto",
-                    marginBottom: 14,
-                  }}
-                >
-                  {JSON.stringify(selected.context, null, 2)}
-                </pre>
-              </>
-            )}
-
-            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-              <button style={{ ...ghostButton, flex: 1 }} onClick={() => copyDetails(selected)}>
-                {copied ? "Copied ✓" : "Copy Details"}
-              </button>
-              <button style={{ ...dangerButton, flex: 1 }} onClick={() => handleDelete(selected.id)}>
-                Delete
-              </button>
+          </div>
+          <DrawerFieldList
+            items={[
+              { label: "Source", value: selected.source },
+              { label: "Org", value: orgName(selected.org_id) ?? (selected.org_id ? selected.org_id : "Platform") },
+              ...(selected.code ? [{ label: "Code", value: selected.code }] : []),
+              { label: "Time", value: new Date(selected.created_at).toLocaleString() },
+            ]}
+          />
+          {selected.context && (
+            <div style={{ marginTop: 16 }}>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Context</label>
+              <pre style={{ fontSize: 11, background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: "10px 12px", overflowX: "auto", marginTop: 6 }}>
+                {JSON.stringify(selected.context, null, 2)}
+              </pre>
             </div>
-          </>
-        )}
-      </Drawer>
+          )}
+          <div className={f.dialogActions} style={{ justifyContent: "flex-start", marginTop: 20 }}>
+            <button className={f.secondary} onClick={() => copyDetails(selected)}>{copied ? "Copied ✓" : "Copy details"}</button>
+            <button className={f.dangerBtn} style={{ width: "auto" }} onClick={() => setConfirmDeleteId(selected.id)}>Delete</button>
+          </div>
+        </DashboardDrawer>
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Clear all error logs?"
+          message={`All ${logs.length} logged errors will be permanently deleted. This can't be undone.`}
+          confirmLabel={clearing ? "Clearing…" : "Clear all"}
+          onConfirm={handleClearAll}
+          onCancel={() => setConfirmClear(false)}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="Delete this log?"
+          message="This entry will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </div>
   );
 }
-
-function StatCard({ label, value, accent, small }: { label: string; value: string | number; accent?: string; small?: boolean }) {
-  return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: small ? 16 : 22, fontWeight: 700, color: accent ?? "var(--text-primary)" }}>{value}</div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-      <span style={{ color: "var(--text-muted)" }}>{label}</span>
-      <span style={{ fontWeight: 600, textAlign: "right" }}>{value}</span>
-    </div>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: 8,
-};
-
-const rowStyle: React.CSSProperties = {
-  display: "grid",
-  padding: "10px 12px",
-  borderBottom: "1px solid var(--border)",
-  fontSize: 13,
-  alignItems: "center",
-  gap: 8,
-};
-
-const gridCols: React.CSSProperties = {
-  gridTemplateColumns: "0.7fr 1fr 0.9fr 2fr",
-};
-
-const sourceTagStyle: React.CSSProperties = {
-  display: "inline-block",
-  padding: "2px 8px",
-  borderRadius: 6,
-  background: "var(--bg-elevated)",
-  border: "1px solid var(--border)",
-  fontSize: 10.5,
-  fontWeight: 600,
-  color: "var(--text-secondary)",
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--bg-base)",
-  color: "var(--text-primary)",
-  fontSize: 13,
-};
-
-const selectStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--bg-base)",
-  color: "var(--text-primary)",
-  fontSize: 12,
-};
-
-const ghostButton: React.CSSProperties = {
-  padding: "9px 16px",
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--text-secondary)",
-  fontSize: 12,
-  cursor: "pointer",
-};
-
-const dangerButton: React.CSSProperties = {
-  padding: "9px 16px",
-  borderRadius: 10,
-  border: "1px solid #ef444460",
-  background: "transparent",
-  color: "#ef4444",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};

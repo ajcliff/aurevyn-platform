@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import {
   getDocuments,
+  getArchivedDocuments,
   uploadDocument,
   getSignedDocumentUrl,
-  deleteDocument,
+  requestDocumentDeletion,
+  restoreDocument,
   type Document,
   type DocumentCategory,
 } from "@/lib/documents";
+import { getPendingApprovalsForOrg, type ApprovalRequest } from "@/lib/approvals";
 
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   receipt: "Receipt",
@@ -22,10 +25,13 @@ const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 };
 
 export default function DocumentsPage() {
-  const { organization } = useEngine();
+  const { organization, membership } = useEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [view, setView] = useState<"active" | "archived">("active");
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [archived, setArchived] = useState<Document[]>([]);
+  const [pendingDeletions, setPendingDeletions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<"all" | DocumentCategory>("all");
@@ -37,12 +43,24 @@ export default function DocumentsPage() {
 
   async function load() {
     setLoading(true);
-    const data = await getDocuments(organization.id);
-    setDocuments(data);
+    const [active, archivedDocs, approvals] = await Promise.all([
+      getDocuments(organization.id),
+      getArchivedDocuments(organization.id),
+      getPendingApprovalsForOrg(organization.id),
+    ]);
+    setDocuments(active);
+    setArchived(archivedDocs);
+    setPendingDeletions(
+      new Set(
+        approvals
+          .filter((a: ApprovalRequest) => a.type === "document_deletion" && a.related_id)
+          .map((a: ApprovalRequest) => a.related_id as string)
+      )
+    );
     setLoading(false);
   }
 
-async function handleView(doc: Document) {
+  async function handleView(doc: Document) {
     const url = await getSignedDocumentUrl(doc.file_path);
     if (url) {
       window.open(url, "_blank");
@@ -57,7 +75,7 @@ async function handleView(doc: Document) {
 
     try {
       setUploading(true);
-      await uploadDocument(organization.id, file, pendingCategory, "You");
+      await uploadDocument(organization.id, file, pendingCategory, membership.userEmail || "You");
       await load();
     } catch (err) {
       console.error(err);
@@ -68,13 +86,32 @@ async function handleView(doc: Document) {
     }
   }
 
-  async function handleDelete(doc: Document) {
-    if (!confirm(`Delete "${doc.name}"?`)) return;
-    await deleteDocument(doc.id, doc.file_path, organization.id, doc.name);
+  async function handleRequestDeletion(doc: Document) {
+    if (pendingDeletions.has(doc.id)) {
+      alert("A deletion request for this document is already pending approval.");
+      return;
+    }
+    if (!confirm(`Request deletion of "${doc.name}"? This needs approval before it's archived, and the file stays recoverable for 90 days after that.`)) return;
+
+    await requestDocumentDeletion(doc, organization.id, membership.userId, membership.userEmail || "You");
+    alert("Deletion requested — it'll show up under Approvals for someone with approval rights to review.");
     load();
   }
 
-  const filtered = documents.filter((d) => categoryFilter === "all" || d.category === categoryFilter);
+  async function handleRestore(doc: Document) {
+    if (!confirm(`Restore "${doc.name}" back to active documents?`)) return;
+    await restoreDocument(doc.id, organization.id, doc.name);
+    load();
+  }
+
+  function daysRemaining(expiresAt: string | null): number {
+    if (!expiresAt) return 0;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  const list = view === "active" ? documents : archived;
+  const filtered = list.filter((d) => categoryFilter === "all" || d.category === categoryFilter);
 
   function formatSize(bytes: number | null): string {
     if (!bytes) return "";
@@ -113,6 +150,17 @@ async function handleView(doc: Document) {
         </div>
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <FilterChip label={`Active (${documents.length})`} active={view === "active"} onClick={() => setView("active")} />
+        <FilterChip label={`Archived (${archived.length})`} active={view === "archived"} onClick={() => setView("archived")} />
+      </div>
+
+      {view === "archived" && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+          Archived files are permanently removed 90 days after archiving unless restored.
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <FilterChip label="All" active={categoryFilter === "all"} onClick={() => setCategoryFilter("all")} />
         {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
@@ -143,23 +191,43 @@ async function handleView(doc: Document) {
               {new Date(doc.created_at).toLocaleDateString()} · {doc.uploaded_by_name}
             </div>
 
-           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            {view === "active" && pendingDeletions.has(doc.id) && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#f5b942", background: "rgba(245,185,66,0.1)", border: "1px solid rgba(245,185,66,0.3)", borderRadius: 8, padding: "4px 8px", display: "inline-block" }}>
+                🔔 Deletion pending approval
+              </div>
+            )}
+
+            {view === "archived" && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#ef4444" }}>
+                {daysRemaining(doc.archive_expires_at)} day{daysRemaining(doc.archive_expires_at) === 1 ? "" : "s"} until permanent removal
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button
                 onClick={() => handleView(doc)}
                 style={{ ...ghostButton, textAlign: "center", flex: 1 }}
               >
                 View
               </button>
-              <button style={dangerBtn} onClick={() => handleDelete(doc)}>
-                Delete
-              </button>
+              {view === "active" ? (
+                <button style={dangerBtn} onClick={() => handleRequestDeletion(doc)}>
+                  Request deletion
+                </button>
+              ) : (
+                <button style={ghostButton} onClick={() => handleRestore(doc)}>
+                  Restore
+                </button>
+              )}
             </div>
           </div>
         ))}
 
         {filtered.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 13, gridColumn: "1 / -1", textAlign: "center", padding: 40 }}>
-            No documents yet. Upload receipts, invoices, or files to keep them all in one place.
+            {view === "active"
+              ? "No documents yet. Upload receipts, invoices, or files to keep them all in one place."
+              : "Nothing archived right now."}
           </div>
         )}
       </div>

@@ -21,9 +21,9 @@ export async function createNotification(
 
   if (error) {
     console.error("Failed to create notification:", error);
+    throw error;
   }
 }
-
 
 export async function getNotifications(): Promise<Notification[]> {
   const supabase = createClient();
@@ -43,10 +43,12 @@ export async function getNotifications(): Promise<Notification[]> {
 
 export async function markAsRead(id: string) {
   const supabase = createClient();
-  await supabase.from("notifications").update({ read: true }).eq("id", id);
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+  if (error) throw error;
 }
 
 export async function markAllAsRead() {
   const supabase = createClient();
-  await supabase.from("notifications").update({ read: true }).eq("read", false);
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("read", false);
+  if (error) throw error;
 }

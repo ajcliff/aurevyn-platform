@@ -9,7 +9,6 @@ interface Service {
   name: string;
   detail: string;
   status: Status;
-  uptime: string;
 }
 
 const dot: Record<Status, string> = {
@@ -43,16 +42,16 @@ function StatusDot({ status }: { status: Status }) {
 
 export default function SystemHealthSection() {
   const [services, setServices] = useState<Service[]>([
-    { name: "Supabase API", detail: "REST & Realtime", status: "checking", uptime: "—" },
-    { name: "Authentication", detail: "Auth service", status: "checking", uptime: "—" },
-    { name: "Database", detail: "PostgreSQL", status: "checking", uptime: "—" },
-    { name: "Edge Functions", detail: "Serverless functions", status: "checking", uptime: "—" },
-    { name: "Billing Engine", detail: "Payment hooks", status: "checking", uptime: "—" },
-    { name: "AI Services", detail: "Claude API", status: "checking", uptime: "—" },
-    { name: "Org Module", detail: "Organizations", status: "checking", uptime: "—" },
-    { name: "Notifications", detail: "Alert system", status: "checking", uptime: "—" },
-    { name: "Realtime", detail: "Live subscriptions", status: "checking", uptime: "—" },
-    { name: "Storage", detail: "File storage", status: "checking", uptime: "—" },
+    { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
+    { name: "Authentication", detail: "Auth service", status: "checking" },
+    { name: "Database", detail: "PostgreSQL", status: "checking" },
+    { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
+    { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
+    { name: "AI Services", detail: "Claude API", status: "checking" },
+    { name: "Org Module", detail: "Organizations", status: "checking" },
+    { name: "Notifications", detail: "Alert system", status: "checking" },
+    { name: "Realtime", detail: "Live subscriptions", status: "checking" },
+    { name: "Storage", detail: "File storage", status: "checking" },
   ]);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -66,16 +65,16 @@ export default function SystemHealthSection() {
   const checkServices = async () => {
     const supabase = createClient();
     let updated: Service[] = [
-      { name: "Supabase API", detail: "REST & Realtime", status: "checking", uptime: "—" },
-      { name: "Authentication", detail: "Auth service", status: "checking", uptime: "—" },
-      { name: "Database", detail: "PostgreSQL", status: "checking", uptime: "—" },
-      { name: "Edge Functions", detail: "Serverless functions", status: "checking", uptime: "—" },
-      { name: "Billing Engine", detail: "Payment hooks", status: "checking", uptime: "—" },
-      { name: "AI Services", detail: "Claude API", status: "checking", uptime: "—" },
-      { name: "Org Module", detail: "Organizations", status: "checking", uptime: "—" },
-      { name: "Notifications", detail: "Alert system", status: "checking", uptime: "—" },
-      { name: "Realtime", detail: "Live subscriptions", status: "checking", uptime: "—" },
-      { name: "Storage", detail: "File storage", status: "checking", uptime: "—" },
+      { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
+      { name: "Authentication", detail: "Auth service", status: "checking" },
+      { name: "Database", detail: "PostgreSQL", status: "checking" },
+      { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
+      { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
+      { name: "AI Services", detail: "Claude API", status: "checking" },
+      { name: "Org Module", detail: "Organizations", status: "checking" },
+      { name: "Notifications", detail: "Alert system", status: "checking" },
+      { name: "Realtime", detail: "Live subscriptions", status: "checking" },
+      { name: "Storage", detail: "File storage", status: "checking" },
     ];
 
     setServices([...updated]);
@@ -87,10 +86,9 @@ export default function SystemHealthSection() {
       updated = updateService("Database", {
         status: error ? "critical" : "operational",
         detail: error ? error.message : `PostgreSQL · ${ms}ms`,
-        uptime: error ? "—" : "99.9%",
       }, updated);
     } catch {
-      updated = updateService("Database", { status: "critical", detail: "Connection failed", uptime: "—" }, updated);
+      updated = updateService("Database", { status: "critical", detail: "Connection failed" }, updated);
     }
     setServices([...updated]);
 
@@ -99,10 +97,9 @@ export default function SystemHealthSection() {
       updated = updateService("Org Module", {
         status: error ? "critical" : "operational",
         detail: error ? "Module error" : `${data?.length ?? 0} orgs active`,
-        uptime: error ? "—" : "100%",
       }, updated);
     } catch {
-      updated = updateService("Org Module", { status: "critical", detail: "Module offline", uptime: "—" }, updated);
+      updated = updateService("Org Module", { status: "critical", detail: "Module offline" }, updated);
     }
     setServices([...updated]);
 
@@ -111,10 +108,9 @@ export default function SystemHealthSection() {
       updated = updateService("Notifications", {
         status: error ? "warning" : "operational",
         detail: error ? "Queue error" : "Queue processing",
-        uptime: error ? "—" : "99.8%",
       }, updated);
     } catch {
-      updated = updateService("Notifications", { status: "warning", detail: "Queue issue", uptime: "—" }, updated);
+      updated = updateService("Notifications", { status: "warning", detail: "Queue issue" }, updated);
     }
     setServices([...updated]);
 
@@ -123,10 +119,9 @@ export default function SystemHealthSection() {
       updated = updateService("Billing Engine", {
         status: error ? "warning" : "operational",
         detail: error ? "Billing issue" : "Payment hooks active",
-        uptime: error ? "—" : "99.7%",
       }, updated);
     } catch {
-      updated = updateService("Billing Engine", { status: "warning", detail: "Billing offline", uptime: "—" }, updated);
+      updated = updateService("Billing Engine", { status: "warning", detail: "Billing offline" }, updated);
     }
     setServices([...updated]);
 
@@ -139,10 +134,9 @@ export default function SystemHealthSection() {
       updated = updateService("Realtime", {
         status: res.ok ? "operational" : "warning",
         detail: res.ok ? `Live subscriptions · ${ms}ms` : "Connection issues",
-        uptime: res.ok ? "99.9%" : "—",
       }, updated);
     } catch {
-      updated = updateService("Realtime", { status: "warning", detail: "Realtime unreachable", uptime: "—" }, updated);
+      updated = updateService("Realtime", { status: "warning", detail: "Realtime unreachable" }, updated);
     }
     setServices([...updated]);
 
@@ -168,13 +162,11 @@ export default function SystemHealthSection() {
         updated = updateService(name, {
           status: ok ? "operational" : ms > 3000 ? "warning" : "operational",
           detail: `${ok ? "Responding" : "Slow"} · ${ms}ms`,
-          uptime: ok ? "99.9%" : "98%",
         }, updated);
       } catch {
         updated = updateService(name, {
           status: "warning",
           detail: "Timeout or blocked",
-          uptime: "—",
         }, updated);
       }
     }));
@@ -253,29 +245,14 @@ export default function SystemHealthSection() {
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: "10px", color: dot[service.status], fontWeight: 600 }}>{label[service.status]}</div>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{service.uptime}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", letterSpacing: "0.05em" }}>OVERALL UPTIME</div>
-        <div style={{ display: "flex", gap: "3px" }}>
-          {Array.from({ length: 30 }).map((_, i) => {
-            const bad = [6, 14, 22].includes(i);
-            const warn = [9, 18].includes(i);
-            return <div key={i} style={{ flex: 1, height: "24px", borderRadius: "3px", background: bad ? "#ef4444" : warn ? "#f59e0b" : "#4ade80", opacity: bad ? 0.8 : warn ? 0.7 : 0.5 }} />;
-          })}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
-          <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>30 days ago</span>
-          <span style={{ fontSize: "10px", color: "var(--green)", fontWeight: 600 }}>
-            {overallPct !== null ? `${overallPct}% services up` : "Checking..."}
-          </span>
-          <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Today</span>
-        </div>
+      <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "4px 0" }}>
+        These are live checks, run every 30 seconds — there's no historical uptime log yet, so only the current status is shown.
       </div>
     </div>
   );

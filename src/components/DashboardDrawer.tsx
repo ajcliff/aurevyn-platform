@@ -1,15 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
-import s from "@/styles/layout.module.css";
+import { useEffect, type ReactNode } from "react";
+import layout from "@/styles/layout.module.css"; // geometry only (fixed to the right edge)
+import f from "@/styles/founder.module.css";
 
-type DrawerTab = {
-  id: string;
-  label: string;
-};
+type DrawerTab = { id: string; label: string };
 
 type DashboardDrawerProps = {
   title: ReactNode;
+  /** A CSS colour for the status dot beside the title (kept for compatibility). */
   statusColor?: string;
   onClose: () => void;
   tabs?: DrawerTab[];
@@ -18,85 +17,28 @@ type DashboardDrawerProps = {
   children: ReactNode;
 };
 
-export default function DashboardDrawer({
-  title,
-  statusColor,
-  onClose,
-  tabs,
-  activeTab,
-  onTabChange,
-  children,
-}: DashboardDrawerProps) {
+export default function DashboardDrawer({ title, statusColor, onClose, tabs, activeTab, onTabChange, children }: DashboardDrawerProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className={s.drawer}>
-      <div style={{ padding: "16px", borderBottom: "1px solid var(--border)" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: tabs ? "12px" : 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-            {statusColor && (
-              <span
-                style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  background: statusColor,
-                  boxShadow: `0 0 8px ${statusColor}`,
-                  flexShrink: 0,
-                }}
-              />
-            )}
-            <span
-              style={{
-                fontSize: "14px",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {title}
-            </span>
+    <aside className={`${layout.drawer} ${f.root} ${f.drawerRoot}`} aria-label="Details">
+      <div className={`${f.drawerHead} ${tabs ? "" : f.drawerHeadPlain}`}>
+        <div className={f.drawerTitleRow}>
+          <div className={f.drawerTitle}>
+            {statusColor && <span className={f.statusDot} style={{ background: statusColor }} aria-hidden="true" />}
+            <span>{title}</span>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: "14px",
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
+          <button className={f.closeBtn} onClick={onClose} aria-label="Close details">✕</button>
         </div>
 
         {tabs && (
-          <div style={{ display: "flex", gap: "4px" }}>
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => onTabChange?.(t.id)}
-                style={{
-                  flex: 1,
-                  padding: "5px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border)",
-                  background: activeTab === t.id ? "var(--bg-elevated)" : "transparent",
-                  color: activeTab === t.id ? "var(--text-primary)" : "var(--text-muted)",
-                  fontSize: "10px",
-                  cursor: "pointer",
-                  textTransform: "capitalize",
-                  fontFamily: "inherit",
-                }}
-              >
+          <div className={`${f.tabs} ${f.drawerTabs}`} role="tablist" style={{ borderBottom: 0 }}>
+            {tabs.map(t => (
+              <button key={t.id} role="tab" aria-selected={activeTab === t.id} className={f.tab} onClick={() => onTabChange?.(t.id)} style={{ textTransform: "capitalize" }}>
                 {t.label}
               </button>
             ))}
@@ -104,45 +46,22 @@ export default function DashboardDrawer({
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>{children}</div>
-    </div>
+      <div className={f.drawerBody}>{children}</div>
+    </aside>
   );
 }
 
-type DrawerFieldItem = {
-  label: string;
-  value: ReactNode;
-  accent?: string;
-};
+type DrawerFieldItem = { label: string; value: ReactNode; accent?: string };
 
 export function DrawerFieldList({ items }: { items: DrawerFieldItem[] }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+    <dl className={f.fields}>
       {items.map((item, i) => (
-        <div
-          key={i}
-          style={{
-            background: "var(--bg-elevated)",
-            borderRadius: "8px",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>
-            {item.label}
-          </div>
-          <div
-            style={{
-              fontSize: "13px",
-              color: item.accent ?? "var(--text-primary)",
-              textTransform: "capitalize",
-              fontWeight: item.accent ? 600 : 400,
-            }}
-          >
-            {item.value}
-          </div>
+        <div key={i} className={f.fieldItem}>
+          <dt>{item.label}</dt>
+          <dd style={item.accent ? { color: item.accent, fontWeight: 600 } : undefined}>{item.value}</dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }

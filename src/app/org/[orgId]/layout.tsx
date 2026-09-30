@@ -24,41 +24,7 @@ import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
 import QuickNotesWidget from "@/components/QuickNotesWidget";
 import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
-
-const ENGINE_ICONS: Record<string, string> = {
-  inventory: "📦",
-  pos: "🛒",
-  finance: "💰",
-  crm: "👥",
-  "hr-payroll": "🧑‍💼",
-  analytics: "📊",
-  procurement: "📋",
-  documents: "📄",
-  "ai-insights": "✨",
-  "business-ops": "🧭",
-};
-
-const NAV_LABELS: Record<string, string> = {
-  activity: "Activity",
-  approvals: "Approvals",
-  documents: "Documents",
-  knowledge: "Knowledge Base",
-  employees: "Employee Hub",
-   team: "Team",
-  settings: "Settings",
-  me: "My Profile",
-  warehouses: "Warehouses",
-  pricelists: "Pricelists",
-   fleet: "Fleet & Delivery",
-  "stock-takes": "Stock Takes",
-  user: "My Profile",
-  automation: "Automation",
-};
-
-const UNGATED_SEGMENTS = new Set([
-  "me", "settings", "team", "employees", "activity", "approvals",
-  "documents", "knowledge", "warehouses", "pricelists", "fleet", "summary", "welcome", "stock-takes", undefined,
-]);
+import { ENGINE_ICONS, NAV_LABELS, SEGMENT_TO_ENGINE, SEGMENT_ICONS, PLATFORM_SEGMENTS } from "@/lib/engineMeta";
 
 const MOBILE_BREAKPOINT = 900;
 
@@ -196,12 +162,20 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
       : engines.filter((e) => membership.allowedEngines!.includes(e.engines?.slug ?? ""));
 
 const canManageTeamAccess = canManageTeam(membership);
-const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segments = pathname.split("/").filter(Boolean);
+const canManageOrgSettingsAccess = canManageOrgSettings(membership);
+  const segments = pathname.split("/").filter(Boolean);
   const engineSlug = segments[2];
-  const isGatedRoute = !UNGATED_SEGMENTS.has(engineSlug);
-  const hasEngine = visibleEngines.some((e) => e.engines?.slug === engineSlug);
 
-  if (engineSlug === "team" && !canManageTeamAccess) {
+  // Every route belongs to exactly one engine and is unlocked by a license
+  // for it. Only org identity and self-service pages (PLATFORM_SEGMENTS) sit
+  // outside — those aren't features someone buys.
+  const requiredEngine =
+    !engineSlug || PLATFORM_SEGMENTS.has(engineSlug) ? null : (SEGMENT_TO_ENGINE[engineSlug] ?? engineSlug);
+  const isGatedRoute = requiredEngine !== null;
+  const hasEngine = requiredEngine ? visibleEngines.some((e) => e.engines?.slug === requiredEngine) : true;
+  const orgHasEngine = requiredEngine ? engines.some((e) => e.engines?.slug === requiredEngine) : true;
+
+  if ((engineSlug === "team" || engineSlug === "users") && !canManageTeamAccess) {
     return (
       <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
         <PageHeaderProvider>
@@ -218,7 +192,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
             setShowBrain={setShowBrain}
             logoUrl={logoUrl}
           >
-            <EmptyState icon="🚫" message="Only owners and admins can manage the team." />
+            <EmptyState icon="🚫" message="Only owners and admins can manage users." />
           </OrgShell>
         </PageHeaderProvider>
       </EngineProvider>
@@ -249,7 +223,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
   );
 }
 
-  if (isGatedRoute && engineSlug !== "team" && !hasEngine) {
+  if (isGatedRoute && !hasEngine) {
     return (
       <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
         <PageHeaderProvider>
@@ -268,9 +242,13 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
           >
             <EmptyState
               icon="🔒"
-              message="This isn't part of your plan, or your role doesn't have access to it."
-              actionLabel="Back to dashboard"
-              onAction={() => { window.location.href = `/org/${orgId}`; }}
+              message={
+                orgHasEngine
+                  ? "You don't have a license for this engine yet. Ask an admin to assign you a seat."
+                  : "This engine isn't active for your organization."
+              }
+              actionLabel="Open Engines"
+              onAction={() => { window.location.href = `/org/${orgId}/engines`; }}
             />
           </OrgShell>
         </PageHeaderProvider>
@@ -278,23 +256,28 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);  const segm
     );
   }
 
+  const installedSlugs = visibleEngines.map((e) => e.engines?.slug ?? "");
+
   const orgCommands = [
     { id: "overview", label: "Overview", icon: "🏠", path: `/org/${orgId}` },
+    { id: "engines", label: "Engines", icon: "🧩", path: `/org/${orgId}/engines` },
     ...visibleEngines.map((e) => ({
       id: e.id,
       label: e.engines?.name ?? e.engines?.slug ?? "",
       icon: ENGINE_ICONS[e.engines?.slug ?? ""] ?? "⚙️",
       path: `/org/${orgId}/${e.engines?.slug}`,
     })),
-    { id: "activity", label: "Activity", icon: "🕐", path: `/org/${orgId}/activity` },
-    { id: "approvals", label: "Approvals", icon: "✅", path: `/org/${orgId}/approvals` },
-    { id: "documents", label: "Documents", icon: "📄", path: `/org/${orgId}/documents` },
-    { id: "automation", label: "Automation", icon: "🔁", path: `/org/${orgId}/automation` },
-    { id: "employees", label: "Employee Hub", icon: "🪪", path: `/org/${orgId}/employees` },
-    { id: "me", label: "My Profile", icon: "🪪", path: `/org/${orgId}/me` },
+    ...Object.entries(SEGMENT_TO_ENGINE)
+      .filter(([, slug]) => installedSlugs.includes(slug))
+      .map(([seg]) => ({
+        id: seg,
+        label: NAV_LABELS[seg] ?? seg,
+        icon: SEGMENT_ICONS[seg] ?? "•",
+        path: `/org/${orgId}/${seg}`,
+      })),
+    { id: "me", label: "Self Service", icon: "👤", path: `/org/${orgId}/me` },
+    ...(canManageTeamAccess ? [{ id: "users", label: "Users", icon: "🧑‍🤝‍🧑", path: `/org/${orgId}/users` }] : []),
   ];
-
-  const installedSlugs = visibleEngines.map((e) => e.engines?.slug ?? "");
 
   return (
     <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
@@ -644,116 +627,72 @@ const { header } = usePageHeader();
             active={pathname === `/org/${orgId}`}
             showLabel={showLabels}
           />
-
-          {engines.map((installed) => (
-            <SidebarLink
-              key={installed.id}
-              href={`/org/${orgId}/${installed.engines?.slug}`}
-              label={installed.engines?.name ?? installed.engines?.slug ?? ""}
-              icon={ENGINE_ICONS[installed.engines?.slug ?? ""] ?? "⚙️"}
-              active={pathname.startsWith(`/org/${orgId}/${installed.engines?.slug}`)}
-              showLabel={showLabels}
-            />
-          ))}
-
-          {engines.some((e) => e.engines?.slug === "inventory") && (
-            <SidebarLink
-              href={`/org/${orgId}/warehouses`}
-              label="Warehouses"
-              icon="🏬"
-              active={pathname.startsWith(`/org/${orgId}/warehouses`)}
-              showLabel={showLabels}
-            />
-          )}
-
-          {engines.some((e) => e.engines?.slug === "inventory") && (
-            <SidebarLink
-              href={`/org/${orgId}/stock-takes`}
-              label="Stock Takes"
-              icon="📋"
-              active={pathname.startsWith(`/org/${orgId}/stock-takes`)}
-              showLabel={showLabels}
-            />
-          )}
-
-          {engines.some((e) => e.engines?.slug === "inventory") && (
-            <SidebarLink
-              href={`/org/${orgId}/pricelists`}
-              label="Pricelists"
-              icon="🏷️"
-              active={pathname.startsWith(`/org/${orgId}/pricelists`)}
-              showLabel={showLabels}
-            />
-          )}
-
-          {engines.some((e) => e.engines?.slug === "pos" || e.engines?.slug === "inventory") && (
-            <SidebarLink
-              href={`/org/${orgId}/fleet`}
-              label="Fleet & Delivery"
-              icon="🚚"
-              active={pathname.startsWith(`/org/${orgId}/fleet`)}
-              showLabel={showLabels}
-            />
-          )}
+          <SidebarLink
+            href={`/org/${orgId}/engines`}
+            label="Engines"
+            icon="🧩"
+            active={pathname.startsWith(`/org/${orgId}/engines`)}
+            showLabel={showLabels}
+          />
 
           <div style={{ height: 1, background: "var(--border)", margin: "12px 4px" }} />
 
-          <SidebarLink
-            href={`/org/${orgId}/activity`}
-            label="Activity"
-            icon="🕐"
-            active={pathname.startsWith(`/org/${orgId}/activity`)}
-            showLabel={showLabels}
-          />
-          <SidebarLink
-            href={`/org/${orgId}/approvals`}
-            label="Approvals"
-            icon="✅"
-            active={pathname.startsWith(`/org/${orgId}/approvals`)}
-            showLabel={showLabels}
-          />
-          <SidebarLink
-            href={`/org/${orgId}/documents`}
-            label="Documents"
-            icon="📄"
-            active={pathname.startsWith(`/org/${orgId}/documents`)}
-            showLabel={showLabels}
-          />
-          <SidebarLink
-            href={`/org/${orgId}/knowledge`}
-            label="Knowledge Base"
-            icon="📚"
-            active={pathname.startsWith(`/org/${orgId}/knowledge`)}
-            showLabel={showLabels}
-          />
-          <SidebarLink
-            href={`/org/${orgId}/employees`}
-            label="Employee Hub"
-            icon="🪪"
-            active={pathname.startsWith(`/org/${orgId}/employees`)}
-            showLabel={showLabels}
-          />
+          {engines.map((installed) => {
+            const slug = installed.engines?.slug ?? "";
+            const children = Object.entries(SEGMENT_TO_ENGINE)
+              .filter(([, engineSlug]) => engineSlug === slug)
+              .map(([seg]) => seg);
+            return (
+              <div key={installed.id}>
+                <SidebarLink
+                  href={`/org/${orgId}/${slug}`}
+                  label={installed.engines?.name ?? slug}
+                  icon={ENGINE_ICONS[slug] ?? "⚙️"}
+                  active={pathname.startsWith(`/org/${orgId}/${slug}`)}
+                  showLabel={showLabels}
+                />
+                {showLabels &&
+                  children.map((seg) => (
+                    <SidebarLink
+                      key={seg}
+                      indent
+                      href={`/org/${orgId}/${seg}`}
+                      label={NAV_LABELS[seg] ?? seg}
+                      icon={SEGMENT_ICONS[seg] ?? "•"}
+                      active={pathname.startsWith(`/org/${orgId}/${seg}`)}
+                      showLabel={showLabels}
+                    />
+                  ))}
+              </div>
+            );
+          })}
+
+          <div style={{ height: 1, background: "var(--border)", margin: "12px 4px" }} />
+
+          {showLabels && (
+            <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", padding: "0 12px 6px" }}>
+              General
+            </div>
+          )}
           <SidebarLink
             href={`/org/${orgId}/me`}
-            label="My Profile"
+            label="Self Service"
             icon="👤"
             active={pathname.startsWith(`/org/${orgId}/me`)}
             showLabel={showLabels}
           />
-
           {canManageTeamAccess && (
             <SidebarLink
-              href={`/org/${orgId}/team`}
-              label="Team"
+              href={`/org/${orgId}/users`}
+              label="Users"
               icon="🧑‍🤝‍🧑"
-              active={pathname.startsWith(`/org/${orgId}/team`)}
+              active={pathname.startsWith(`/org/${orgId}/users`)}
               showLabel={showLabels}
             />
           )}
-
           {canManageOrgSettingsAccess && (
-  <SidebarLink
-    href={`/org/${orgId}/settings`}
+            <SidebarLink
+              href={`/org/${orgId}/settings`}
               label="Settings"
               icon="⚙️"
               active={pathname.startsWith(`/org/${orgId}/settings`)}
@@ -1045,12 +984,14 @@ function SidebarLink({
   icon,
   active,
   showLabel,
+  indent,
 }: {
   href: string;
   label: string;
   icon: string;
   active: boolean;
   showLabel: boolean;
+  indent?: boolean;
 }) {
   return (
     <Link
@@ -1060,13 +1001,13 @@ function SidebarLink({
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "10px 12px",
+        padding: indent ? "7px 12px 7px 34px" : "10px 12px",
         borderRadius: 10,
         marginBottom: 4,
         textDecoration: "none",
         color: active ? "var(--gold-contrast)" : "var(--text-secondary)",
         background: active ? "var(--gold)" : "transparent",
-        fontSize: 13,
+        fontSize: indent ? 12 : 13,
         fontWeight: active ? 700 : 500,
         justifyContent: showLabel ? "flex-start" : "center",
       }}

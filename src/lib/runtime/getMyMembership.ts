@@ -31,9 +31,25 @@ export async function getMyMembership(orgId: string): Promise<MyMembership | nul
 
   if (!data) return null;
 
+  // Engine access is licensed per user now (user_engine_licenses), not the
+  // old org_users.allowed_engines allowlist. Owners and admins manage the org
+  // so they can open anything the org has; everyone else can only open the
+  // engines they hold a seat on.
+  let allowedEngines: string[] | null = null;
+  if (data.role !== "owner" && data.role !== "admin") {
+    const { data: licenses } = await supabase
+      .from("user_engine_licenses")
+      .select("engines(slug)")
+      .eq("org_id", orgId)
+      .eq("user_id", user.id);
+    allowedEngines = (licenses ?? [])
+      .map((l: any) => l.engines?.slug as string | undefined)
+      .filter((slug): slug is string => !!slug);
+  }
+
   return {
     role: data.role as TeamRole,
-    allowedEngines: data.allowed_engines,
+    allowedEngines,
     isFounder: false,
     hrPermissions: data.hr_permissions || {},
     userId: user.id,

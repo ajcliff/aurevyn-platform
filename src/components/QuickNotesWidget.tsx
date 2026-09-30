@@ -69,13 +69,13 @@ export default function QuickNotesWidget({ orgId }: Props) {
       <button
         onClick={() => setOpen(true)}
         data-mobile-safe
-        style={{
+                style={{
           position: "fixed",
-          bottom: 20,
-          right: 20,
+          bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+          right: "calc(24px + env(safe-area-inset-right, 0px))",
           zIndex: 9998,
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           borderRadius: "50%",
           border: "1px solid var(--border)",
           background: "var(--bg-card)",

@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import StatCard from "@/components/StatCard";
-import Sparkline from "@/components/Sparkline";
+import RevenueChart from "@/components/RevenueChart";
 import SystemActivity from "@/components/SystemActivity";
 import OrgsNeedingAttention from "@/components/OrgsNeedingAttention";
 import GreetingHeader from "@/components/GreetingHeader";
@@ -13,10 +12,12 @@ import { getPackages, type Package } from "@/lib/packages";
 import { getPlatformPaymentsSince } from "@/lib/payments";
 import { formatError } from "@/lib/errorFormat";
 import { createClient } from "@/lib/supabase";
-import s from "@/styles/layout.module.css";
 import { logError } from "@/lib/errorLog";
+import f from "@/styles/founder.module.css";
 
 type Range = "7d" | "30d";
+
+const kes = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
 
 export default function Home() {
   const router = useRouter();
@@ -32,9 +33,11 @@ export default function Home() {
 
   const loadRevenue = useCallback(async (days: number) => {
     try {
-      const since = new Date();
-      since.setDate(since.getDate() - days * 2); // fetch double the window so we can compare period-over-period
-      since.setHours(0, 0, 0, 0);
+      // Two back-to-back windows of `days` days, ending today, so we can compare period-over-period.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const since = new Date(today);
+      since.setDate(since.getDate() - (days * 2 - 1));
 
       const payments = await getPlatformPaymentsSince(since.toISOString());
 
@@ -62,7 +65,6 @@ export default function Home() {
 
   useEffect(() => {
     load();
-    loadRevenue(days);
 
     const supabase = createClient();
 
@@ -88,7 +90,7 @@ export default function Home() {
 
   useEffect(() => {
     loadRevenue(days);
-  }, [range, loadRevenue, days]);
+  }, [loadRevenue, days]);
 
   async function load() {
     setLoading(true);
@@ -97,11 +99,11 @@ export default function Home() {
       const [orgsData, packagesData] = await Promise.all([getOrganizations(), getPackages()]);
       setOrgs(orgsData);
       setPackages(packagesData);
-   } catch (err) {
-  const message = formatError(err);
-  setError(message);
-  logError({ source: "dashboard/overview", message });
-} finally {
+    } catch (err) {
+      const message = formatError(err);
+      setError(message);
+      logError({ source: "dashboard/overview", message });
+    } finally {
       setLoading(false);
     }
   }
@@ -123,86 +125,91 @@ export default function Home() {
   }, 0);
 
   const activeOrgs = orgs.filter(o => o.status === "operational").length;
+  const flagged = orgs.length - activeOrgs;
+  const subscriptions = packages.reduce((sum, p) => sum + p.orgs, 0);
+  const periodTotal = dailyRevenue.reduce((a, b) => a + b, 0);
+
+  const headline = loading
+    ? "Checking on your organizations"
+    : orgs.length === 0
+      ? "No organizations yet."
+      : flagged === 0
+        ? orgs.length === 1 ? "Your organization is running." : `All ${orgs.length} organizations are running.`
+        : flagged === 1 ? "1 organization needs you." : `${flagged} organizations need you.`;
 
   return (
-    <div className={s.shell}>
-      <div className={s.body}>
-        <main className={s.main}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <GreetingHeader />
-            <div style={{ display: "flex", gap: "4px" }}>
-              {(["7d", "30d"] as const).map(r => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  style={{
-                    padding: "6px 14px", borderRadius: "8px", border: "1px solid var(--border)",
-                    background: range === r ? "var(--bg-elevated)" : "transparent",
-                    color: range === r ? "var(--gold)" : "var(--text-muted)",
-                    fontSize: "11px", fontWeight: range === r ? 600 : 400,
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}
-                >
-                  {r === "7d" ? "7 Days" : "30 Days"}
-                </button>
-              ))}
-            </div>
-          </div>
+    <div className={`page-shell ${f.root}`}>
+      <main className="page-main">
+        <div className={f.page}>
+          <GreetingHeader
+            headline={headline}
+            actions={
+              <div className={f.segmented} role="group" aria-label="Time range">
+                {(["7d", "30d"] as const).map(r => (
+                  <button key={r} className={f.segBtn} aria-pressed={range === r} onClick={() => setRange(r)}>
+                    {r === "7d" ? "7 days" : "30 days"}
+                  </button>
+                ))}
+              </div>
+            }
+          />
 
-          {error && (
-            <ErrorBanner
-              message={error}
-              source="dashboard/overview"
-              onRetry={load}
-            />
-          )}
+          {error && <ErrorBanner message={error} source="dashboard/overview" onRetry={load} />}
 
           {loading ? (
-            <div style={{ padding: 20, fontSize: 13, color: "var(--text-muted)" }}>Loading overview...</div>
+            <p className={f.status} role="status">Loading overview…</p>
           ) : (
             <>
-              <div className={s.summaryCards}>
-                <StatCard
-                  label="Monthly Revenue"
-                  value={`KES ${totalRevenue.toLocaleString()}`}
-                  sub={growthPct === null ? `Last ${days} days` : `${growthPct >= 0 ? "↑" : "↓"} ${Math.abs(growthPct)}% vs prior ${days}d`}
-                  subColor={growthPct === null || growthPct >= 0 ? "var(--green)" : "#ef4444"}
-                  icon="📈"
-                  onClick={() => router.push("/dashboard/finance")}
-                  chart={<Sparkline values={dailyRevenue} />}
-                />
-                <StatCard
-                  label="Active Organizations"
-                  value={`${orgs.length}`}
-                  sub={`${activeOrgs} operational`}
-                  icon="🏢"
-                  onClick={() => router.push("/dashboard/organizations")}
-                />
-                <StatCard
-                  label="Packages"
-                  value={`${packages.length}`}
-                  sub={`${packages.reduce((sum, p) => sum + p.orgs, 0)} subscriptions`}
-                  icon="📦"
-                  onClick={() => router.push("/dashboard/packages")}
-                />
-                <StatCard
-                  label="System Health"
-                  value="View status"
-                  sub="Live service checks"
-                  subColor="var(--green)"
-                  icon="⚡"
-                  onClick={() => router.push("/dashboard/control")}
-                />
+              <section className={f.revenue} aria-label="Revenue">
+                <div>
+                  <div className={f.figLabel}>Monthly revenue</div>
+                  <div className={f.fig}>{kes(totalRevenue)}</div>
+                  <p className={f.figNote}>
+                    {kes(periodTotal)} in payments over the last {days} days
+                    {growthPct === null ? "." : (
+                      <>
+                        , <span className={growthPct >= 0 ? f.up : f.down}>{growthPct >= 0 ? "up" : "down"} {Math.abs(growthPct)}%</span>{" "}
+                        on the {days} days before.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className={f.chartWrap}>
+                  <RevenueChart values={dailyRevenue} format={kes} />
+                </div>
+              </section>
+
+              <div className={f.vitals}>
+                <button className={f.vital} onClick={() => router.push("/dashboard/organizations")}>
+                  <span className={f.vitalLabel}>Organizations</span>
+                  <span className={f.vitalValue}>{orgs.length}</span>
+                  <span className={f.vitalSub}>{activeOrgs} operational</span>
+                </button>
+                <button className={f.vital} onClick={() => router.push("/dashboard/packages")}>
+                  <span className={f.vitalLabel}>Packages</span>
+                  <span className={f.vitalValue}>{packages.length}</span>
+                  <span className={f.vitalSub}>{subscriptions} subscriptions</span>
+                </button>
+                <button className={f.vital} onClick={() => router.push("/dashboard/finance")}>
+                  <span className={f.vitalLabel}>Finance</span>
+                  <span className={f.vitalValue}>Open ledger</span>
+                  <span className={f.vitalSub}>Income, expenses and cashflow</span>
+                </button>
+                <button className={f.vital} onClick={() => router.push("/dashboard/control")}>
+                  <span className={f.vitalLabel}>System health</span>
+                  <span className={f.vitalValue}>Check status</span>
+                  <span className={f.vitalSub}>Live service checks</span>
+                </button>
               </div>
 
-              <div style={{ display: "flex", gap: "16px", flex: 1 }}>
+              <div className={f.split}>
                 <OrgsNeedingAttention orgs={orgs} onStatusChange={handleOrgStatusChange} />
                 <SystemActivity />
               </div>
             </>
           )}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

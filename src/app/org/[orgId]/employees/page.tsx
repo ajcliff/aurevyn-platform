@@ -9,10 +9,6 @@ import {
   updateEmployeeStatus,
   getPayrollHistoryForEmployee,
   getLeaveHistoryForEmployee,
-  getMyEmployeeRecord,
-  ensureEmployeeRecord,
-  getMyBroadcasts,
-  requestLeave,
   sendBroadcast,
   linkEmployeeToUser,
   getUnlinkedTeamMembers,
@@ -24,7 +20,7 @@ import {
 } from "@/lib/employeeHub";
 import { canManageTeam } from "@/lib/permissions";
 
-type Tab = "directory" | "broadcast" | "profile";
+type Tab = "directory" | "broadcast";
 
 export default function EmployeeHubPage() {
   const { organization, membership, installedEngines } = useEngine();
@@ -35,7 +31,7 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
   const canBroadcast = isHRAdmin || !!membership.hrPermissions.broadcast;
   const hasAnyHRAccess = canEditEmployees || canApproveLeave || canBroadcast;
 
-  const [tab, setTab] = useState<Tab>(hasAnyHRAccess ? "directory" : "profile");
+  const [tab, setTab] = useState<Tab>("directory");
   const [loading, setLoading] = useState(true);
 
   const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
@@ -44,14 +40,7 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
   const [payroll, setPayroll] = useState<PayrollHistoryItem[]>([]);
   const [leave, setLeave] = useState<LeaveHistoryItem[]>([]);
 
-  const [myRecord, setMyRecord] = useState<EmployeeProfile | null>(null);
-  const [myPayroll, setMyPayroll] = useState<PayrollHistoryItem[]>([]);
-  const [myLeave, setMyLeave] = useState<LeaveHistoryItem[]>([]);
-  const [myBroadcasts, setMyBroadcasts] = useState<Broadcast[]>([]);
 
-  const [leaveType, setLeaveType] = useState("annual");
-  const [leaveStart, setLeaveStart] = useState("");
-  const [leaveEnd, setLeaveEnd] = useState("");
 
   const [bTitle, setBTitle] = useState("");
   const [bMessage, setBMessage] = useState("");
@@ -77,23 +66,6 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
       setEmployees(emps);
       setTeamMembers(members);
       setUnlinkedMembers(unlinked);
-    }
-
-    if (membership.userId) {
-      const mine = await getMyEmployeeRecord(organization.id, membership.userId)
-        ?? await ensureEmployeeRecord(organization.id, membership.userId, membership.userEmail, membership.role);
-      setMyRecord(mine);
-
-      if (mine) {
-        const [pay, lv, bc] = await Promise.all([
-          getPayrollHistoryForEmployee(mine.id),
-          getLeaveHistoryForEmployee(mine.id),
-          getMyBroadcasts(organization.id, mine.department, mine.id),
-        ]);
-        setMyPayroll(pay);
-        setMyLeave(lv);
-        setMyBroadcasts(bc);
-      }
     }
 
     setLoading(false);
@@ -126,13 +98,6 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
     load();
   }
 
-  async function handleSubmitLeave() {
-    if (!myRecord || !leaveStart || !leaveEnd) return;
-    await requestLeave(organization.id, myRecord.id, leaveType, leaveStart, leaveEnd);
-    setLeaveStart("");
-    setLeaveEnd("");
-    load();
-  }
 
   async function handleLinkToLogin(emp: EmployeeProfile) {
     if (!linkChoice) return;
@@ -166,9 +131,9 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
   return (
     <div style={{ overflowY: "auto", height: "100%" }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Employee Hub</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>HR Directory</h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-          {hasAnyHRAccess ? "Directory, access, and broadcasts for your team." : "Your profile, pay, and leave."}
+          Directory, access, and broadcasts for your team. Your own profile, payslips and leave live under My Profile.
         </p>
       </div>
 
@@ -178,7 +143,14 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
           {canBroadcast && (
             <TabButton label="Broadcast" active={tab === "broadcast"} onClick={() => setTab("broadcast")} />
           )}
-          <TabButton label="My Profile" active={tab === "profile"} onClick={() => setTab("profile")} />
+        </div>
+      )}
+
+      {!hasAnyHRAccess && (
+        <div className="card" style={cardStyle}>
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+            You have HR access but no directory permissions yet. Ask an admin to grant them, or open My Profile for your own pay and leave.
+          </p>
         </div>
       )}
 
@@ -360,77 +332,6 @@ const isHRAdmin = canManageTeam(membership);  const canEditEmployees = isHRAdmin
         </div>
       )}
 
-      {tab === "profile" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 600 }}>
-          {!myRecord ? (
-            <div className="card" style={cardStyle}>
-              <p style={{ color: "var(--text-muted)" }}>
-                You're not linked to an employee record yet. Ask your admin to link your account from the Employee Hub directory.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="card" style={cardStyle}>
-                <h3>{myRecord.full_name}</h3>
-                <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  {myRecord.role} · {myRecord.department || "No department"}
-                </p>
-                <div style={{ marginTop: 10, fontSize: 13 }}>
-                  Status: <StatusBadge status={myRecord.employment_status} />
-                </div>
-              </div>
-
-              <div className="card" style={cardStyle}>
-                <h4 style={{ marginBottom: 10 }}>Request Leave</h4>
-                <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} style={inputStyle}>
-                  <option value="annual">Annual</option>
-                  <option value="sick">Sick</option>
-                  <option value="unpaid">Unpaid</option>
-                </select>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <input type="date" value={leaveStart} onChange={(e) => setLeaveStart(e.target.value)} style={inputStyle} />
-                  <input type="date" value={leaveEnd} onChange={(e) => setLeaveEnd(e.target.value)} style={inputStyle} />
-                </div>
-                <button onClick={handleSubmitLeave} style={{ ...buttonGold, width: "100%" }}>
-                  Submit Request
-                </button>
-
-                <div style={{ marginTop: 16 }}>
-                  {myLeave.map((lv) => (
-                    <div key={lv.id} style={rowStyle}>
-                      <span>{lv.leave_type}</span>
-                      <span>{lv.start_date} → {lv.end_date}</span>
-                      <StatusBadge status={lv.status} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="card" style={cardStyle}>
-                <h4 style={{ marginBottom: 10 }}>My Payslips</h4>
-                {myPayroll.map((p) => (
-                  <div key={p.id} style={rowStyle}>
-                    <span>{p.payroll_runs?.period_start} → {p.payroll_runs?.period_end}</span>
-                    <span>KES {Number(p.net_pay).toLocaleString()}</span>
-                  </div>
-                ))}
-                {myPayroll.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No payslips yet.</div>}
-              </div>
-
-              <div className="card" style={cardStyle}>
-                <h4 style={{ marginBottom: 10 }}>Broadcasts</h4>
-                {myBroadcasts.map((b) => (
-                  <div key={b.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-                    <div style={{ fontWeight: 600 }}>{b.title}</div>
-                    <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{b.message}</div>
-                  </div>
-                ))}
-                {myBroadcasts.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No broadcasts yet.</div>}
-              </div>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }

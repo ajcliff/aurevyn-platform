@@ -1,0 +1,90 @@
+/* Company page — builds on founder.module.css (imported alongside). */
+
+.name { font-family: var(--font-heading), var(--font-inter), sans-serif; font-size: clamp(30px, 4.6vw, 48px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; margin-top: 8px; }
+.identity { margin-top: 10px; font-size: 14px; color: var(--text-secondary); line-height: 1.6; max-width: 62ch; }
+.metaLine { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 12px; font-size: 13px; color: var(--text-secondary); }
+.metaLine b { color: var(--text-primary); font-weight: 500; }
+
+.tag { display: inline-block; font-size: 12px; color: var(--text-secondary); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.mark { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; }
+.mark::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); }
+.mark[data-tone="high"]::before, .mark[data-tone="bad"]::before { background: var(--red); }
+.mark[data-tone="medium"]::before, .mark[data-tone="warn"]::before { background: var(--amber); }
+.mark[data-tone="good"]::before { background: var(--green); }
+.late { color: var(--red); }
+.soon { color: var(--amber); }
+
+/* ---------- overview ---------- */
+.overviewGrid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 40px; }
+.attnRow { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.attnMain { flex: 1; min-width: 0; }
+.when { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.progress { display: flex; gap: 3px; height: 10px; margin: 18px 0 12px; }
+.progress span { display: block; min-width: 4px; border-radius: 5px; }
+.p-backlog { background: var(--rule-strong); }
+.p-planned { background: var(--amber); }
+.p-in_progress { background: var(--gold); }
+.p-done { background: var(--green); }
+.progressLegend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--text-secondary); }
+.progressLegend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 8px; }
+.timeline { list-style: none; }
+.timeItem { display: grid; grid-template-columns: 64px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.timeDate { font-family: var(--num); font-size: 14px; font-weight: 600; }
+.timeDate small { display: block; font-family: var(--font-inter), sans-serif; font-weight: 400; font-size: 12px; color: var(--text-secondary); }
+
+/* ---------- roadmap board ---------- */
+.board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+.col { background: var(--tint); border-radius: 12px; padding: 10px; min-height: 220px; border: 1px dashed transparent; }
+.colOver { border-color: var(--gold); }
+.colHead { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 12px; font-size: 13px; font-weight: 600; }
+.colHead span { font-weight: 400; color: var(--text-secondary); }
+.item { background: var(--bg-card); border: 1px solid var(--rule); border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: grab; display: flex; flex-direction: column; gap: 8px; }
+.item:active { cursor: grabbing; }
+.itemDragging { opacity: 0.45; }
+.itemTitle { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.itemDesc { font-size: 13px; color: var(--text-secondary); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.itemMeta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-secondary); }
+.itemFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.itemActions { display: flex; gap: 12px; }
+.colEmpty { font-size: 13px; color: var(--text-secondary); padding: 8px 6px; }
+
+/* ---------- compliance ---------- */
+.groupTitle { display: flex; align-items: baseline; gap: 10px; font-family: var(--num); font-size: 16px; font-weight: 600; margin: 28px 0 0; padding-bottom: 10px; border-bottom: 1px solid var(--rule-strong); }
+.groupTitle span { font-family: var(--font-inter), sans-serif; font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+.dueRow { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); align-items: center; }
+.dueTitle { font-size: 14px; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dueNotes { font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+.dueMeta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.dueSide { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.dueActions { display: flex; align-items: center; gap: 14px; }
+.templates { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule-strong); background: transparent; color: var(--text-primary); font-size: 12px; cursor: pointer; }
+.chip:hover { background: var(--tint); }
+.chip:focus-visible { outline: 2px solid var(--gold-light); outline-offset: 2px; }
+
+/* ---------- profile ---------- */
+.profileGrid { display: grid; grid-template-columns: 220px 1fr; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--rule); }
+.profileGrid h3 { font-family: var(--num); font-size: 16px; font-weight: 600; }
+.profileGrid p.sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+.defs { display: flex; flex-direction: column; }
+.defs > div { display: grid; grid-template-columns: 170px 1fr; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.defs > div:last-child { border-bottom: 0; }
+.defs dt { color: var(--text-secondary); font-size: 13px; }
+.defs dd { overflow-wrap: anywhere; }
+.missing { color: var(--text-secondary); font-style: italic; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.formGrid .wide { grid-column: 1 / -1; }
+.completeness { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-secondary); }
+.completeBar { width: 140px; height: 6px; border-radius: 3px; background: var(--tint); overflow: hidden; }
+.completeBar span { display: block; height: 100%; background: var(--gold); }
+textarea.input { resize: vertical; min-height: 72px; font-family: inherit; }
+
+@media (max-width: 900px) {
+  .overviewGrid { grid-template-columns: 1fr; gap: 40px; }
+  .profileGrid { grid-template-columns: 1fr; gap: 12px; }
+  .defs > div { grid-template-columns: 1fr; gap: 2px; }
+  .formGrid { grid-template-columns: 1fr; }
+  .dueRow { grid-template-columns: 1fr; }
+  .dueSide { align-items: flex-start; }
+}

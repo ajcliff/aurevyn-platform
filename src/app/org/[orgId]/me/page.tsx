@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import {
   getMyEmployeeRecord,
   getPayrollHistoryForEmployee,
   getLeaveHistoryForEmployee,
+  getMyBroadcasts,
   requestLeave,
   ensureEmployeeRecord,
   type EmployeeProfile,
   type PayrollHistoryItem,
   type LeaveHistoryItem,
+  type Broadcast,
 } from "@/lib/employeeHub";
 import EmptyState from "@/components/EmptyState";
 import { formatError } from "@/lib/errorFormat";
@@ -30,6 +33,7 @@ export default function MyProfilePage() {
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [payrollHistory, setPayrollHistory] = useState<PayrollHistoryItem[]>([]);
   const [leaveHistory, setLeaveHistory] = useState<LeaveHistoryItem[]>([]);
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
 
   const [leaveType, setLeaveType] = useState("annual");
   const [startDate, setStartDate] = useState("");
@@ -52,12 +56,14 @@ export default function MyProfilePage() {
       ?? await ensureEmployeeRecord(organization.id, membership.userId, membership.userEmail, membership.role);
     setEmployee(emp);
     if (emp) {
-      const [payroll, leave] = await Promise.all([
+      const [payroll, leave, bc] = await Promise.all([
         getPayrollHistoryForEmployee(emp.id),
         getLeaveHistoryForEmployee(emp.id),
+        getMyBroadcasts(organization.id, emp.department, emp.id),
       ]);
       setPayrollHistory(payroll);
       setLeaveHistory(leave);
+      setBroadcasts(bc);
     }
     setLoading(false);
   }
@@ -92,7 +98,7 @@ export default function MyProfilePage() {
     return (
       <EmptyState
         icon="🪪"
-        message="No employee profile linked to your account yet. Ask an admin to check Team & Access."
+        message="No employee profile linked to your account yet. Ask an admin to check Users."
       />
     );
   }
@@ -222,7 +228,7 @@ export default function MyProfilePage() {
         {payrollHistory.length === 0 ? (
           <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No payroll runs recorded yet.</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "max-content max-content max-content max-content", columnGap: 18, width: "fit-content" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "max-content max-content max-content max-content max-content", columnGap: 18, width: "fit-content" }}>
             {payrollHistory.map((p) => (
               <div key={p.id} style={{ display: "contents" }}>
                 <div style={{ fontSize: 11.5, padding: "6px 0", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>
@@ -237,9 +243,33 @@ export default function MyProfilePage() {
                 <div style={{ fontSize: 11.5, fontWeight: 700, padding: "6px 0", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>
                   Net KES {Number(p.net_pay).toLocaleString()}
                 </div>
+                <div style={{ fontSize: 11.5, padding: "6px 0", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>
+                  {p.payroll_runs?.status === "paid" ? (
+                    <Link href={`/org/${organization.id}/me/payslip/${p.id}`} style={{ color: "var(--gold)" }}>
+                      Payslip
+                    </Link>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>Pending</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Broadcasts */}
+      <div className="card" style={{ ...cardStyle, marginTop: 14 }}>
+        <h3 style={headingStyle}>Broadcasts</h3>
+        {broadcasts.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No broadcasts yet.</div>
+        ) : (
+          broadcasts.map((b) => (
+            <div key={b.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 600, fontSize: 12.5 }}>{b.title}</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{b.message}</div>
+            </div>
+          ))
         )}
       </div>
     </div>

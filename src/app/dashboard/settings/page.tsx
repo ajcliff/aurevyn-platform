@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { getFounderSettings, updateFounderSettings, type FounderSettings } from "@/lib/founderSettings";
 import { getOrganizations } from "@/lib/organizations";
 import { getPackages } from "@/lib/packages";
 import { getInvoices } from "@/lib/invoices";
 import type { ThemeName } from "@/lib/orgSettings";
-import { formatError } from "@/lib/errorFormat";
-import ErrorBanner from "@/components/ErrorBanner";
-import { useRouter } from "next/navigation";
-import s from "@/styles/layout.module.css";
 import { getThemePresets, type ThemePreset } from "@/lib/themePresets";
 import { applyThemeColors } from "@/lib/themeColors";
+import { formatError } from "@/lib/errorFormat";
+import ConfirmDialog from "@/components/founder/ConfirmDialog";
+import TypedConfirmDialog from "@/components/founder/TypedConfirmDialog";
+import f from "@/styles/founder.module.css";
 
 type Section = "profile" | "platform" | "security" | "notifications" | "danger";
+const TABS: { id: Section; label: string }[] = [
+  { id: "profile", label: "Profile" },
+  { id: "platform", label: "Platform" },
+  { id: "security", label: "Security" },
+  { id: "notifications", label: "Notifications" },
+  { id: "danger", label: "Danger zone" },
+];
 
 const THEMES: { id: ThemeName; name: string; description: string; base: string; accent: string }[] = [
   { id: "rift-valley", name: "Rift Valley", description: "Aubergine and gold", base: "#1A0F14", accent: "#C9A227" },
@@ -42,7 +50,6 @@ export default function FounderSettingsPage() {
 
   const [fullName, setFullName] = useState("");
   const [location, setLocation] = useState("");
-
   const [platformName, setPlatformName] = useState("");
   const [defaultCurrency, setDefaultCurrency] = useState("");
   const [defaultPackage, setDefaultPackage] = useState("");
@@ -64,17 +71,15 @@ export default function FounderSettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [presets, setPresets] = useState<ThemePreset[]>([]);
 
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     load();
-    return () => {
-      if (flashTimeout.current) clearTimeout(flashTimeout.current);
-    };
+    return () => { if (flashTimeout.current) clearTimeout(flashTimeout.current); };
   }, []);
 
   async function load() {
@@ -90,14 +95,14 @@ export default function FounderSettingsPage() {
       setEmail(user.email ?? "");
 
       const [data, orgPresets] = await Promise.all([getFounderSettings(user.id), getThemePresets()]);
-setSettings(data);
-setPresets(orgPresets);
-setFullName(data.full_name ?? "");
-setLocation(data.location ?? "");
-setPlatformName(data.platform_name);
-setDefaultCurrency(data.default_currency);
-setDefaultPackage(data.default_package);
-setTimezone(data.timezone);
+      setSettings(data);
+      setPresets(orgPresets);
+      setFullName(data.full_name ?? "");
+      setLocation(data.location ?? "");
+      setPlatformName(data.platform_name);
+      setDefaultCurrency(data.default_currency);
+      setDefaultPackage(data.default_package);
+      setTimezone(data.timezone);
     } catch (err) {
       setError(formatError(err));
     } finally {
@@ -116,10 +121,7 @@ setTimezone(data.timezone);
     setActionError(null);
     setSaving(true);
     try {
-      const updated = await updateFounderSettings(userId, {
-        full_name: fullName || null,
-        location: location || null,
-      });
+      const updated = await updateFounderSettings(userId, { full_name: fullName || null, location: location || null });
       setSettings(updated);
       flashSaved("profile");
     } catch (err) {
@@ -150,37 +152,37 @@ setTimezone(data.timezone);
   }
 
   async function handleBuiltInThemeChange(theme: ThemeName) {
-  if (!userId) return;
-  setSavingTheme(true);
-  document.documentElement.style.cssText = "";
-  document.documentElement.setAttribute("data-theme", theme);
-  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: theme }));
-  try {
-    const updated = await updateFounderSettings(userId, { platform_theme: theme, theme_preset_id: null });
-    setSettings(updated);
-  } catch (err) {
-    setActionError(formatError(err));
-    if (settings) document.documentElement.setAttribute("data-theme", settings.platform_theme);
-  } finally {
-    setSavingTheme(false);
+    if (!userId) return;
+    setSavingTheme(true);
+    document.documentElement.style.cssText = "";
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: theme }));
+    try {
+      const updated = await updateFounderSettings(userId, { platform_theme: theme, theme_preset_id: null });
+      setSettings(updated);
+    } catch (err) {
+      setActionError(formatError(err));
+      if (settings) document.documentElement.setAttribute("data-theme", settings.platform_theme);
+    } finally {
+      setSavingTheme(false);
+    }
   }
-}
 
-async function handlePresetThemeChange(preset: ThemePreset) {
-  if (!userId) return;
-  setSavingTheme(true);
-  document.documentElement.removeAttribute("data-theme");
-  applyThemeColors(preset);
-  localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
-  try {
-    const updated = await updateFounderSettings(userId, { theme_preset_id: preset.id });
-    setSettings(updated);
-  } catch (err) {
-    setActionError(formatError(err));
-  } finally {
-    setSavingTheme(false);
+  async function handlePresetThemeChange(preset: ThemePreset) {
+    if (!userId) return;
+    setSavingTheme(true);
+    document.documentElement.removeAttribute("data-theme");
+    applyThemeColors(preset);
+    localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
+    try {
+      const updated = await updateFounderSettings(userId, { theme_preset_id: preset.id });
+      setSettings(updated);
+    } catch (err) {
+      setActionError(formatError(err));
+    } finally {
+      setSavingTheme(false);
+    }
   }
-}
 
   async function handleToggleNotification(key: keyof FounderSettings) {
     if (!userId || !settings) return;
@@ -191,14 +193,13 @@ async function handlePresetThemeChange(preset: ThemePreset) {
       const updated = await updateFounderSettings(userId, { [key]: nextValue } as Partial<FounderSettings>);
       setSettings(updated);
     } catch (err) {
-      setSettings(settings); // revert
+      setSettings(settings);
       setActionError(formatError(err));
     }
   }
 
   async function handleChangePassword() {
     setPasswordMsg(null);
-
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordMsg({ type: "err", text: "Fill in all three password fields." });
       return;
@@ -211,20 +212,13 @@ async function handlePresetThemeChange(preset: ThemePreset) {
       setPasswordMsg({ type: "err", text: "New password and confirmation don't match." });
       return;
     }
-
     setChangingPassword(true);
     try {
       const supabase = createClient();
-
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email,
-        password: currentPassword,
-      });
+      const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
       if (reauthError) throw new Error("Current password is incorrect.");
-
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
-
       setPasswordMsg({ type: "ok", text: "Password updated successfully." });
       setCurrentPassword("");
       setNewPassword("");
@@ -240,19 +234,8 @@ async function handlePresetThemeChange(preset: ThemePreset) {
     setActionError(null);
     setExporting(true);
     try {
-      const [orgs, packages, invoices] = await Promise.all([
-        getOrganizations(),
-        getPackages(),
-        getInvoices(),
-      ]);
-
-      const payload = {
-        exported_at: new Date().toISOString(),
-        organizations: orgs,
-        packages,
-        invoices,
-      };
-
+      const [orgs, packages, invoices] = await Promise.all([getOrganizations(), getPackages(), getInvoices()]);
+      const payload = { exported_at: new Date().toISOString(), organizations: orgs, packages, invoices };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -287,348 +270,243 @@ async function handlePresetThemeChange(preset: ThemePreset) {
     }
   }
 
-  async function handleDeleteAccount() {
+  async function handleSignOut() {
     setActionError(null);
-    setDeleting(true);
+    setSigningOut(true);
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
       router.push("/login");
     } catch (err) {
       setActionError(formatError(err));
-      setDeleting(false);
+      setSigningOut(false);
     }
   }
 
-  const navItems: { id: Section; label: string; icon: string }[] = [
-    { id: "profile", label: "Profile", icon: "👤" },
-    { id: "platform", label: "Platform", icon: "⚙" },
-    { id: "security", label: "Security", icon: "🔒" },
-    { id: "notifications", label: "Notifications", icon: "🔔" },
-    { id: "danger", label: "Danger Zone", icon: "⚠" },
-  ];
-
   return (
-    <div className="page-shell">
-      <div className={s.body}>
-        <main className={s.settingsMain}>
-          <div style={{ width: "200px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
-            <div style={{ fontSize: "11px", color: "var(--gold)", marginBottom: "8px", letterSpacing: "0.08em", fontWeight: 700 }}>
-              ⚙ SETTINGS
+    <div className={`page-shell ${f.root}`}>
+      <main className="page-main">
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Settings</p>
+              <h1 className={f.headline}>{loading ? "Loading settings" : "Your founder account and platform defaults."}</h1>
             </div>
-            {navItems.map(item => (
-              <button key={item.id} onClick={() => setSection(item.id)} style={{
-                padding: "9px 14px", borderRadius: "8px", border: "none",
-                background: section === item.id ? "var(--bg-elevated)" : "transparent",
-                color: section === item.id
-                  ? item.id === "danger" ? "#ef4444" : "var(--gold)"
-                  : item.id === "danger" ? "#ef444480" : "var(--text-secondary)",
-                fontSize: "12px", cursor: "pointer", textAlign: "left",
-                fontWeight: section === item.id ? 600 : 400,
-                borderLeft: section === item.id
-                  ? `2px solid ${item.id === "danger" ? "#ef4444" : "var(--gold)"}`
-                  : "2px solid transparent",
-                transition: "all 0.15s ease", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: "8px",
-              }}>
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+          </div>
+
+          {error && (
+            <div className={f.empty}><strong>Couldn&apos;t load settings.</strong><div><button className={f.secondary} onClick={load}>Retry</button></div></div>
+          )}
+
+          <div className={f.tabs} role="tablist" aria-label="Settings sections">
+            {TABS.map(t => (
+              <button key={t.id} role="tab" id={`set-tab-${t.id}`} aria-selected={section === t.id} aria-controls="set-panel" className={f.tab} onClick={() => setSection(t.id)} style={t.id === "danger" ? { color: section === t.id ? "var(--red)" : undefined } : undefined}>
+                {t.label}
               </button>
             ))}
           </div>
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", maxHeight: "calc(100vh - 80px)" }}>
-
-            {error && (
-              <ErrorBanner message={error} source="dashboard/settings" onRetry={load} />
-            )}
-
+          <div id="set-panel" role="tabpanel" aria-labelledby={`set-tab-${section}`} className={f.tabPanel} style={{ paddingTop: 8 }}>
             {loading ? (
-              <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
-                Loading settings...
-              </div>
+              <p className={f.status} role="status">Loading settings…</p>
             ) : (
-            <>
-
-            {/* PROFILE */}
-            {section === "profile" && (
               <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Profile</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Your founder identity across the platform</p>
-                </div>
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px", maxWidth: 440 }}>
-                  <Field label="Full name">
-                    <input value={fullName} onChange={e => setFullName(e.target.value)} className={s.input} placeholder="Your name" />
-                  </Field>
-                  <Field label="Email">
-                    <input value={email} disabled className={s.input} style={{ opacity: 0.6, cursor: "not-allowed" }} />
-                  </Field>
-                  <Field label="Location">
-                    <input value={location} onChange={e => setLocation(e.target.value)} className={s.input} placeholder="e.g. Nairobi, Kenya" />
-                  </Field>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                    <button onClick={handleSaveProfile} disabled={saving} className={s.btnGold}>
-                      {saving ? "Saving..." : "Save Changes"}
-                    </button>
-                    {savedFlash === "profile" && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
-                  </div>
-                  {actionError && <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>}
-                </div>
-              </>
-            )}
-
-            {/* PLATFORM */}
-            {section === "platform" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Platform</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Defaults applied across the founder dashboard</p>
-                </div>
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px", maxWidth: 440 }}>
-                  <Field label="Platform name">
-                    <input value={platformName} onChange={e => setPlatformName(e.target.value)} className={s.input} />
-                  </Field>
-                  <Field label="Default currency">
-                    <input value={defaultCurrency} onChange={e => setDefaultCurrency(e.target.value)} className={s.input} placeholder="KES" />
-                  </Field>
-                  <Field label="Default package for new orgs">
-                    <input value={defaultPackage} onChange={e => setDefaultPackage(e.target.value)} className={s.input} placeholder="Starter" />
-                  </Field>
-                  <Field label="Timezone">
-                    <input value={timezone} onChange={e => setTimezone(e.target.value)} className={s.input} placeholder="Africa/Nairobi" />
-                  </Field>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                    <button onClick={handleSavePlatform} disabled={saving} className={s.btnGold}>
-                      {saving ? "Saving..." : "Save Changes"}
-                    </button>
-                    {savedFlash === "platform" && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
-                  </div>
-                  {actionError && <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>}
-                </div>
-
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "20px", maxWidth: 620 }}>
-                  <h3 style={{ marginBottom: 4, fontSize: 14 }}>Dashboard Theme</h3>
-                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-                    Only affects your Founder Dashboard — independent from any organization's theme.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-                    
-                    {THEMES.map((t) => {
-  const active = settings?.platform_theme === t.id && !settings?.theme_preset_id;
-  return (
-    <button
-      key={t.id}
-      onClick={() => handleBuiltInThemeChange(t.id)}
-      disabled={savingTheme}
-                          style={{
-                            textAlign: "left",
-                            background: t.base,
-                            border: active ? `2px solid ${t.accent}` : "1px solid var(--border)",
-                            borderRadius: 12,
-                            padding: 12,
-                            cursor: savingTheme ? "default" : "pointer",
-                            opacity: savingTheme && !active ? 0.6 : 1,
-                          }}
-                        >
-                          <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
-                            <div style={{ width: 14, height: 14, borderRadius: 4, background: t.accent }} />
-                            <div style={{ width: 14, height: 14, borderRadius: 4, background: t.base, border: "1px solid rgba(255,255,255,0.15)" }} />
-                          </div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: t.id === "zanzibar-spice" ? "#2B1D14" : "#F0E6D8" }}>
-                            {t.name}{active && " ✓"}
-                          </div>
-                          <div style={{ fontSize: 10.5, color: t.id === "zanzibar-spice" ? "#6B5745" : "#A08B94" }}>
-                            {t.description}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {presets.length > 0 && (
-  <>
-    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", margin: "16px 0 10px", letterSpacing: "0.05em" }}>
-      YOUR PRESETS
-    </div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-      {presets.map((p) => {
-        const active = settings?.theme_preset_id === p.id;
-        return (
-          <button
-            key={p.id}
-            onClick={() => handlePresetThemeChange(p)}
-            disabled={savingTheme}
-            style={{
-              textAlign: "left",
-              background: p.bg_base,
-              border: active ? `2px solid ${p.gold}` : "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 12,
-              cursor: savingTheme ? "default" : "pointer",
-              opacity: savingTheme && !active ? 0.6 : 1,
-            }}
-          >
-            <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: p.gold }} />
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: p.bg_base, border: "1px solid rgba(255,255,255,0.15)" }} />
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: p.text_primary }}>
-              {p.name}{active && " ✓"}
-            </div>
-            {p.description && (
-              <div style={{ fontSize: 10.5, color: p.text_secondary }}>{p.description}</div>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  </>
-)}
-                </div>
-              </>
-            )}
-
-            {/* SECURITY */}
-            {section === "security" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Security</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Change your account password</p>
-                </div>
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px", maxWidth: 440 }}>
-                  <Field label="Current password">
-                    <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className={s.input} />
-                  </Field>
-                  <Field label="New password">
-                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={s.input} />
-                  </Field>
-                  <Field label="Confirm new password">
-                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={s.input} />
-                  </Field>
-                  <button onClick={handleChangePassword} disabled={changingPassword} className={s.btnGold} style={{ marginTop: 4, alignSelf: "flex-start" }}>
-                    {changingPassword ? "Updating..." : "Update Password"}
-                  </button>
-                  {passwordMsg && (
-                    <div style={{ fontSize: 12, color: passwordMsg.type === "ok" ? "var(--green)" : "#ef4444" }}>
-                      {passwordMsg.type === "ok" ? "✓ " : ""}{passwordMsg.text}
+                {section === "profile" && (
+                  <div className={f.stack} style={{ maxWidth: 440 }}>
+                    <div className={f.field}>
+                      <label htmlFor="pr-name">Full name</label>
+                      <input id="pr-name" className={f.input} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" />
                     </div>
-                  )}
-                </div>
-              </>
-            )}
+                    <div className={f.field}>
+                      <label htmlFor="pr-email">Email</label>
+                      <input id="pr-email" className={f.input} value={email} disabled style={{ opacity: 0.6, cursor: "not-allowed" }} />
+                    </div>
+                    <div className={f.field}>
+                      <label htmlFor="pr-loc">Location</label>
+                      <input id="pr-loc" className={f.input} value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Nairobi, Kenya" />
+                    </div>
+                    <div className={f.actions}>
+                      <button className={f.primary} onClick={handleSaveProfile} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                      {savedFlash === "profile" && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+                    </div>
+                    {actionError && <div className={f.formError} role="alert">{actionError}</div>}
+                  </div>
+                )}
 
-            {/* NOTIFICATIONS */}
-            {section === "notifications" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Notifications</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Choose what you get notified about</p>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 620 }}>
-                  {settings && NOTIF_LABELS.map((n) => (
-                    <div key={n.key} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{n.label}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{n.desc}</div>
+                {section === "platform" && (
+                  <div className={f.stack}>
+                    <div className={f.stack} style={{ maxWidth: 440 }}>
+                      <div className={f.field}>
+                        <label htmlFor="pl-name">Platform name</label>
+                        <input id="pl-name" className={f.input} value={platformName} onChange={e => setPlatformName(e.target.value)} />
                       </div>
-                      <div
-                        onClick={() => handleToggleNotification(n.key)}
-                        style={{
-                          width: 34, height: 19, borderRadius: 10,
-                          background: settings[n.key] ? "var(--gold)" : "var(--bg-elevated)",
-                          border: "1px solid var(--border)", cursor: "pointer",
-                          position: "relative", transition: "background 0.2s ease", flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ position: "absolute", top: 2, left: settings[n.key] ? 16 : 2, width: 13, height: 13, borderRadius: "50%", background: "#fff", transition: "left 0.2s ease" }} />
+                      <div className={f.field}>
+                        <label htmlFor="pl-cur">Default currency</label>
+                        <input id="pl-cur" className={f.input} value={defaultCurrency} onChange={e => setDefaultCurrency(e.target.value)} placeholder="KES" />
                       </div>
+                      <div className={f.field}>
+                        <label htmlFor="pl-pkg">Default package for new orgs</label>
+                        <input id="pl-pkg" className={f.input} value={defaultPackage} onChange={e => setDefaultPackage(e.target.value)} placeholder="Starter" />
+                      </div>
+                      <div className={f.field}>
+                        <label htmlFor="pl-tz">Timezone</label>
+                        <input id="pl-tz" className={f.input} value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="Africa/Nairobi" />
+                      </div>
+                      <div className={f.actions}>
+                        <button className={f.primary} onClick={handleSavePlatform} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                        {savedFlash === "platform" && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+                      </div>
+                      {actionError && <div className={f.formError} role="alert">{actionError}</div>}
                     </div>
-                  ))}
-                </div>
-                {actionError && <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>}
-              </>
-            )}
 
-            {/* DANGER ZONE */}
-            {section === "danger" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#ef4444" }}>Danger Zone</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Careful — some of these are irreversible</p>
-                </div>
+                    <section aria-labelledby="theme-title">
+                      <div className={f.sectionHead}>
+                        <h2 id="theme-title" className={f.sectionTitle}>Dashboard theme</h2>
+                        <span className={f.sectionSub}>Only affects your founder dashboard</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 16 }}>
+                        {THEMES.map(t => {
+                          const active = settings?.platform_theme === t.id && !settings?.theme_preset_id;
+                          return (
+                            <button key={t.id} onClick={() => handleBuiltInThemeChange(t.id)} disabled={savingTheme}
+                              className={f.themeCard} style={{ background: t.base, borderColor: active ? t.accent : "var(--rule-strong)", borderWidth: active ? 2 : 1, opacity: savingTheme && !active ? 0.6 : 1 }}>
+                              <div className={f.themePreview}>
+                                <div className={f.themeSwatchRow}>
+                                  <div className={f.themeSwatch} style={{ background: t.accent }} />
+                                  <div className={f.themeSwatch} style={{ background: t.base, border: "1px solid rgba(255,255,255,0.15)" }} />
+                                </div>
+                                <div className={f.themeName} style={{ color: t.id === "zanzibar-spice" ? "#2B1D14" : "#F0E6D8" }}>{t.name}{active && " ✓"}</div>
+                                <div className={f.themeDesc} style={{ color: t.id === "zanzibar-spice" ? "#6B5745" : "#A08B94" }}>{t.description}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, maxWidth: 620 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>Export Data</div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Download all organizations, packages, and invoices as JSON</div>
+                      {presets.length > 0 && (
+                        <>
+                          <div className={f.sectionSub} style={{ margin: "20px 0 10px", fontWeight: 700, letterSpacing: "0.05em" }}>YOUR PRESETS</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+                            {presets.map(p => {
+                              const active = settings?.theme_preset_id === p.id;
+                              return (
+                                <button key={p.id} onClick={() => handlePresetThemeChange(p)} disabled={savingTheme}
+                                  className={f.themeCard} style={{ background: p.bg_base, borderColor: active ? p.gold : "var(--rule-strong)", borderWidth: active ? 2 : 1, opacity: savingTheme && !active ? 0.6 : 1 }}>
+                                  <div className={f.themePreview}>
+                                    <div className={f.themeSwatchRow}>
+                                      <div className={f.themeSwatch} style={{ background: p.gold }} />
+                                      <div className={f.themeSwatch} style={{ background: p.bg_base, border: "1px solid rgba(255,255,255,0.15)" }} />
+                                    </div>
+                                    <div className={f.themeName} style={{ color: p.text_primary }}>{p.name}{active && " ✓"}</div>
+                                    {p.description && <div className={f.themeDesc} style={{ color: p.text_secondary }}>{p.description}</div>}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </section>
                   </div>
-                  <button onClick={handleExportData} disabled={exporting} className={s.btnGhost} style={{ whiteSpace: "nowrap" }}>
-                    {exporting ? "Exporting..." : "Export"}
-                  </button>
-                </div>
+                )}
 
-                <div style={{ background: "var(--bg-card)", border: "1px solid #f59e0b40", borderRadius: "12px", padding: "16px", maxWidth: 620 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Reset Platform Data</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Wipes all organizations, invoices, and activity logs. Packages are kept.</div>
+                {section === "security" && (
+                  <div className={f.stack} style={{ maxWidth: 440 }}>
+                    <div className={f.field}>
+                      <label htmlFor="sec-cur">Current password</label>
+                      <input id="sec-cur" className={f.input} type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
                     </div>
-                    {!confirmReset ? (
-                      <button onClick={() => setConfirmReset(true)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #f59e0b60", background: "transparent", color: "#f59e0b", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                        Reset
-                      </button>
-                    ) : (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={handleResetPlatform} disabled={resetting} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                          {resetting ? "Resetting..." : "Confirm Reset"}
-                        </button>
-                        <button onClick={() => setConfirmReset(false)} className={s.btnGhost}>Cancel</button>
+                    <div className={f.field}>
+                      <label htmlFor="sec-new">New password</label>
+                      <input id="sec-new" className={f.input} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                    </div>
+                    <div className={f.field}>
+                      <label htmlFor="sec-conf">Confirm new password</label>
+                      <input id="sec-conf" className={f.input} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                    </div>
+                    <button className={f.primary} style={{ alignSelf: "flex-start" }} onClick={handleChangePassword} disabled={changingPassword}>
+                      {changingPassword ? "Updating…" : "Update password"}
+                    </button>
+                    {passwordMsg && (
+                      <div style={{ fontSize: 12, color: passwordMsg.type === "ok" ? "var(--green)" : "var(--red)" }}>
+                        {passwordMsg.type === "ok" ? "✓ " : ""}{passwordMsg.text}
                       </div>
                     )}
                   </div>
-                </div>
+                )}
 
-                <div style={{ background: "var(--bg-card)", border: "1px solid #ef444460", borderRadius: "12px", padding: "16px", maxWidth: 620 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>Delete Account</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                        Signs you out immediately. Full permanent deletion needs a server-side step that isn't built yet — your account record will still exist until that's added.
-                      </div>
+                {section === "notifications" && (
+                  <div className={f.stack}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                      {settings && NOTIF_LABELS.map(n => (
+                        <div key={n.key} className={f.switchRow}>
+                          <div>
+                            <div className={f.rowName}>{n.label}</div>
+                            <div className={f.rowSub}>{n.desc}</div>
+                          </div>
+                          <button className={f.switch} role="switch" aria-checked={!!settings[n.key]} aria-label={n.label} onClick={() => handleToggleNotification(n.key)} />
+                        </div>
+                      ))}
                     </div>
-                    {!confirmDelete ? (
-                      <button onClick={() => setConfirmDelete(true)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #ef444460", background: "transparent", color: "#ef4444", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                        Delete
-                      </button>
-                    ) : (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={handleDeleteAccount} disabled={deleting} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                          {deleting ? "Signing out..." : "Confirm"}
-                        </button>
-                        <button onClick={() => setConfirmDelete(false)} className={s.btnGhost}>Cancel</button>
-                      </div>
-                    )}
+                    {actionError && <div className={f.formError} role="alert">{actionError}</div>}
                   </div>
-                </div>
+                )}
 
-                {actionError && <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>}
+                {section === "danger" && (
+                  <div className={f.stack}>
+                    <div className={f.notice}>
+                      <div className={f.noticeMain}>
+                        <div className={f.noticeTitle}>Export data</div>
+                        <div className={f.noticeDesc}>Download all organizations, packages, and invoices as JSON</div>
+                      </div>
+                      <button className={f.secondary} onClick={handleExportData} disabled={exporting}>{exporting ? "Exporting…" : "Export"}</button>
+                    </div>
+
+                    <div className={f.notice}>
+                      <div className={f.noticeMain}>
+                        <div className={f.noticeTitle} style={{ color: "var(--amber)" }}>Reset platform data</div>
+                        <div className={f.noticeDesc}>Wipes all organizations, invoices, and activity logs. Packages are kept.</div>
+                      </div>
+                      <button className={f.dangerBtn} style={{ width: "auto" }} onClick={() => setConfirmReset(true)}>Reset</button>
+                    </div>
+
+                    <div className={f.notice} style={{ borderBottom: 0 }}>
+                      <div className={f.noticeMain}>
+                        <div className={f.noticeTitle} style={{ color: "var(--red)" }}>Delete account</div>
+                        <div className={f.noticeDesc}>Signs you out immediately. Full permanent deletion needs a server-side step that isn&apos;t built yet — your account record still exists until that&apos;s added.</div>
+                      </div>
+                      <button className={f.dangerBtn} style={{ width: "auto" }} onClick={() => setConfirmSignOut(true)}>Sign out</button>
+                    </div>
+
+                    {actionError && <div className={f.formError} role="alert">{actionError}</div>}
+                  </div>
+                )}
               </>
-            )}
-
-            </>
             )}
           </div>
-        </main>
-      </div>
-    </div>
-  );
-}
+        </div>
+      </main>
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
-      {children}
+      {confirmReset && (
+        <TypedConfirmDialog
+          title="Reset platform data?"
+          message="This wipes all organizations, invoices, and activity logs. Packages and module limits are kept. This can't be undone."
+          phrase="RESET"
+          confirmLabel={resetting ? "Resetting…" : "Reset platform"}
+          onConfirm={handleResetPlatform}
+          onCancel={() => setConfirmReset(false)}
+        />
+      )}
+
+      {confirmSignOut && (
+        <ConfirmDialog
+          title="Sign out?"
+          message="This signs you out. It does not delete your account — that step isn't built yet."
+          confirmLabel={signingOut ? "Signing out…" : "Sign out"}
+          onConfirm={handleSignOut}
+          onCancel={() => setConfirmSignOut(false)}
+        />
+      )}
     </div>
   );
 }

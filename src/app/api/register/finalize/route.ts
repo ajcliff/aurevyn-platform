@@ -10,7 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 // self-registered org has been landing with zero engines enabled. Moving
 // both here, server-side with the service role, fixes that at the source.
 export async function POST(req: NextRequest) {
-  const { orgId, orgName, packageSlug } = await req.json();
+  const { orgId, orgName } = await req.json();
 
   if (!orgId) {
     return NextResponse.json({ error: "Missing orgId." }, { status: 400 });
@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
       engine_id: engine.id,
       engine_slug: engine.slug,
       enabled: true,
-      subscription_tier: packageSlug ?? null,
+      // Trial: every engine, unlimited seats. Real per-engine seat tiers get
+      // chosen when the trial ends (see /api/trial/confirm-selection).
+      licensed_seats: 999999,
+      subscription_tier: "trial",
     }));
 
     const { error: grantError } = await supabaseAdmin.from("organization_engines").insert(engineRows);
@@ -45,7 +48,7 @@ export async function POST(req: NextRequest) {
   const { error: notifyError } = await supabaseAdmin.from("notifications").insert({
     type: "new_org",
     title: "New organization registered",
-    message: `${orgName ?? "An organization"} signed up on the ${packageSlug ?? "trial"} plan`,
+    message: `${orgName ?? "An organization"} started a free trial`,
     read: false,
   });
   if (notifyError) {

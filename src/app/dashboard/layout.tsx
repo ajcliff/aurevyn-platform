@@ -24,6 +24,7 @@ const founderCommands: CommandItem[] = [
   { id: "packages", label: "Packages", icon: "📦", path: "/dashboard/packages" },
   { id: "billing", label: "Billing", icon: "💳", path: "/dashboard/billing" },
   { id: "finance", label: "Finance", icon: "💰", path: "/dashboard/finance" },
+  { id: "messages", label: "Messages", icon: "✉", path: "/dashboard/messages" },
   { id: "error-logs", label: "Error Logs", icon: "🧯", path: "/dashboard/error-logs" },
   { id: "control", label: "Control Center", icon: "🎛", path: "/dashboard/control" },
   { id: "themes", label: "Theme Presets", icon: "🎨", path: "/dashboard/themes" },

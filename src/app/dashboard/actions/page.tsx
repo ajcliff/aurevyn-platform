@@ -10,9 +10,16 @@ import { getPlatformAlerts, type PlatformAlert } from "@/lib/platformAlerts";
 import { formatError } from "@/lib/errorFormat";
 import { logError } from "@/lib/errorLog";
 import { getEngines, getBlueprintEngines, activateEngine, type Engine } from "@/lib/engines";
-import s from "@/styles/layout.module.css";
+import f from "@/styles/founder.module.css";
 
 type Section = "create" | "broadcast" | "alerts";
+const TABS: { id: Section; label: string }[] = [
+  { id: "create", label: "Quick create" },
+  { id: "broadcast", label: "Broadcast" },
+  { id: "alerts", label: "Alerts" },
+];
+
+const kes = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
 
 export default function ActionsPage() {
   const [section, setSection] = useState<Section>("create");
@@ -23,30 +30,31 @@ export default function ActionsPage() {
   const [alertList, setAlertList] = useState<PlatformAlert[]>([]);
   const [enginesList, setEnginesList] = useState<Engine[]>([]);
   const [selectedEngineIds, setSelectedEngineIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [createTab, setCreateTab] = useState<"org" | "package" | "offer">("org");
+  const [createTab, setCreateTab] = useState<"org" | "package">("org");
   const [newOrg, setNewOrg] = useState({ name: "", location: "", packageSlug: "", blueprintId: "" });
-  const [newPackage, setNewPackage] = useState({ name: "", price: "", features: "" });
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [newPackage, setNewPackage] = useState({ name: "", price: "", isBundle: false });
+  const [packageEngineIds, setPackageEngineIds] = useState<Set<string>>(new Set());
+  const [creatingPackage, setCreatingPackage] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [broadcastTarget, setBroadcastTarget] = useState("All Organizations");
+  const [broadcastTarget, setBroadcastTarget] = useState("All organizations");
+  const [broadcasting, setBroadcasting] = useState(false);
   const [broadcastSent, setBroadcastSent] = useState(false);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   async function load() {
+    setLoading(true);
     setLoadError(null);
     try {
       const [orgs, packages, blueprints, alerts, engines] = await Promise.all([
-        getOrganizations(),
-        getPackages(),
-        getBlueprintOptions(),
-        getPlatformAlerts(),
-        getEngines(),
+        getOrganizations(), getPackages(), getBlueprintOptions(), getPlatformAlerts(), getEngines(),
       ]);
       setOrgList(orgs);
       setPackageList(packages);
@@ -57,6 +65,8 @@ export default function ActionsPage() {
       const message = formatError(err);
       setLoadError(message);
       logError({ source: "ActionsPage", message });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -65,40 +75,29 @@ export default function ActionsPage() {
     getBlueprintEngines(newOrg.blueprintId).then(ids => setSelectedEngineIds(new Set(ids)));
   }, [newOrg.blueprintId]);
 
-  const createOrg = async () => {
+  async function createOrg() {
     if (!newOrg.name.trim() || !newOrg.packageSlug || !newOrg.blueprintId) {
-      setCreateError("Please fill in the organization name, package, and industry blueprint.");
+      setCreateError("Fill in the organization name, package, and industry blueprint.");
       return;
     }
-
     setCreateError(null);
+    setCreatingOrg(true);
     try {
-      const selectedPackage = packageList.find((p) => p.slug === newOrg.packageSlug);
-
+      const selectedPackage = packageList.find(p => p.slug === newOrg.packageSlug);
       const created = await createOrganization({
-        name: newOrg.name,
-        location: newOrg.location,
+        name: newOrg.name.trim(),
+        location: newOrg.location.trim(),
         status: "operational",
         revenue: "KES 0",
         package: selectedPackage?.name || newOrg.packageSlug,
-        blueprint_id: newOrg.blueprintId,
-      } as any);
+      });
 
       for (const engineId of selectedEngineIds) {
         await activateEngine(created.id, engineId, newOrg.packageSlug);
       }
 
-      await logActivity({
-        icon: "🏢",
-        title: "New organization registered",
-        sub: created.name,
-      });
-
-      await createNotification(
-        "new_org",
-        "New organization registered",
-        `${created.name} was added via quick-create`
-      );
+      await logActivity({ icon: "🏢", title: "New organization registered", sub: created.name });
+      await createNotification("new_org", "New organization registered", `${created.name} was added via quick create`);
 
       setOrgList(prev => [...prev, created]);
       setNewOrg({ name: "", location: "", packageSlug: "", blueprintId: "" });
@@ -107,249 +106,244 @@ export default function ActionsPage() {
       const message = formatError(err);
       setCreateError(message);
       logError({ source: "ActionsPage/createOrg", message });
+    } finally {
+      setCreatingOrg(false);
     }
-  };
+  }
 
-  const handleCreatePackage = async () => {
-    if (!newPackage.name.trim()) return;
+  async function createPkg() {
+    const price = parseFloat(newPackage.price);
+    if (!newPackage.name.trim() || !price || price < 0) {
+      setCreateError("Give the package a name and a price of zero or more.");
+      return;
+    }
     setCreateError(null);
+    setCreatingPackage(true);
     try {
       const created = await createPackage({
-        name: newPackage.name,
-        price: newPackage.price,
-        features: newPackage.features,
-        orgs: 0,
+        name: newPackage.name.trim(),
+        price,
+        engine_slugs: enginesList.filter(e => packageEngineIds.has(e.id)).map(e => e.slug),
+        is_bundle: newPackage.isBundle,
       });
       if (!created) {
         setCreateError("Couldn't create the package. Please try again.");
         return;
       }
-      await logActivity({
-        icon: "📦",
-        title: "New package created",
-        sub: created.name,
-      });
+      await logActivity({ icon: "📦", title: "New package created", sub: created.name });
       setPackageList(prev => [...prev, created]);
-      setNewPackage({ name: "", price: "", features: "" });
+      setNewPackage({ name: "", price: "", isBundle: false });
+      setPackageEngineIds(new Set());
     } catch (err) {
       const message = formatError(err);
       setCreateError(message);
       logError({ source: "ActionsPage/createPackage", message });
+    } finally {
+      setCreatingPackage(false);
     }
-  };
+  }
 
-  const sendBroadcast = () => {
-    if (!broadcastMsg.trim()) return;
-    setBroadcastSent(true);
-    setBroadcastMsg("");
-  };
-
-  const navItems: { id: Section; label: string; icon: string }[] = [
-    { id: "create", label: "Quick Create", icon: "✦" },
-    { id: "broadcast", label: "Broadcast", icon: "📣" },
-    { id: "alerts", label: "Alerts", icon: "⚠" },
-  ];
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "10px 12px", borderRadius: "8px",
-    border: "1px solid var(--border)", background: "var(--bg-base)",
-    color: "var(--text-primary)", fontSize: "13px", outline: "none", fontFamily: "inherit",
-  };
+  async function sendBroadcast() {
+    if (!broadcastMsg.trim()) {
+      setBroadcastError("Write a message first.");
+      return;
+    }
+    setBroadcastError(null);
+    setBroadcasting(true);
+    try {
+      await logActivity({ icon: "📣", title: `Broadcast: ${broadcastTarget}`, sub: broadcastMsg.trim() });
+      await createNotification("broadcast", `Broadcast sent to ${broadcastTarget}`, broadcastMsg.trim());
+      setBroadcastSent(true);
+      setBroadcastMsg("");
+    } catch (err) {
+      setBroadcastError(formatError(err));
+    } finally {
+      setBroadcasting(false);
+    }
+  }
 
   return (
-    <div className="page-shell">
-      <div className={s.body}>
-        <main className={s.settingsMain}>
-
-          <div style={{ width: "200px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
-            <div style={{ fontSize: "11px", color: "var(--gold)", marginBottom: "8px", letterSpacing: "0.08em", fontWeight: 700 }}>
-              ✦ ACTIONS
+    <div className={`page-shell ${f.root}`}>
+      <main className="page-main">
+        <div className={f.page}>
+          <div className={f.top}>
+            <div>
+              <p className={f.greeting}>Quick actions</p>
+              <h1 className={f.headline}>Create, notify, and keep an eye on the platform.</h1>
             </div>
-            {navItems.map(item => (
-              <button key={item.id} onClick={() => setSection(item.id)} style={{
-                padding: "9px 14px", borderRadius: "8px", border: "none",
-                background: section === item.id ? "var(--bg-elevated)" : "transparent",
-                color: section === item.id ? "var(--gold)" : "var(--text-secondary)",
-                fontSize: "12px", cursor: "pointer", textAlign: "left",
-                fontWeight: section === item.id ? 600 : 400,
-                borderLeft: section === item.id ? "2px solid var(--gold)" : "2px solid transparent",
-                transition: "all 0.15s ease", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: "8px",
-              }}>
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+          </div>
+
+          {loadError && (
+            <div className={f.empty}><strong>Couldn&apos;t load quick actions.</strong><div><button className={f.secondary} onClick={load}>Retry</button></div></div>
+          )}
+
+          <div className={f.tabs} role="tablist" aria-label="Quick action sections">
+            {TABS.map(t => (
+              <button key={t.id} role="tab" id={`act-tab-${t.id}`} aria-selected={section === t.id} aria-controls="act-panel" className={f.tab} onClick={() => setSection(t.id)}>
+                {t.label}{t.id === "alerts" && alertList.length > 0 ? ` (${alertList.length})` : ""}
               </button>
             ))}
           </div>
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", maxHeight: "calc(100vh - 80px)", maxWidth: "560px" }}>
-
-            {loadError && (
-              <div style={{ fontSize: 12, color: "#ef4444", background: "#ef44441a", border: "1px solid #ef444440", borderRadius: 8, padding: "10px 12px" }}>
-                {loadError}
-              </div>
-            )}
-
-            {section === "create" && (
+          <div id="act-panel" role="tabpanel" aria-labelledby={`act-tab-${section}`} className={f.tabPanel} style={{ paddingTop: 8, maxWidth: 560 }}>
+            {loading ? (
+              <p className={f.status} role="status">Loading…</p>
+            ) : (
               <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Quick Create</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Spin up a new org, package, or promotional offer</p>
-                </div>
+                {section === "create" && (
+                  <div className={f.stack}>
+                    <div className={f.segmented} role="group" aria-label="What to create">
+                      <button className={f.segBtn} aria-pressed={createTab === "org"} onClick={() => { setCreateTab("org"); setCreateError(null); }}>Organization</button>
+                      <button className={f.segBtn} aria-pressed={createTab === "package"} onClick={() => { setCreateTab("package"); setCreateError(null); }}>Package</button>
+                    </div>
 
-                <div style={{ display: "flex", gap: "4px" }}>
-                  {(["org", "package", "offer"] as const).map(t => (
-                    <button key={t} onClick={() => setCreateTab(t)} style={{
-                      flex: 1, padding: "8px", borderRadius: "8px",
-                      border: "1px solid var(--border)",
-                      background: createTab === t ? "var(--gold)" : "var(--bg-card)",
-                      color: createTab === t ? "#0a0a0f" : "var(--text-secondary)",
-                      fontSize: "12px", fontWeight: createTab === t ? 700 : 400,
-                      cursor: "pointer", textTransform: "capitalize", fontFamily: "inherit",
-                    }}>{t}</button>
-                  ))}
-                </div>
-
-                {createTab === "org" && (
-                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <input value={newOrg.name} onChange={e => setNewOrg({ ...newOrg, name: e.target.value })} placeholder="Organization name" style={inputStyle} />
-                    <input value={newOrg.location} onChange={e => setNewOrg({ ...newOrg, location: e.target.value })} placeholder="Location (e.g. Nairobi, KE)" style={inputStyle} />
-                    <select value={newOrg.packageSlug} onChange={e => setNewOrg({ ...newOrg, packageSlug: e.target.value })} style={inputStyle}>
-                      <option value="">Select package...</option>
-                      {packageList.map((p) => <option key={p.id} value={p.slug}>{p.name}</option>)}
-                    </select>
-                    <select value={newOrg.blueprintId} onChange={e => setNewOrg({ ...newOrg, blueprintId: e.target.value })} style={inputStyle}>
-                      <option value="">Select industry...</option>
-                      {blueprintOptions.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.industry})</option>)}
-                    </select>
-
-                    {newOrg.blueprintId && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                          Engines this org actually needs — adjust freely, this overrides the package default
+                    {createTab === "org" && (
+                      <div className={f.stack}>
+                        <div className={f.field}>
+                          <label htmlFor="qc-name">Organization name</label>
+                          <input id="qc-name" className={f.input} value={newOrg.name} onChange={e => setNewOrg({ ...newOrg, name: e.target.value })} placeholder="Kilimani Grocers" />
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "220px", overflowY: "auto", background: "var(--bg-base)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px" }}>
-                          {enginesList.map(engine => {
-                            const checked = selectedEngineIds.has(engine.id);
-                            return (
-                              <label key={engine.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => {
-                                    setSelectedEngineIds(prev => {
+                        <div className={f.field}>
+                          <label htmlFor="qc-loc">Location</label>
+                          <input id="qc-loc" className={f.input} value={newOrg.location} onChange={e => setNewOrg({ ...newOrg, location: e.target.value })} placeholder="Nairobi, KE" />
+                        </div>
+                        <div className={f.field}>
+                          <label htmlFor="qc-pkg">Package</label>
+                          <select id="qc-pkg" className={f.input} value={newOrg.packageSlug} onChange={e => setNewOrg({ ...newOrg, packageSlug: e.target.value })}>
+                            <option value="">Select package…</option>
+                            {packageList.map(p => <option key={p.id} value={p.slug}>{p.name} — {kes(p.price)}</option>)}
+                          </select>
+                        </div>
+                        <div className={f.field}>
+                          <label htmlFor="qc-bp">Industry blueprint</label>
+                          <select id="qc-bp" className={f.input} value={newOrg.blueprintId} onChange={e => setNewOrg({ ...newOrg, blueprintId: e.target.value })}>
+                            <option value="">Select industry…</option>
+                            {blueprintOptions.map(b => <option key={b.id} value={b.id}>{b.name} ({b.industry})</option>)}
+                          </select>
+                        </div>
+
+                        {newOrg.blueprintId && (
+                          <div className={f.field}>
+                            <label>Engines this org needs — adjust freely, this overrides the package default</label>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto", background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: 10 }}>
+                              {enginesList.map(engine => {
+                                const checked = selectedEngineIds.has(engine.id);
+                                return (
+                                  <label key={engine.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                                    <input type="checkbox" checked={checked} onChange={() => setSelectedEngineIds(prev => {
                                       const next = new Set(prev);
                                       if (checked) next.delete(engine.id); else next.add(engine.id);
                                       return next;
-                                    });
-                                  }}
-                                />
-                                <span>{engine.icon}</span>
-                                <span>{engine.name}</span>
-                                <span style={{ color: "var(--text-muted)", fontSize: "10px", marginLeft: "auto" }}>{engine.category}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
+                                    })} />
+                                    <span>{engine.icon}</span>
+                                    <span>{engine.name}</span>
+                                    <span style={{ color: "var(--text-secondary)", fontSize: 10, marginLeft: "auto" }}>{engine.category}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <button className={f.primary} onClick={createOrg} disabled={creatingOrg}>{creatingOrg ? "Creating…" : "Create organization"}</button>
+                        {createError && <div className={f.formError} role="alert">{createError}</div>}
                       </div>
                     )}
 
-                    <button onClick={createOrg} className={s.btnGold} style={{ marginTop: "4px" }}>Create Organization</button>
-                    {createError && <div style={{ fontSize: 11, color: "#ef4444" }}>{createError}</div>}
-                  </div>
-                )}
-
-                {createTab === "package" && (
-                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <input value={newPackage.name} onChange={e => setNewPackage({ ...newPackage, name: e.target.value })} placeholder="Package name" style={inputStyle} />
-                    <input value={newPackage.price} onChange={e => setNewPackage({ ...newPackage, price: e.target.value })} placeholder="Price (e.g. KES 5,000/mo)" style={inputStyle} />
-                    <input value={newPackage.features} onChange={e => setNewPackage({ ...newPackage, features: e.target.value })} placeholder="Features (e.g. 10 Modules · 25 Users)" style={inputStyle} />
-                    <button onClick={handleCreatePackage} className={s.btnGold} style={{ marginTop: "4px" }}>Create Package</button>
-                    {createError && <div style={{ fontSize: 11, color: "#ef4444" }}>{createError}</div>}
-                  </div>
-                )}
-
-                {createTab === "offer" && (
-                  <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <input placeholder="Offer title" style={inputStyle} />
-                    <input placeholder="Discount (e.g. 20%)" style={inputStyle} />
-                    <select style={inputStyle}>
-                      <option>All Organizations</option>
-                      {orgList.map((o, i) => <option key={i}>{o.name}</option>)}
-                    </select>
-                    <input placeholder="Expiry date" style={inputStyle} />
-                    <button className={s.btnGold} style={{ marginTop: "4px" }}>Create Offer</button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {section === "broadcast" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Broadcast Message</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Send a message to one or all organizations</p>
-                </div>
-
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
-                  {broadcastSent ? (
-                    <div style={{ textAlign: "center", padding: "32px 0" }}>
-                      <div style={{ fontSize: "32px", marginBottom: "8px" }}>✅</div>
-                      <div style={{ fontSize: "14px", color: "var(--green)", fontWeight: 600 }}>Broadcast sent!</div>
-                      <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Delivered to {broadcastTarget}</div>
-                      <button onClick={() => setBroadcastSent(false)} className={s.btnGold} style={{ marginTop: "16px", width: "auto", padding: "8px 24px" }}>Send Another</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      <select value={broadcastTarget} onChange={e => setBroadcastTarget(e.target.value)} style={inputStyle}>
-                        <option>All Organizations</option>
-                        {orgList.map((o, i) => <option key={i}>{o.name}</option>)}
-                      </select>
-                      <textarea
-                        value={broadcastMsg}
-                        onChange={e => setBroadcastMsg(e.target.value)}
-                        placeholder="Type your message..."
-                        rows={6}
-                        style={{ ...inputStyle, resize: "none" }}
-                      />
-                      <button onClick={sendBroadcast} className={s.btnGold}>Send Broadcast</button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {section === "alerts" && (
-              <>
-                <div>
-                  <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Alerts</h2>
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>Platform-level items that need your attention</p>
-                </div>
-
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
-                  {alertList.length === 0 && (
-                    <div style={{ fontSize: "13px", color: "var(--text-muted)", textAlign: "center", padding: "24px 0" }}>
-                      Nothing needs attention right now.
-                    </div>
-                  )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {alertList.map((a) => (
-                      <div key={a.id} style={{ display: "flex", gap: "10px", padding: "12px", borderRadius: "10px", background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
-                        <span style={{ fontSize: "16px" }}>{a.icon}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "13px", color: a.color, fontWeight: 600 }}>{a.text}</div>
-                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{a.time}</div>
+                    {createTab === "package" && (
+                      <div className={f.stack}>
+                        <div className={f.field}>
+                          <label htmlFor="qp-name">Package name</label>
+                          <input id="qp-name" className={f.input} value={newPackage.name} onChange={e => setNewPackage({ ...newPackage, name: e.target.value })} placeholder="Professional" />
                         </div>
+                        <div className={f.field}>
+                          <label htmlFor="qp-price">Price (KES per month)</label>
+                          <input id="qp-price" className={f.input} type="number" min="0" inputMode="decimal" value={newPackage.price} onChange={e => setNewPackage({ ...newPackage, price: e.target.value })} placeholder="15000" />
+                        </div>
+                        <div className={f.field}>
+                          <label>Engines included</label>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto", background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: 10 }}>
+                            {enginesList.map(engine => {
+                              const checked = packageEngineIds.has(engine.id);
+                              return (
+                                <label key={engine.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                                  <input type="checkbox" checked={checked} onChange={() => setPackageEngineIds(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) next.delete(engine.id); else next.add(engine.id);
+                                    return next;
+                                  })} />
+                                  <span>{engine.icon}</span>
+                                  <span>{engine.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                          <input type="checkbox" checked={newPackage.isBundle} onChange={e => setNewPackage({ ...newPackage, isBundle: e.target.checked })} />
+                          This is a bundle package
+                        </label>
+                        <button className={f.primary} onClick={createPkg} disabled={creatingPackage}>{creatingPackage ? "Creating…" : "Create package"}</button>
+                        {createError && <div className={f.formError} role="alert">{createError}</div>}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
+                )}
+
+                {section === "broadcast" && (
+                  <div className={f.stack}>
+                    <p className={f.hint}>
+                      This logs a broadcast to your own activity feed and notifications — organizations don&apos;t have a way to receive it yet, so use this as a record of what you meant to announce rather than a live delivery channel.
+                    </p>
+                    {broadcastSent ? (
+                      <div style={{ textAlign: "center", padding: "32px 0" }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                        <div style={{ fontSize: 14, color: "var(--green)", fontWeight: 600 }}>Logged.</div>
+                        <div className={f.hint} style={{ marginTop: 4 }}>Recorded for {broadcastTarget}.</div>
+                        <button className={f.secondary} style={{ marginTop: 16 }} onClick={() => setBroadcastSent(false)}>Log another</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className={f.field}>
+                          <label htmlFor="bc-target">Target</label>
+                          <select id="bc-target" className={f.input} value={broadcastTarget} onChange={e => setBroadcastTarget(e.target.value)}>
+                            <option>All organizations</option>
+                            {orgList.map(o => <option key={o.id}>{o.name}</option>)}
+                          </select>
+                        </div>
+                        <div className={f.field}>
+                          <label htmlFor="bc-msg">Message</label>
+                          <textarea id="bc-msg" className={f.input} rows={6} style={{ resize: "vertical" }} value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} placeholder="Type your message…" />
+                        </div>
+                        <button className={f.primary} onClick={sendBroadcast} disabled={broadcasting}>{broadcasting ? "Logging…" : "Log broadcast"}</button>
+                        {broadcastError && <div className={f.formError} role="alert">{broadcastError}</div>}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {section === "alerts" && (
+                  alertList.length === 0 ? (
+                    <div className={f.empty}><strong>Nothing needs attention right now.</strong>Flagged organizations and stale invites will show up here.</div>
+                  ) : (
+                    <div className={f.inbox}>
+                      {alertList.map(a => (
+                        <div key={a.id} className={f.inboxItem} style={{ cursor: "default" }}>
+                          <span className={f.inboxIcon} aria-hidden="true">{a.icon}</span>
+                          <span className={f.inboxMain}>
+                            <span className={f.inboxFrom} style={{ color: a.color }}>{a.text}</span>
+                          </span>
+                          {a.time && <span className={f.inboxTime}>{a.time}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
               </>
             )}
-
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
