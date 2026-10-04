@@ -22,6 +22,7 @@ import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
 import { getThemePresets } from "@/lib/themePresets";
 import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
+import InstallAppButton from "@/components/InstallAppButton";
 import QuickNotesWidget from "@/components/QuickNotesWidget";
 import TrialCountdownBanner from "@/components/TrialCountdownBanner";
 import PackageSelectionGate from "@/components/PackageSelectionGate";
@@ -752,6 +753,7 @@ const { header } = usePageHeader();
               </div>
             )}
           </div>
+          <InstallAppButton variant="sidebar" showLabel={showLabels} />
           <button
             onClick={handleLogout}
             title="Log out"

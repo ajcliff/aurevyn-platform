@@ -106,5 +106,5 @@ export async function proxy(req: NextRequest) {
 
 // Apply middleware only to app routes
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|pwa-.*\\.png|apple-touch-icon.png|icon.png|logo.png).*)"],
 };

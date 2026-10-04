@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import NotificationCenter from "@/components/NotificationCenter";
+import InstallAppButton from "@/components/InstallAppButton";
 import Icon from "@/components/Icon";
 import s from "@/styles/founderShell.module.css";
 
@@ -78,6 +79,7 @@ export default function TopBar({ isMobile, onOpenMobile, founderName, onOpenSear
 
           {showMenu && (
             <div className={s.menu} role="menu">
+              <InstallAppButton variant="menu" menuClassName={s.menuItem} />
               <button className={s.menuItem} role="menuitem" onClick={handleSignOut}>
                 <Icon name="logout" size={16} /> Sign out
               </button>

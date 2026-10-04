@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import PwaManager from "@/components/PwaManager";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,12 +13,19 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-heading",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1A0F14",
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "AUREVYN — The POS System for Africa",
   description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
   icons: {
     icon: "/icon.png",
+    apple: "/apple-touch-icon.png",
   },
+  appleWebApp: { capable: true, title: "AUREVYN", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "AUREVYN — The POS System for Africa",
     description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
@@ -67,6 +75,7 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable}`}
       >
         {children}
+        <PwaManager />
       </body>
     </html>
   );
