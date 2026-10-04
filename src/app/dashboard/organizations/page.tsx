@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getOrganizations, updateOrganization, deleteOrganization, type Organization } from "@/lib/organizations";
-import { getPackages, type Package } from "@/lib/packages";
+import { getOrganizations, updateOrganization, deleteOrganization, planLabel, type Organization } from "@/lib/organizations";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase";
 import { formatError } from "@/lib/errorFormat";
@@ -20,7 +19,6 @@ const statusVar: Record<string, string> = {
 
 export default function OrganizationsPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
@@ -51,9 +49,8 @@ export default function OrganizationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [orgsData, packagesData, enginesData] = await Promise.all([getOrganizations(), getPackages(), getEngines()]);
+      const [orgsData, enginesData] = await Promise.all([getOrganizations(), getEngines()]);
       setOrgs(orgsData);
-      setPackages(packagesData);
       setAllEngines(enginesData);
     } catch (err) {
       setError(formatError(err));
@@ -99,7 +96,7 @@ export default function OrganizationsPage() {
     const isEnabled = orgEngines.find(oe => oe.engine_id === engine.id)?.enabled ?? false;
     try {
       if (isEnabled) await deactivateEngine(selectedOrg.id, engine.id);
-      else await activateEngine(selectedOrg.id, engine.id, selectedOrg.package);
+      else await activateEngine(selectedOrg.id, engine.id, "founder");
       setOrgEngines(await getOrgEngines(selectedOrg.id));
     } catch (err) {
       setActionError(formatError(err));
@@ -178,14 +175,14 @@ export default function OrganizationsPage() {
             <div className={f.tableWrap}>
               <table className={f.ledger}>
                 <thead>
-                  <tr><th>Organization</th><th>Location</th><th>Package</th><th>Revenue</th><th>Status</th></tr>
+                  <tr><th>Organization</th><th>Location</th><th>Plan</th><th>Revenue</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {filtered.map(org => (
                     <tr key={org.id} className={`${f.clickable} ${selectedOrg?.id === org.id ? f.selected : ""}`} onClick={() => openOrg(org)}>
                       <td><button className={f.cellBtn} onClick={e => { e.stopPropagation(); openOrg(org); }}>{org.name}</button></td>
                       <td className={f.cellMuted}>{org.location}</td>
-                      <td className={f.cellMuted} style={{ textTransform: "capitalize" }}>{org.package}</td>
+                      <td className={f.cellMuted} style={{ textTransform: "capitalize" }}>{planLabel(org)}</td>
                       <td className={f.cellMuted}>{org.revenue}</td>
                       <td><span className={f.pill} data-status={org.status}>{org.status}</span></td>
                     </tr>
@@ -210,7 +207,7 @@ export default function OrganizationsPage() {
             <DrawerFieldList
               items={[
                 { label: "Location", value: selectedOrg.location },
-                { label: "Package", value: selectedOrg.package },
+                { label: "Plan", value: planLabel(selectedOrg) },
                 { label: "Revenue", value: selectedOrg.revenue },
                 { label: "Status", value: selectedOrg.status, accent: statusVar[selectedOrg.status] },
                 { label: "Created", value: new Date(selectedOrg.created_at).toLocaleDateString("en-KE") },
@@ -231,12 +228,6 @@ export default function OrganizationsPage() {
                 </div>
               ))}
               <div className={f.field}>
-                <label htmlFor="org-package">Package</label>
-                <select id="org-package" className={f.input} defaultValue={selectedOrg.package} onChange={e => setEditData(prev => ({ ...prev, package: e.target.value }))}>
-                  {packages.map(p => <option key={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className={f.field}>
                 <label htmlFor="org-status">Status</label>
                 <select id="org-status" className={f.input} defaultValue={selectedOrg.status} onChange={e => setEditData(prev => ({ ...prev, status: e.target.value as Organization["status"] }))}>
                   <option value="operational">Operational</option>
@@ -251,7 +242,7 @@ export default function OrganizationsPage() {
 
           {drawerTab === "engines" && (
             <div>
-              <p className={f.hint}>Turn engines on or off for this organization. This overrides what the {selectedOrg.package} package normally includes, and no payment is involved.</p>
+              <p className={f.hint}>Turn engines on or off for this organization. Changes here override the org's licenses, and no payment is involved. Use Licensing to manage seats and offers.</p>
               {allEngines.map(engine => {
                 const enabled = orgEngines.find(oe => oe.engine_id === engine.id)?.enabled ?? false;
                 return (

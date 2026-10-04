@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { getOrganizations, createOrganization, type Organization } from "@/lib/organizations";
 import { getBlueprintOptions, type BlueprintOption } from "@/lib/blueprintsList";
-import { getPackages, createPackage, type Package } from "@/lib/packages";
 import { logActivity } from "@/lib/activity";
 import { createNotification } from "@/lib/notifications";
 import { getPlatformAlerts, type PlatformAlert } from "@/lib/platformAlerts";
@@ -25,7 +24,6 @@ export default function ActionsPage() {
   const [section, setSection] = useState<Section>("create");
 
   const [orgList, setOrgList] = useState<Organization[]>([]);
-  const [packageList, setPackageList] = useState<Package[]>([]);
   const [blueprintOptions, setBlueprintOptions] = useState<BlueprintOption[]>([]);
   const [alertList, setAlertList] = useState<PlatformAlert[]>([]);
   const [enginesList, setEnginesList] = useState<Engine[]>([]);
@@ -33,12 +31,8 @@ export default function ActionsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [createTab, setCreateTab] = useState<"org" | "package">("org");
-  const [newOrg, setNewOrg] = useState({ name: "", location: "", packageSlug: "", blueprintId: "" });
+  const [newOrg, setNewOrg] = useState({ name: "", location: "", blueprintId: "" });
   const [creatingOrg, setCreatingOrg] = useState(false);
-  const [newPackage, setNewPackage] = useState({ name: "", price: "", isBundle: false });
-  const [packageEngineIds, setPackageEngineIds] = useState<Set<string>>(new Set());
-  const [creatingPackage, setCreatingPackage] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [broadcastMsg, setBroadcastMsg] = useState("");
@@ -53,11 +47,10 @@ export default function ActionsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [orgs, packages, blueprints, alerts, engines] = await Promise.all([
-        getOrganizations(), getPackages(), getBlueprintOptions(), getPlatformAlerts(), getEngines(),
+      const [orgs, blueprints, alerts, engines] = await Promise.all([
+        getOrganizations(), getBlueprintOptions(), getPlatformAlerts(), getEngines(),
       ]);
       setOrgList(orgs);
-      setPackageList(packages);
       setBlueprintOptions(blueprints);
       setAlertList(alerts);
       setEnginesList(engines);
@@ -76,31 +69,30 @@ export default function ActionsPage() {
   }, [newOrg.blueprintId]);
 
   async function createOrg() {
-    if (!newOrg.name.trim() || !newOrg.packageSlug || !newOrg.blueprintId) {
-      setCreateError("Fill in the organization name, package, and industry blueprint.");
+    if (!newOrg.name.trim() || !newOrg.blueprintId) {
+      setCreateError("Fill in the organization name and industry blueprint.");
       return;
     }
     setCreateError(null);
     setCreatingOrg(true);
     try {
-      const selectedPackage = packageList.find(p => p.slug === newOrg.packageSlug);
       const created = await createOrganization({
         name: newOrg.name.trim(),
         location: newOrg.location.trim(),
         status: "operational",
         revenue: "KES 0",
-        package: selectedPackage?.name || newOrg.packageSlug,
+        package: "Free trial",
       });
 
       for (const engineId of selectedEngineIds) {
-        await activateEngine(created.id, engineId, newOrg.packageSlug);
+        await activateEngine(created.id, engineId, "founder");
       }
 
       await logActivity({ icon: "🏢", title: "New organization registered", sub: created.name });
       await createNotification("new_org", "New organization registered", `${created.name} was added via quick create`);
 
       setOrgList(prev => [...prev, created]);
-      setNewOrg({ name: "", location: "", packageSlug: "", blueprintId: "" });
+      setNewOrg({ name: "", location: "", blueprintId: "" });
       setSelectedEngineIds(new Set());
     } catch (err) {
       const message = formatError(err);
@@ -108,38 +100,6 @@ export default function ActionsPage() {
       logError({ source: "ActionsPage/createOrg", message });
     } finally {
       setCreatingOrg(false);
-    }
-  }
-
-  async function createPkg() {
-    const price = parseFloat(newPackage.price);
-    if (!newPackage.name.trim() || !price || price < 0) {
-      setCreateError("Give the package a name and a price of zero or more.");
-      return;
-    }
-    setCreateError(null);
-    setCreatingPackage(true);
-    try {
-      const created = await createPackage({
-        name: newPackage.name.trim(),
-        price,
-        engine_slugs: enginesList.filter(e => packageEngineIds.has(e.id)).map(e => e.slug),
-        is_bundle: newPackage.isBundle,
-      });
-      if (!created) {
-        setCreateError("Couldn't create the package. Please try again.");
-        return;
-      }
-      await logActivity({ icon: "📦", title: "New package created", sub: created.name });
-      setPackageList(prev => [...prev, created]);
-      setNewPackage({ name: "", price: "", isBundle: false });
-      setPackageEngineIds(new Set());
-    } catch (err) {
-      const message = formatError(err);
-      setCreateError(message);
-      logError({ source: "ActionsPage/createPackage", message });
-    } finally {
-      setCreatingPackage(false);
     }
   }
 
@@ -192,12 +152,7 @@ export default function ActionsPage() {
               <>
                 {section === "create" && (
                   <div className={f.stack}>
-                    <div className={f.segmented} role="group" aria-label="What to create">
-                      <button className={f.segBtn} aria-pressed={createTab === "org"} onClick={() => { setCreateTab("org"); setCreateError(null); }}>Organization</button>
-                      <button className={f.segBtn} aria-pressed={createTab === "package"} onClick={() => { setCreateTab("package"); setCreateError(null); }}>Package</button>
-                    </div>
-
-                    {createTab === "org" && (
+                    {(
                       <div className={f.stack}>
                         <div className={f.field}>
                           <label htmlFor="qc-name">Organization name</label>
@@ -206,13 +161,6 @@ export default function ActionsPage() {
                         <div className={f.field}>
                           <label htmlFor="qc-loc">Location</label>
                           <input id="qc-loc" className={f.input} value={newOrg.location} onChange={e => setNewOrg({ ...newOrg, location: e.target.value })} placeholder="Nairobi, KE" />
-                        </div>
-                        <div className={f.field}>
-                          <label htmlFor="qc-pkg">Package</label>
-                          <select id="qc-pkg" className={f.input} value={newOrg.packageSlug} onChange={e => setNewOrg({ ...newOrg, packageSlug: e.target.value })}>
-                            <option value="">Select package…</option>
-                            {packageList.map(p => <option key={p.id} value={p.slug}>{p.name} — {kes(p.price)}</option>)}
-                          </select>
                         </div>
                         <div className={f.field}>
                           <label htmlFor="qc-bp">Industry blueprint</label>
@@ -224,7 +172,7 @@ export default function ActionsPage() {
 
                         {newOrg.blueprintId && (
                           <div className={f.field}>
-                            <label>Engines this org needs — adjust freely, this overrides the package default</label>
+                            <label>Engines this org needs — adjust freely</label>
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto", background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: 10 }}>
                               {enginesList.map(engine => {
                                 const checked = selectedEngineIds.has(engine.id);
@@ -250,43 +198,6 @@ export default function ActionsPage() {
                       </div>
                     )}
 
-                    {createTab === "package" && (
-                      <div className={f.stack}>
-                        <div className={f.field}>
-                          <label htmlFor="qp-name">Package name</label>
-                          <input id="qp-name" className={f.input} value={newPackage.name} onChange={e => setNewPackage({ ...newPackage, name: e.target.value })} placeholder="Professional" />
-                        </div>
-                        <div className={f.field}>
-                          <label htmlFor="qp-price">Price (KES per month)</label>
-                          <input id="qp-price" className={f.input} type="number" min="0" inputMode="decimal" value={newPackage.price} onChange={e => setNewPackage({ ...newPackage, price: e.target.value })} placeholder="15000" />
-                        </div>
-                        <div className={f.field}>
-                          <label>Engines included</label>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto", background: "var(--bg-elevated)", border: "1px solid var(--rule)", borderRadius: 8, padding: 10 }}>
-                            {enginesList.map(engine => {
-                              const checked = packageEngineIds.has(engine.id);
-                              return (
-                                <label key={engine.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
-                                  <input type="checkbox" checked={checked} onChange={() => setPackageEngineIds(prev => {
-                                    const next = new Set(prev);
-                                    if (checked) next.delete(engine.id); else next.add(engine.id);
-                                    return next;
-                                  })} />
-                                  <span>{engine.icon}</span>
-                                  <span>{engine.name}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                          <input type="checkbox" checked={newPackage.isBundle} onChange={e => setNewPackage({ ...newPackage, isBundle: e.target.checked })} />
-                          This is a bundle package
-                        </label>
-                        <button className={f.primary} onClick={createPkg} disabled={creatingPackage}>{creatingPackage ? "Creating…" : "Create package"}</button>
-                        {createError && <div className={f.formError} role="alert">{createError}</div>}
-                      </div>
-                    )}
                   </div>
                 )}
 

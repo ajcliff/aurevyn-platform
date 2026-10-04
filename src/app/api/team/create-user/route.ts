@@ -29,6 +29,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
+  // Refuse before creating anything if any requested engine has no seat left —
+  // otherwise the account would exist with no license and no way to retry the same email.
+  for (const engineId of engineIds ?? []) {
+    const [{ data: oe }, { count }, { data: engine }] = await Promise.all([
+      supabaseAdmin.from("organization_engines").select("licensed_seats").eq("org_id", orgId).eq("engine_id", engineId).maybeSingle(),
+      supabaseAdmin.from("user_engine_licenses").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("engine_id", engineId),
+      supabaseAdmin.from("engines").select("name").eq("id", engineId).maybeSingle(),
+    ]);
+    if (!oe || (count ?? 0) >= (oe.licensed_seats ?? 0)) {
+      return NextResponse.json(
+        { error: `No ${engine?.name ?? "engine"} seats left. Buy more seats on the Engines page, then create this user.` },
+        { status: 409 }
+      );
+    }
+  }
+
   let departmentName: string | null = null;
   if (departmentId) {
     const { data: dept } = await supabaseAdmin.from("departments").select("name").eq("id", departmentId).maybeSingle();

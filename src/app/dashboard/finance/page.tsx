@@ -193,7 +193,7 @@ export default function FinancePage() {
               <span style={{ fontSize: "16px" }}>🏢</span>
               <div>
                 <span style={{ fontSize: "13px", fontWeight: 600 }}>{selectedOrg.name}</span>
-                <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: "8px" }}>{selectedOrg.location} · {selectedOrg.package} package</span>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: "8px" }}>{selectedOrg.location} · {selectedOrg.package}</span>
               </div>
             </div>
           )}

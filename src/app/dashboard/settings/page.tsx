@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { getFounderSettings, updateFounderSettings, type FounderSettings } from "@/lib/founderSettings";
 import { getOrganizations } from "@/lib/organizations";
-import { getPackages } from "@/lib/packages";
 import { getInvoices } from "@/lib/invoices";
 import type { ThemeName } from "@/lib/orgSettings";
 import { getThemePresets, type ThemePreset } from "@/lib/themePresets";
@@ -47,7 +46,6 @@ export default function FounderSettingsPage() {
   const [location, setLocation] = useState("");
   const [platformName, setPlatformName] = useState("");
   const [defaultCurrency, setDefaultCurrency] = useState("");
-  const [defaultPackage, setDefaultPackage] = useState("");
   const [timezone, setTimezone] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -96,7 +94,6 @@ export default function FounderSettingsPage() {
       setLocation(data.location ?? "");
       setPlatformName(data.platform_name);
       setDefaultCurrency(data.default_currency);
-      setDefaultPackage(data.default_package);
       setTimezone(data.timezone);
     } catch (err) {
       setError(formatError(err));
@@ -134,7 +131,6 @@ export default function FounderSettingsPage() {
       const updated = await updateFounderSettings(userId, {
         platform_name: platformName || "AUREVYN",
         default_currency: defaultCurrency || "KES",
-        default_package: defaultPackage || "Starter",
         timezone: timezone || "Africa/Nairobi",
       });
       setSettings(updated);
@@ -225,8 +221,8 @@ export default function FounderSettingsPage() {
     setActionError(null);
     setExporting(true);
     try {
-      const [orgs, packages, invoices] = await Promise.all([getOrganizations(), getPackages(), getInvoices()]);
-      const payload = { exported_at: new Date().toISOString(), organizations: orgs, packages, invoices };
+      const [orgs, invoices] = await Promise.all([getOrganizations(), getInvoices()]);
+      const payload = { exported_at: new Date().toISOString(), organizations: orgs, invoices };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -336,10 +332,6 @@ export default function FounderSettingsPage() {
                         <input id="pl-cur" className={f.input} value={defaultCurrency} onChange={e => setDefaultCurrency(e.target.value)} placeholder="KES" />
                       </div>
                       <div className={f.field}>
-                        <label htmlFor="pl-pkg">Default package for new orgs</label>
-                        <input id="pl-pkg" className={f.input} value={defaultPackage} onChange={e => setDefaultPackage(e.target.value)} placeholder="Starter" />
-                      </div>
-                      <div className={f.field}>
                         <label htmlFor="pl-tz">Timezone</label>
                         <input id="pl-tz" className={f.input} value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="Africa/Nairobi" />
                       </div>
@@ -417,7 +409,7 @@ export default function FounderSettingsPage() {
                     <div className={f.notice}>
                       <div className={f.noticeMain}>
                         <div className={f.noticeTitle}>Export data</div>
-                        <div className={f.noticeDesc}>Download all organizations, packages, and invoices as JSON</div>
+                        <div className={f.noticeDesc}>Download all organizations and invoices as JSON</div>
                       </div>
                       <button className={f.secondary} onClick={handleExportData} disabled={exporting}>{exporting ? "Exporting…" : "Export"}</button>
                     </div>

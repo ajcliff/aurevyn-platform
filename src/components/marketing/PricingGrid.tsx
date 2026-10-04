@@ -1,185 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import type { Package } from "@/lib/packages";
-import { ENGINE_META, ENGINE_ORDER } from "./engineData";
-import { useTilt } from "./interactions";
+import type { PricedEngine } from "@/lib/pricing";
+import { UNLIMITED_SEATS } from "@/lib/pricing";
 
-const NON_FEATURED_GLOW = "var(--mkt-blueprint-glow)";
-
-function PricingCard({ pkg, featured, accent }: { pkg: Package; featured: boolean; accent: string }) {
-  const tiltRef = useTilt<HTMLDivElement>(4);
-
-  return (
-    <div
-      ref={tiltRef}
-      className={`mkt-card mkt-pricing-card ${featured ? "mkt-pricing-card--featured" : ""}`}
-      style={{ ["--pkg-glow" as string]: featured ? "var(--mkt-brass-glow)" : accent }}
-    >
-      {featured && <div className="mkt-tag mkt-pricing-card__badge">Most chosen</div>}
-      <div className="mkt-pricing-card__top">
-        <div className="mkt-tag">{pkg.name}</div>
-        <div className="mkt-tag mkt-tag--trial">30 days free</div>
-      </div>
-      <div className="mkt-pricing-card__price">{pkg.price}</div>
-      <div className="mkt-pricing-card__price-note mkt-mono">after your trial ends</div>
-      <p className="mkt-body" style={{ fontSize: "0.875rem", marginTop: 6, minHeight: 60 }}>
-        {pkg.engine_slugs.length} engines included
-      </p>
-
-      <div className="mkt-pricing-card__engines" title="Every engine — unlocked for your 30-day trial">
-        {ENGINE_ORDER.map((id, ei) => (
-          <span
-            key={id}
-            className="mkt-pricing-card__dot"
-            style={{ background: ENGINE_META[id].color, animationDelay: `${ei * 0.15}s` }}
-          />
-        ))}
-      </div>
-
-      <Link
-        href="/register"
-        className={`mkt-btn ${featured ? "mkt-btn--primary" : "mkt-btn--ghost"} mkt-btn--full`}
-        style={{ marginTop: 20 }}
-      >
-        Choose {pkg.name}
-      </Link>
-    </div>
-  );
-}
+const kes = (n: number) => `KES ${n.toLocaleString("en-KE")}`;
 
 export default function PricingGrid({
-  packages,
+  engines,
   loading = false,
+  limit,
 }: {
-  packages: Package[];
+  engines: PricedEngine[];
   loading?: boolean;
+  limit?: number;
 }) {
   if (loading) {
-    return (
-      <p className="mkt-dim mkt-mono" style={{ textAlign: "center", padding: "40px 0" }}>
-        Loading pricing…
-      </p>
-    );
+    return <p className="mkt-dim mkt-mono" style={{ textAlign: "center", padding: "40px 0" }}>Loading pricing…</p>;
   }
-
-  if (packages.length === 0) {
+  if (engines.length === 0) {
     return (
       <div className="mkt-card" style={{ textAlign: "center", padding: "40px 28px" }}>
-        <p className="mkt-body" style={{ fontSize: "0.9375rem" }}>
-          No pricing plans found. Check that your Supabase{" "}
-          <code className="mkt-mono">packages</code> table has rows, and that
-          anonymous <code className="mkt-mono">SELECT</code> is allowed by
-          Row Level Security.
-        </p>
+        <p className="mkt-body" style={{ fontSize: "0.9375rem" }}>Pricing is being updated — start a free trial and see every engine in action.</p>
       </div>
     );
   }
 
-  const featured = Math.min(1, packages.length - 1);
+  const rows = limit ? engines.slice(0, limit) : engines;
+  const seatSteps = Array.from(new Set(rows.flatMap(e => e.tiers.map(t => t.seats)))).sort((a, b) => a - b);
+  const seatLabel = (s: number) => (s >= UNLIMITED_SEATS ? "Unlimited" : `${s} seats`);
 
   return (
-    <div className="mkt-grid mkt-cols-3 mkt-pricing-grid">
-      {packages.map((pkg, i) => (
-        <PricingCard
-          key={pkg.id}
-          pkg={pkg}
-          featured={i === featured}
-          accent={NON_FEATURED_GLOW}
-        />
-      ))}
+    <div>
+      <div className="mkt-price-wrap">
+        <table className="mkt-price-table">
+          <thead>
+            <tr>
+              <th scope="col">Engine</th>
+              {seatSteps.map(s => <th key={s} scope="col" className="mkt-price-num">{seatLabel(s)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(e => (
+              <tr key={e.slug}>
+                <th scope="row">{e.name}</th>
+                {seatSteps.map(s => {
+                  const t = e.tiers.find(x => x.seats === s);
+                  return <td key={s} className="mkt-price-num">{t ? kes(t.price) : "—"}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mkt-mono" style={{ textAlign: "center", marginTop: 14, fontSize: "0.75rem", color: "var(--mkt-paper-faint)" }}>
+        Prices in KES per month, per engine. One seat = one team member using that engine.
+      </p>
+      <p style={{ textAlign: "center", marginTop: 20 }}>
+        <Link href="/register" className="mkt-btn mkt-btn--primary">Start free trial</Link>
+      </p>
 
       <style>{`
-        .mkt-pricing-card {
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(0);
-          transition: transform 0.2s ease-out, box-shadow 0.25s ease, border-color 0.25s ease;
-        }
-        .mkt-pricing-card::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-            420px circle at var(--mx, 50%) var(--my, 50%),
-            var(--pkg-glow, var(--mkt-brass-glow)),
-            transparent 60%
-          );
-          opacity: 0;
-          transition: opacity 0.25s ease;
-          pointer-events: none;
-        }
-        .mkt-pricing-card:hover::after {
-          opacity: 1;
-        }
-        .mkt-pricing-card:hover {
-          transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px);
-        }
-        .mkt-pricing-card--featured:hover {
-          box-shadow: 0 0 0 1px var(--mkt-brass), 0 20px 44px -16px var(--mkt-brass-glow);
-        }
-        .mkt-pricing-card--featured {
-          border-color: var(--mkt-brass);
-        }
-        .mkt-pricing-card--featured::before,
-        .mkt-pricing-card--featured::after {
-          border-color: var(--mkt-brass);
-        }
-        .mkt-pricing-card__badge {
-          position: absolute;
-          top: -11px;
-          left: 24px;
-          background: var(--mkt-ink);
-          color: var(--mkt-brass-light);
-          border-color: var(--mkt-brass);
-        }
-        .mkt-pricing-card__top {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .mkt-tag--trial {
-          color: var(--mkt-brass-light);
-          border-color: var(--mkt-brass);
-        }
-        .mkt-pricing-card__price {
-          font-family: var(--mkt-font-mono);
-          font-size: 1.75rem;
-          font-weight: 600;
-          color: var(--mkt-paper);
-          margin-top: 18px;
-        }
-        .mkt-pricing-card__price-note {
-          font-size: 0.6875rem;
-          color: var(--mkt-paper-faint);
-          margin-top: 2px;
-        }
-        .mkt-pricing-card__engines {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          margin-top: 18px;
-          padding-top: 16px;
-          border-top: 1px solid var(--mkt-line);
-        }
-        .mkt-pricing-card__dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          flex-shrink: 0;
-          animation: mkt-pricing-dot-pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes mkt-pricing-dot-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.45; transform: scale(0.8); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .mkt-pricing-card__dot {
-            animation: none;
-          }
-        }
+        .mkt-price-wrap { overflow-x: auto; border: 1px solid var(--mkt-line); }
+        .mkt-price-table { width: 100%; border-collapse: collapse; min-width: 560px; font-size: 0.9rem; }
+        .mkt-price-table th, .mkt-price-table td { padding: 14px 18px; border-bottom: 1px solid var(--mkt-line); text-align: left; }
+        .mkt-price-table thead th { font-family: var(--mkt-font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mkt-paper-faint); font-weight: 500; }
+        .mkt-price-table tbody th { color: var(--mkt-paper); font-weight: 600; }
+        .mkt-price-table tbody td { font-family: var(--mkt-font-mono); color: var(--mkt-paper-dim); }
+        .mkt-price-table tbody tr:hover { background: var(--mkt-brass-glow); }
+        .mkt-price-table tbody tr:last-child th, .mkt-price-table tbody tr:last-child td { border-bottom: none; }
+        .mkt-price-num { text-align: right !important; white-space: nowrap; }
       `}</style>
     </div>
   );

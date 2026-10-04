@@ -171,7 +171,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);
   const hasEngine = requiredEngine ? visibleEngines.some((e) => e.engines?.slug === requiredEngine) : true;
   const orgHasEngine = requiredEngine ? engines.some((e) => e.engines?.slug === requiredEngine) : true;
 
-  if ((engineSlug === "team" || engineSlug === "users") && !canManageTeamAccess) {
+  if ((engineSlug === "team" || engineSlug === "users" || engineSlug === "billing") && !canManageTeamAccess) {
     return (
       <EngineProvider organization={organization} installedEngines={visibleEngines} membership={membership}>
         <PageHeaderProvider>
@@ -188,7 +188,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);
             setShowBrain={setShowBrain}
             logoUrl={logoUrl}
           >
-            <EmptyState icon="🚫" message="Only owners and admins can manage users." />
+            <EmptyState icon="🚫" message="Only owners and admins can manage users and billing." />
           </OrgShell>
         </PageHeaderProvider>
       </EngineProvider>
@@ -272,7 +272,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);
         path: `/org/${orgId}/${seg}`,
       })),
     { id: "me", label: "Self Service", icon: "👤", path: `/org/${orgId}/me` },
-    ...(canManageTeamAccess ? [{ id: "users", label: "Users", icon: "🧑‍🤝‍🧑", path: `/org/${orgId}/users` }] : []),
+    ...(canManageTeamAccess ? [{ id: "users", label: "Users", icon: "🧑‍🤝‍🧑", path: `/org/${orgId}/users` }, { id: "billing", label: "Billing", icon: "🧾", path: `/org/${orgId}/billing` }] : []),
   ];
 
   return (
@@ -698,6 +698,15 @@ const { header } = usePageHeader();
               label="Users"
               icon="🧑‍🤝‍🧑"
               active={pathname.startsWith(`/org/${orgId}/users`)}
+              showLabel={showLabels}
+            />
+          )}
+          {canManageTeamAccess && (
+            <SidebarLink
+              href={`/org/${orgId}/billing`}
+              label="Billing"
+              icon="🧾"
+              active={pathname.startsWith(`/org/${orgId}/billing`)}
               showLabel={showLabels}
             />
           )}

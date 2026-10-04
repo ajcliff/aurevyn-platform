@@ -16,7 +16,6 @@ import { getMaintenanceItems, type MaintenanceItem } from "@/lib/maintenance";
 import { getCompanyMembers, type CompanyMember } from "@/lib/companyTeam";
 import { getCompanyDocuments, type CompanyDocument } from "@/lib/companyDocuments";
 import { getOrganizations, type Organization } from "@/lib/organizations";
-import { getPackages, type Package } from "@/lib/packages";
 import { getInvoices, type Invoice } from "@/lib/invoices";
 import { formatError } from "@/lib/errorFormat";
 import { logError } from "@/lib/errorLog";
@@ -45,7 +44,6 @@ export default function CompanyPage() {
   const [members, setMembers] = useState<CompanyMember[]>([]);
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   const report = useCallback((err: unknown, source: string) => {
@@ -61,9 +59,9 @@ export default function CompanyPage() {
 
     // Each source loads on its own, so one failing table (for example the new team/documents tables
     // before the SQL has been run) doesn't blank the whole page.
-    const [prof, road, maint, team, docs, orgList, pkgs, invs] = await Promise.allSettled([
+    const [prof, road, maint, team, docs, orgList, invs] = await Promise.allSettled([
       getCompanyProfile(), getRoadmapItems(), getMaintenanceItems(), getCompanyMembers(),
-      getCompanyDocuments(), getOrganizations(), getPackages(), getInvoices(),
+      getCompanyDocuments(), getOrganizations(), getInvoices(),
     ]);
 
     if (prof.status === "fulfilled") setProfile(prof.value); else report(prof.reason, "CompanyPage/profile");
@@ -72,7 +70,6 @@ export default function CompanyPage() {
     if (team.status === "fulfilled") setMembers(team.value); else setUnavailable(u => ({ ...u, team: formatError(team.reason) }));
     if (docs.status === "fulfilled") setDocuments(docs.value); else setUnavailable(u => ({ ...u, documents: formatError(docs.reason) }));
     if (orgList.status === "fulfilled") setOrgs(orgList.value); else report(orgList.reason, "CompanyPage/orgs");
-    if (pkgs.status === "fulfilled") setPackages(pkgs.value); else report(pkgs.reason, "CompanyPage/packages");
     if (invs.status === "fulfilled") setInvoices(invs.value);
 
     setLoading(false);
@@ -133,7 +130,7 @@ export default function CompanyPage() {
               ) : (
                 <>
                   {tab === "overview" && (
-                    <Overview profile={profile} orgs={orgs} packages={packages} invoices={invoices} roadmap={roadmap} maintenance={maintenance} documents={documents} members={members} goTo={setTab} />
+                    <Overview profile={profile} orgs={orgs} invoices={invoices} roadmap={roadmap} maintenance={maintenance} documents={documents} members={members} goTo={setTab} />
                   )}
                   {tab === "roadmap" && <Roadmap items={roadmap} setItems={setRoadmap} onError={report} />}
                   {tab === "compliance" && <Compliance items={maintenance} setItems={setMaintenance} onError={report} />}

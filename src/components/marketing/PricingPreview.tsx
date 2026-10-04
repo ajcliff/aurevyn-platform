@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getPackages, type Package } from "@/lib/packages";
+import { getPublicPricing, type PricedEngine } from "@/lib/pricing";
 import PricingGrid from "./PricingGrid";
 import { useCountUp } from "./interactions";
 
@@ -15,7 +15,7 @@ function TrialStrip() {
         <span className="mkt-num mkt-trial-strip__days">
           <span ref={ref}>{display}</span> days
         </span>
-        , every engine unlocked — pick a plan once you know what you'll actually keep.
+        , every engine unlocked — keep only what you actually use.
       </p>
 
       <style>{`
@@ -65,12 +65,12 @@ function TrialStrip() {
 }
 
 export default function PricingPreview() {
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [engines, setEngines] = useState<PricedEngine[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPackages()
-      .then(setPackages)
+    getPublicPricing()
+      .then(setEngines)
       .finally(() => setLoading(false));
   }, []);
 
@@ -79,20 +79,20 @@ export default function PricingPreview() {
       <div className="mkt-container">
         <div className="mkt-section-head" style={{ textAlign: "center" }}>
           <div className="mkt-eyebrow" style={{ justifyContent: "center" }}>Sheet 05 / Pricing</div>
-          <h2 className="mkt-h2" style={{ marginTop: 14 }}>One price, every engine included.</h2>
+          <h2 className="mkt-h2" style={{ marginTop: 14 }}>Pay only for the engines you use.</h2>
           <p className="mkt-body-lg" style={{ marginTop: 12, maxWidth: 480, marginInline: "auto" }}>
-            No per-module upsell. Pick a tier by the size of your operation.
+            Each engine is priced by how many people use it. Start with the ones that run your shop, add the rest when you need them.
           </p>
           <TrialStrip />
         </div>
 
         <div style={{ marginTop: 44 }}>
-          <PricingGrid packages={packages} loading={loading} />
+          <PricingGrid engines={engines} loading={loading} limit={4} />
         </div>
 
         <p style={{ textAlign: "center", marginTop: 28 }}>
           <Link href="/pricing" className="mkt-mono" style={{ color: "var(--mkt-blueprint)", fontSize: "0.875rem" }}>
-            View full plan comparison →
+            See every engine and price →
           </Link>
         </p>
       </div>

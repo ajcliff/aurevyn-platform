@@ -1,7 +1,6 @@
 "use client";
 
 import type { Organization } from "@/lib/organizations";
-import type { Package } from "@/lib/packages";
 import type { Invoice } from "@/lib/invoices";
 import type { RoadmapItem } from "@/lib/roadmap";
 import type { MaintenanceItem } from "@/lib/maintenance";
@@ -20,7 +19,6 @@ export type CompanyTab = "overview" | "roadmap" | "compliance" | "team" | "docum
 type Props = {
   profile: CompanyProfile | null;
   orgs: Organization[];
-  packages: Package[];
   invoices: Invoice[];
   roadmap: RoadmapItem[];
   maintenance: MaintenanceItem[];
@@ -32,12 +30,12 @@ type Props = {
 type Attention = { id: string; title: string; detail: string; tone: "bad" | "warn"; tab?: CompanyTab; href?: string; action: string };
 type Upcoming = { id: string; date: string; title: string; kind: string };
 
-export default function Overview({ profile, orgs, packages, invoices, roadmap, maintenance, documents, members, goTo }: Props) {
+export default function Overview({ profile, orgs, invoices, roadmap, maintenance, documents, members, goTo }: Props) {
   const router = useRouter();
 
   const running = orgs.filter(o => o.status === "operational").length;
   const flaggedOrgs = orgs.length - running;
-  const mrr = packages.reduce((sum, p) => sum + toNumber(p.price) * p.orgs, 0);
+  const collected = invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + Number(i.amount_kes), 0);
   const openRoadmap = roadmap.filter(r => r.status !== "done");
   const inProgress = roadmap.filter(r => r.status === "in_progress");
   const openMaintenance = maintenance.filter(m => !(m.frequency === "one_off" && m.last_completed));
@@ -76,8 +74,8 @@ export default function Overview({ profile, orgs, packages, invoices, roadmap, m
           <span className={f.vitalSub}>{running} running{flaggedOrgs > 0 ? `, ${flaggedOrgs} flagged` : ""}</span>
         </button>
         <button className={f.vital} onClick={() => router.push("/dashboard/finance")}>
-          <span className={f.vitalLabel}>Monthly recurring revenue</span>
-          <span className={f.vitalValue}>{kes(mrr)}</span>
+          <span className={f.vitalLabel}>Revenue collected</span>
+          <span className={f.vitalValue}>{kes(collected)}</span>
           <span className={f.vitalSub}>See company finances</span>
         </button>
         <button className={f.vital} onClick={() => goTo("roadmap")}>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getPackages, type Package } from "@/lib/packages";
+import { getPublicPricing, type PricedEngine } from "@/lib/pricing";
 import MarketingShell from "@/components/marketing/MarketingShell";
 import MarketingNav from "@/components/marketing/MarketingNav";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -10,28 +10,33 @@ import PricingGrid from "@/components/marketing/PricingGrid";
 
 const FAQS = [
   {
-    q: "Does every plan include every engine?",
-    a: "Yes. POS, Inventory, Finance, CRM, HR & Payroll, and Security ship on every tier — plans scale by organizations and usage, not by which engines you're allowed to switch on.",
+    q: "Do I have to buy every engine?",
+    a: "No. During your free trial every engine is unlocked. When it ends you choose which engines to keep and how many seats each needs — you only pay for those.",
   },
   {
-    q: "Can I change plans later?",
-    a: "Anytime. Upgrades apply immediately; downgrades take effect at the start of your next billing cycle. Your data stays exactly where it is.",
+    q: "What is a seat?",
+    a: "One seat is one team member using one engine. Five people on Point of Sale and two on Finance means a 5-seat POS license and a 2-seat Finance license.",
   },
   {
-    q: "Is M-Pesa included?",
-    a: "Native STK push at checkout is built into the POS engine on every plan, reconciled straight into Finance — no separate integration to pay for.",
+    q: "Can I change seats later?",
+    a: "Anytime from your Engines page. Your data stays exactly where it is.",
+  },
+  {
+    q: "How do payments work?",
+    a: "M-Pesa, bank transfer, cash and cheque payments are recorded in POS and reconciled into Finance. We issue numbered invoices and receipts for your subscription.",
   },
   {
     q: "What happens after my free trial?",
-    a: "You choose a plan and keep going with everything already set up. Nothing is deleted, and there's no forced migration.",
+    a: "You choose your engines and seats and keep going with everything already set up. Nothing is deleted, and there's no forced migration.",
   },
 ];
 
 export default function PricingPage() {
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [engines, setEngines] = useState<PricedEngine[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPackages().then(setPackages);
+    getPublicPricing().then(setEngines).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -42,19 +47,19 @@ export default function PricingPage() {
         <div className="mkt-container">
           <div className="mkt-eyebrow" style={{ justifyContent: "center" }}>Pricing</div>
           <h1 className="mkt-h1" style={{ marginTop: 16, fontSize: "clamp(2.25rem, 4.4vw, 3.25rem)" }}>
-            One price, every engine included.
+            Pay only for the engines you use.
           </h1>
           <p className="mkt-body-lg" style={{ marginTop: 16, maxWidth: 540, marginInline: "auto" }}>
-            No per-module upsell, no per-seat surprises. Pick the tier that
-            fits how many organizations you run, upgrade the day you need
-            to.
+            Every engine is priced by seats — the number of people who use
+            it. Run your till on Point of Sale, add Finance when you need
+            the books, and leave the rest switched off.
           </p>
         </div>
       </section>
 
       <section className="mkt-section">
         <div className="mkt-container">
-          <PricingGrid packages={packages} />
+          <PricingGrid engines={engines} loading={loading} />
         </div>
       </section>
 

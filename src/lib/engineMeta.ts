@@ -44,6 +44,7 @@ export const PLATFORM_SEGMENTS = new Set([
   "users",
   "team",
   "engines",
+  "billing",
   "welcome",
   "summary",
 ]);

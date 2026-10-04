@@ -8,7 +8,6 @@ import OrgsNeedingAttention from "@/components/OrgsNeedingAttention";
 import GreetingHeader from "@/components/GreetingHeader";
 import ErrorBanner from "@/components/ErrorBanner";
 import { getOrganizations, updateOrganization, type Organization } from "@/lib/organizations";
-import { getPackages, type Package } from "@/lib/packages";
 import { getPlatformPaymentsSince } from "@/lib/payments";
 import { formatError } from "@/lib/errorFormat";
 import { createClient } from "@/lib/supabase";
@@ -22,7 +21,6 @@ const kes = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
 export default function Home() {
   const router = useRouter();
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("7d");
@@ -75,16 +73,8 @@ export default function Home() {
       })
       .subscribe();
 
-    const packagesChannel = supabase
-      .channel("packages-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "packages" }, () => {
-        getPackages().then(setPackages).catch((err) => setError(formatError(err)));
-      })
-      .subscribe();
-
     return () => {
       supabase.removeChannel(orgsChannel);
-      supabase.removeChannel(packagesChannel);
     };
   }, []);
 
@@ -96,9 +86,8 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const [orgsData, packagesData] = await Promise.all([getOrganizations(), getPackages()]);
+      const orgsData = await getOrganizations();
       setOrgs(orgsData);
-      setPackages(packagesData);
     } catch (err) {
       const message = formatError(err);
       setError(message);
@@ -126,7 +115,7 @@ export default function Home() {
 
   const activeOrgs = orgs.filter(o => o.status === "operational").length;
   const flagged = orgs.length - activeOrgs;
-  const subscriptions = packages.reduce((sum, p) => sum + p.orgs, 0);
+  const licensedOrgs = orgs.filter(o => o.package_confirmed_at).length;
   const periodTotal = dailyRevenue.reduce((a, b) => a + b, 0);
 
   const headline = loading
@@ -186,9 +175,9 @@ export default function Home() {
                   <span className={f.vitalSub}>{activeOrgs} operational</span>
                 </button>
                 <button className={f.vital} onClick={() => router.push("/dashboard/licensing")}>
-                  <span className={f.vitalLabel}>Packages</span>
-                  <span className={f.vitalValue}>{packages.length}</span>
-                  <span className={f.vitalSub}>{subscriptions} subscriptions</span>
+                  <span className={f.vitalLabel}>Licensed</span>
+                  <span className={f.vitalValue}>{licensedOrgs}</span>
+                  <span className={f.vitalSub}>{orgs.length - licensedOrgs} on free trial</span>
                 </button>
                 <button className={f.vital} onClick={() => router.push("/dashboard/finance")}>
                   <span className={f.vitalLabel}>Finance</span>

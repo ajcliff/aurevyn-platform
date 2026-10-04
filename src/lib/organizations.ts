@@ -7,8 +7,15 @@ export type Organization = {
   status: "operational" | "warning" | "critical";
   revenue: string;
   package: string;
+  package_confirmed_at?: string | null;
   created_at: string;
 };
+
+// Plan shown in the founder dashboard: orgs are either still on their free trial
+// or have confirmed a licensed plan (engines + seats). There are no packages.
+export function planLabel(org: Pick<Organization, "package_confirmed_at">): "Licensed" | "Free trial" {
+  return org.package_confirmed_at ? "Licensed" : "Free trial";
+}
 
 export async function getOrganizations(): Promise<Organization[]> {
   const supabase = createClient();

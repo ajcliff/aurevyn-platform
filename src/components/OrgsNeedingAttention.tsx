@@ -37,7 +37,7 @@ export default function OrgsNeedingAttention({
             <span className={`${f.statusDot} ${org.status === "critical" ? f.dotCritical : f.dotWarning}`} aria-hidden="true" />
             <button className={f.rowMain} onClick={() => router.push(`/dashboard/organizations?highlight=${org.id}`)}>
               <span className={f.rowName}>{org.name}</span>
-              <span className={f.rowSub}>{label[org.status]} · {org.location} · {org.package}</span>
+              <span className={f.rowSub}>{label[org.status]} · {org.location}</span>
             </button>
             <select
               aria-label={`Status for ${org.name}`}
