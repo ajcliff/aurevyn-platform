@@ -24,7 +24,7 @@ function PricingCard({ pkg, featured, accent }: { pkg: Package; featured: boolea
       <div className="mkt-pricing-card__price">{pkg.price}</div>
       <div className="mkt-pricing-card__price-note mkt-mono">after your trial ends</div>
       <p className="mkt-body" style={{ fontSize: "0.875rem", marginTop: 6, minHeight: 60 }}>
-        {pkg.features}
+        {pkg.engine_slugs.length} engines included
       </p>
 
       <div className="mkt-pricing-card__engines" title="Every engine — unlocked for your 30-day trial">

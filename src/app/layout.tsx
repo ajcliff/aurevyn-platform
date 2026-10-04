@@ -34,18 +34,20 @@ export const metadata: Metadata = {
   },
 };
 
+// Runs before first paint. Reads the cached theme (written by applyThemeColors /
+// applyBuiltinTheme) so the saved theme shows instantly with no default-colors flash.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
-    var cached = localStorage.getItem("aurevyn-active-theme");
+    var m = location.pathname.match(/^\\/org\\/([^\\/]+)/);
+    var cached = (m && localStorage.getItem("aurevyn-active-theme:" + m[1])) || localStorage.getItem("aurevyn-active-theme");
     if (!cached) return;
     var theme = JSON.parse(cached);
+    var root = document.documentElement;
     if (theme.mode === "builtin") {
-      document.documentElement.setAttribute("data-theme", theme.name);
-    } else if (theme.mode === "colors" && theme.colors) {
-      for (var key in theme.colors) {
-        document.documentElement.style.setProperty("--" + key.replace(/_/g, "-"), theme.colors[key]);
-      }
+      root.setAttribute("data-theme", theme.name);
+    } else if (theme.mode === "vars" && theme.vars) {
+      for (var key in theme.vars) root.style.setProperty(key, theme.vars[key]);
     }
   } catch (e) {}
 })();

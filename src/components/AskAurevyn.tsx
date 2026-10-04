@@ -12,7 +12,7 @@ const suggestions = [
   "Show revenue summary",
   "Which orgs need attention?",
   "Recommend growth strategies",
-  "List expiring packages",
+  "Which trials end soonest?",
   "How is system health?",
 ];
 
@@ -32,13 +32,11 @@ export default function AskAurevyn({ onClose }: { onClose: () => void }) {
       const [
         { data: orgs },
         { data: invoices },
-        { data: packages },
         { data: modules },
         { data: notifications },
       ] = await Promise.all([
         supabase.from("organizations").select("*"),
         supabase.from("invoices").select("*"),
-        supabase.from("packages").select("*"),
         supabase.from("modules").select("*"),
         supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(5),
       ]);
@@ -61,15 +59,12 @@ ORGANIZATIONS (${orgs?.length ?? 0} total):
 - Active/Operational: ${activeOrgs}
 - Warning: ${warningOrgs.map(o => o.name).join(", ") || "None"}
 - Critical: ${criticalOrgs.map(o => o.name).join(", ") || "None"}
-- Full list: ${orgs?.map(o => `${o.name} (${o.location}, ${o.status}, ${o.revenue}, ${o.package} package)`).join("; ") ?? "None"}
+- Full list: ${orgs?.map(o => `${o.name} (${o.location}, ${o.status}, ${o.revenue}, ${o.package})`).join("; ") ?? "None"}
 
 REVENUE:
 - Total monthly revenue: KES ${totalRevenue.toLocaleString()}
 - Overdue amount: KES ${totalOverdue.toLocaleString()} across ${overdueInvoices.length} invoice(s)
 - Pending amount: KES ${totalPending.toLocaleString()} across ${pendingInvoices.length} invoice(s)
-
-PACKAGES (${packages?.length ?? 0} total):
-${packages?.map(p => `- ${p.name}: ${p.price}, ${p.orgs} orgs subscribed`).join("\n") ?? "None"}
 
 MODULES:
 - Active: ${activeModules} of ${modules?.length ?? 0} total

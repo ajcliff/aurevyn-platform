@@ -9,7 +9,9 @@ import { getPackages } from "@/lib/packages";
 import { getInvoices } from "@/lib/invoices";
 import type { ThemeName } from "@/lib/orgSettings";
 import { getThemePresets, type ThemePreset } from "@/lib/themePresets";
-import { applyThemeColors } from "@/lib/themeColors";
+import { applyThemeColors, applyBuiltinTheme } from "@/lib/themeColors";
+import ThemePicker from "@/components/ThemePicker";
+import { BUILTIN_THEMES } from "@/lib/builtinThemes";
 import { formatError } from "@/lib/errorFormat";
 import ConfirmDialog from "@/components/founder/ConfirmDialog";
 import TypedConfirmDialog from "@/components/founder/TypedConfirmDialog";
@@ -22,13 +24,6 @@ const TABS: { id: Section; label: string }[] = [
   { id: "security", label: "Security" },
   { id: "notifications", label: "Notifications" },
   { id: "danger", label: "Danger zone" },
-];
-
-const THEMES: { id: ThemeName; name: string; description: string; base: string; accent: string }[] = [
-  { id: "rift-valley", name: "Rift Valley", description: "Aubergine and gold", base: "#1A0F14", accent: "#C9A227" },
-  { id: "savannah-dusk", name: "Savannah Dusk", description: "Indigo-navy and coral", base: "#0B0E1A", accent: "#E15B4D" },
-  { id: "highland-tea", name: "Highland Tea", description: "Forest green and copper", base: "#0D1410", accent: "#C87F3B" },
-  { id: "zanzibar-spice", name: "Zanzibar Spice", description: "Parchment and clove, light mode", base: "#F2E8D5", accent: "#5B3A29" },
 ];
 
 const NOTIF_LABELS: { key: keyof FounderSettings; label: string; desc: string }[] = [
@@ -154,15 +149,13 @@ export default function FounderSettingsPage() {
   async function handleBuiltInThemeChange(theme: ThemeName) {
     if (!userId) return;
     setSavingTheme(true);
-    document.documentElement.style.cssText = "";
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: theme }));
+    applyBuiltinTheme(theme);
     try {
       const updated = await updateFounderSettings(userId, { platform_theme: theme, theme_preset_id: null });
       setSettings(updated);
     } catch (err) {
       setActionError(formatError(err));
-      if (settings) document.documentElement.setAttribute("data-theme", settings.platform_theme);
+      if (settings) applyBuiltinTheme(settings.platform_theme);
     } finally {
       setSavingTheme(false);
     }
@@ -171,9 +164,7 @@ export default function FounderSettingsPage() {
   async function handlePresetThemeChange(preset: ThemePreset) {
     if (!userId) return;
     setSavingTheme(true);
-    document.documentElement.removeAttribute("data-theme");
     applyThemeColors(preset);
-    localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
     try {
       const updated = await updateFounderSettings(userId, { theme_preset_id: preset.id });
       setSettings(updated);
@@ -364,48 +355,17 @@ export default function FounderSettingsPage() {
                         <h2 id="theme-title" className={f.sectionTitle}>Dashboard theme</h2>
                         <span className={f.sectionSub}>Only affects your founder dashboard</span>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 16 }}>
-                        {THEMES.map(t => {
-                          const active = settings?.platform_theme === t.id && !settings?.theme_preset_id;
-                          return (
-                            <button key={t.id} onClick={() => handleBuiltInThemeChange(t.id)} disabled={savingTheme}
-                              className={f.themeCard} style={{ background: t.base, borderColor: active ? t.accent : "var(--rule-strong)", borderWidth: active ? 2 : 1, opacity: savingTheme && !active ? 0.6 : 1 }}>
-                              <div className={f.themePreview}>
-                                <div className={f.themeSwatchRow}>
-                                  <div className={f.themeSwatch} style={{ background: t.accent }} />
-                                  <div className={f.themeSwatch} style={{ background: t.base, border: "1px solid rgba(255,255,255,0.15)" }} />
-                                </div>
-                                <div className={f.themeName} style={{ color: t.id === "zanzibar-spice" ? "#2B1D14" : "#F0E6D8" }}>{t.name}{active && " ✓"}</div>
-                                <div className={f.themeDesc} style={{ color: t.id === "zanzibar-spice" ? "#6B5745" : "#A08B94" }}>{t.description}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
+                      <div style={{ marginTop: 16 }}>
+                        <ThemePicker
+                          builtins={[...BUILTIN_THEMES]}
+                          presets={presets}
+                          activeBuiltinId={settings?.platform_theme ?? null}
+                          activePresetId={settings?.theme_preset_id ?? null}
+                          busy={savingTheme}
+                          onPickBuiltin={id => handleBuiltInThemeChange(id as ThemeName)}
+                          onPickPreset={handlePresetThemeChange}
+                        />
                       </div>
-
-                      {presets.length > 0 && (
-                        <>
-                          <div className={f.sectionSub} style={{ margin: "20px 0 10px", fontWeight: 700, letterSpacing: "0.05em" }}>YOUR PRESETS</div>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-                            {presets.map(p => {
-                              const active = settings?.theme_preset_id === p.id;
-                              return (
-                                <button key={p.id} onClick={() => handlePresetThemeChange(p)} disabled={savingTheme}
-                                  className={f.themeCard} style={{ background: p.bg_base, borderColor: active ? p.gold : "var(--rule-strong)", borderWidth: active ? 2 : 1, opacity: savingTheme && !active ? 0.6 : 1 }}>
-                                  <div className={f.themePreview}>
-                                    <div className={f.themeSwatchRow}>
-                                      <div className={f.themeSwatch} style={{ background: p.gold }} />
-                                      <div className={f.themeSwatch} style={{ background: p.bg_base, border: "1px solid rgba(255,255,255,0.15)" }} />
-                                    </div>
-                                    <div className={f.themeName} style={{ color: p.text_primary }}>{p.name}{active && " ✓"}</div>
-                                    {p.description && <div className={f.themeDesc} style={{ color: p.text_secondary }}>{p.description}</div>}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
                     </section>
                   </div>
                 )}

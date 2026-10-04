@@ -27,7 +27,7 @@ const navGroups: NavGroup[] = [
       { id: "actions", label: "Quick actions", path: "/dashboard/actions" },
     ],
   },
-  { label: "Platform", items: [{ id: "packages", label: "Packages", path: "/dashboard/packages" }] },
+  { label: "Platform", items: [{ id: "licensing", label: "Licensing", path: "/dashboard/licensing" }] },
   {
     label: "Money",
     items: [

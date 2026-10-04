@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { requireOrgAdmin } from "@/lib/server/guards";
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -17,6 +18,12 @@ function generateTempPassword(): string {
 // exist yet.
 export async function POST(req: NextRequest) {
   const { orgId, fullName, email, role, departmentId, engineIds } = await req.json();
+
+  const access = orgId ? await requireOrgAdmin(orgId) : null;
+  if (!access) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  if (role === "owner" && access.role !== "owner" && !access.isFounder) {
+    return NextResponse.json({ error: "Only an owner can create another owner." }, { status: 403 });
+  }
 
   if (!orgId || !fullName?.trim() || !email?.trim() || !role) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });

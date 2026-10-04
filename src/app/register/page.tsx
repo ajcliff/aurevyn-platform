@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { getPackages, type Package } from "@/lib/packages";
 import { isValidEmail, isValidPhone, isStrongEnoughPassword } from "@/lib/validation";
 import { PACKAGE_ENGINES } from "@/lib/packageEngines";
 import { COUNTRIES, OTHER_OPTION } from "@/lib/locations";
@@ -41,7 +40,7 @@ const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
   Other: "sme",
 };
 
-const STEP_LABELS = ["Business", "Profile", "Account", "Package", "Confirm"];
+const STEP_LABELS = ["Business", "Profile", "Account", "Confirm"];
 
 type Form = {
   companyName: string;
@@ -56,7 +55,6 @@ type Form = {
   email: string;
   password: string;
   confirmPassword: string;
-  packageSlug: string;
 };
 
 export default function RegisterPage() {
@@ -65,7 +63,6 @@ export default function RegisterPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [packages, setPackages] = useState<Package[]>([]);
   const [step, setStep] = useState(1);
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
@@ -82,7 +79,6 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    packageSlug: "",
   });
 
   // Location is handled separately so we can offer real dropdowns with an
@@ -101,10 +97,6 @@ export default function RegisterPage() {
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    getPackages().then(setPackages);
-  }, []);
 
   const update = (key: keyof Form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -149,7 +141,6 @@ export default function RegisterPage() {
   const step1Valid = Object.keys(step1Errors).length === 0;
   const step2Valid = Object.keys(step2Errors).length === 0;
   const step3Valid = Object.keys(step3Errors).length === 0;
-  const step4Valid = !!form.packageSlug;
 
   const goToStep2 = () => {
     setFieldErrors(step1Errors);
@@ -169,14 +160,10 @@ export default function RegisterPage() {
     if (step3Valid) setStep(4);
   };
 
-  const goToStep5 = () => {
-    if (step4Valid) setStep(5);
-  };
-
   const handleRegistration = async () => {
     // Defensive re-check — never allow submission with an incomplete/invalid form,
     // even if someone reaches this step some other way.
-    if (!step1Valid || !step2Valid || !step3Valid || !step4Valid) {
+    if (!step1Valid || !step2Valid || !step3Valid) {
       setError("Please complete every field correctly before continuing.");
       return;
     }
@@ -214,14 +201,15 @@ export default function RegisterPage() {
         .maybeSingle();
 
       const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+      const TRIAL_DAYS = 2; // TEMPORARY for testing — restore to 30 before launch
+      trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
 
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .insert({
           name: form.companyName.trim(),
           location: `${resolvedCity}, ${resolvedCountry}`,
-          package: form.packageSlug,
+          package: "Free trial",
           status: "operational",
           revenue: "0",
           blueprint_id: blueprint?.id ?? null,
@@ -262,7 +250,6 @@ export default function RegisterPage() {
         body: JSON.stringify({
           orgId,
           orgName: form.companyName.trim(),
-          packageSlug: form.packageSlug,
         }),
       });
       if (!finalizeRes.ok) {
@@ -322,7 +309,7 @@ export default function RegisterPage() {
       <h1 className="mkt-h3" style={{ fontSize: "1.375rem" }}>Set up Aurevyn</h1>
 
       <div className="mkt-register-steps">
-        {[1, 2, 3, 4, 5].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <div key={s} className="mkt-register-steps__item">
             <div className={`mkt-register-steps__bar ${step >= s ? "mkt-register-steps__bar--active" : ""}`} />
             <span className="mkt-mono mkt-register-steps__label">{STEP_LABELS[s - 1]}</span>
@@ -573,40 +560,6 @@ export default function RegisterPage() {
 
       {step === 4 && (
         <div>
-          <h2 className="mkt-h3" style={{ fontSize: "1rem", marginBottom: 12 }}>Select package</h2>
-
-          <div className="mkt-register-packages">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                onClick={() => update("packageSlug", pkg.slug)}
-                className={`mkt-card mkt-register-package ${form.packageSlug === pkg.slug ? "mkt-register-package--active" : ""}`}
-              >
-                <h3 className="mkt-h3" style={{ fontSize: "1rem" }}>{pkg.name}</h3>
-                <p className="mkt-num" style={{ color: "var(--mkt-brass-light)", fontWeight: 700, marginTop: 6 }}>
-                  {pkg.price}
-                </p>
-                <p style={{ fontSize: "0.8125rem", color: "var(--mkt-paper-faint)", marginTop: 8 }}>
-                  {pkg.features}
-                </p>
-              </div>
-            ))}
-          </div>
-          {packages.length === 0 && (
-            <p className="mkt-dim mkt-mono" style={{ fontSize: "0.8125rem" }}>Loading packages…</p>
-          )}
-
-          <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-            <button onClick={() => setStep(3)} className="mkt-btn mkt-btn--ghost">Back</button>
-            <button onClick={goToStep5} disabled={!step4Valid} className="mkt-btn mkt-btn--primary" style={{ flex: 1 }}>
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === 5 && (
-        <div>
           <h2 className="mkt-h3" style={{ fontSize: "1.0625rem", color: "var(--mkt-brass-light)" }}>
             Review & confirm
           </h2>
@@ -620,17 +573,17 @@ export default function RegisterPage() {
             <div><span className="mkt-dim">Locations</span><span>{form.branches}</span></div>
             <div><span className="mkt-dim">Owner</span><span>{form.fullName}</span></div>
             <div><span className="mkt-dim">Email</span><span>{form.email}</span></div>
-            <div><span className="mkt-dim">Package</span><span>{packages.find((p) => p.slug === form.packageSlug)?.name}</span></div>
+            <div><span className="mkt-dim">Trial</span><span>Every engine unlocked, free. Pay only for the engines and seats you keep.</span></div>
           </div>
 
           {error && <div className="mkt-alert-box" style={{ marginTop: 14 }}>{error}</div>}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            <button onClick={() => setStep(4)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
+            <button onClick={() => setStep(3)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
             <button
               className="mkt-btn mkt-btn--primary"
               style={{ flex: 1 }}
-              disabled={loading || !step1Valid || !step2Valid || !step3Valid || !step4Valid}
+              disabled={loading || !step1Valid || !step2Valid || !step3Valid}
               onClick={handleRegistration}
             >
               {loading ? "Creating organization…" : "Create organization"}

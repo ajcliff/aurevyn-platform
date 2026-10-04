@@ -1,0 +1,518 @@
+From 5ba28f1b16f60c824724713b263dd662e6e14a68 Mon Sep 17 00:00:00 2001
+From: Claude <c@x>
+Date: Thu, 1 Oct 2026 06:04:00 +0000
+Subject: [PATCH] Remove package step from registration; remove unused edge
+ functions and their health check
+
+---
+ src/app/register/page.tsx                     | 62 +++----------------
+ src/components/SystemHealthSection.tsx        |  3 -
+ supabase/config.toml                          | 33 ----------
+ supabase/functions/.vscode/settings.json      |  5 --
+ supabase/functions/deno.json                  |  5 --
+ supabase/functions/on-new-org/.npmrc          |  3 -
+ supabase/functions/on-new-org/deno.json       |  6 --
+ supabase/functions/on-new-org/index.ts        | 50 ---------------
+ supabase/functions/on-overdue-invoice/.npmrc  |  3 -
+ .../functions/on-overdue-invoice/deno.json    |  6 --
+ .../functions/on-overdue-invoice/index.ts     | 40 ------------
+ supabase/functions/on-system-alert/.npmrc     |  3 -
+ supabase/functions/on-system-alert/deno.json  |  6 --
+ supabase/functions/on-system-alert/index.ts   | 47 --------------
+ 14 files changed, 7 insertions(+), 265 deletions(-)
+ delete mode 100644 supabase/config.toml
+ delete mode 100644 supabase/functions/.vscode/settings.json
+ delete mode 100644 supabase/functions/deno.json
+ delete mode 100644 supabase/functions/on-new-org/.npmrc
+ delete mode 100644 supabase/functions/on-new-org/deno.json
+ delete mode 100644 supabase/functions/on-new-org/index.ts
+ delete mode 100644 supabase/functions/on-overdue-invoice/.npmrc
+ delete mode 100644 supabase/functions/on-overdue-invoice/deno.json
+ delete mode 100644 supabase/functions/on-overdue-invoice/index.ts
+ delete mode 100644 supabase/functions/on-system-alert/.npmrc
+ delete mode 100644 supabase/functions/on-system-alert/deno.json
+ delete mode 100644 supabase/functions/on-system-alert/index.ts
+
+diff --git a/src/app/register/page.tsx b/src/app/register/page.tsx
+index 7e01624..ec922a0 100644
+--- a/src/app/register/page.tsx
++++ b/src/app/register/page.tsx
+@@ -3,7 +3,6 @@
+ import { useEffect, useMemo, useState } from "react";
+ import { useRouter } from "next/navigation";
+ import { createClient } from "@/lib/supabase";
+-import { getPackages, type Package } from "@/lib/packages";
+ import { isValidEmail, isValidPhone, isStrongEnoughPassword } from "@/lib/validation";
+ import { PACKAGE_ENGINES } from "@/lib/packageEngines";
+ import { COUNTRIES, OTHER_OPTION } from "@/lib/locations";
+@@ -41,7 +40,7 @@ const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
+   Other: "sme",
+ };
+ 
+-const STEP_LABELS = ["Business", "Profile", "Account", "Package", "Confirm"];
++const STEP_LABELS = ["Business", "Profile", "Account", "Confirm"];
+ 
+ type Form = {
+   companyName: string;
+@@ -56,7 +55,6 @@ type Form = {
+   email: string;
+   password: string;
+   confirmPassword: string;
+-  packageSlug: string;
+ };
+ 
+ export default function RegisterPage() {
+@@ -65,7 +63,6 @@ export default function RegisterPage() {
+ 
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState("");
+-  const [packages, setPackages] = useState<Package[]>([]);
+   const [step, setStep] = useState(1);
+   const [pendingConfirmation, setPendingConfirmation] = useState(false);
+ 
+@@ -82,7 +79,6 @@ export default function RegisterPage() {
+     email: "",
+     password: "",
+     confirmPassword: "",
+-    packageSlug: "",
+   });
+ 
+   // Location is handled separately so we can offer real dropdowns with an
+@@ -102,10 +98,6 @@ export default function RegisterPage() {
+   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+   const [touched, setTouched] = useState<Record<string, boolean>>({});
+ 
+-  useEffect(() => {
+-    getPackages().then(setPackages);
+-  }, []);
+-
+   const update = (key: keyof Form, value: string) => {
+     setForm((prev) => ({ ...prev, [key]: value }));
+     setFieldErrors((prev) => ({ ...prev, [key]: "" }));
+@@ -149,7 +141,6 @@ export default function RegisterPage() {
+   const step1Valid = Object.keys(step1Errors).length === 0;
+   const step2Valid = Object.keys(step2Errors).length === 0;
+   const step3Valid = Object.keys(step3Errors).length === 0;
+-  const step4Valid = !!form.packageSlug;
+ 
+   const goToStep2 = () => {
+     setFieldErrors(step1Errors);
+@@ -169,14 +160,10 @@ export default function RegisterPage() {
+     if (step3Valid) setStep(4);
+   };
+ 
+-  const goToStep5 = () => {
+-    if (step4Valid) setStep(5);
+-  };
+-
+   const handleRegistration = async () => {
+     // Defensive re-check — never allow submission with an incomplete/invalid form,
+     // even if someone reaches this step some other way.
+-    if (!step1Valid || !step2Valid || !step3Valid || !step4Valid) {
++    if (!step1Valid || !step2Valid || !step3Valid) {
+       setError("Please complete every field correctly before continuing.");
+       return;
+     }
+@@ -222,7 +209,7 @@ export default function RegisterPage() {
+         .insert({
+           name: form.companyName.trim(),
+           location: `${resolvedCity}, ${resolvedCountry}`,
+-          package: form.packageSlug,
++          package: "Free trial",
+           status: "operational",
+           revenue: "0",
+           blueprint_id: blueprint?.id ?? null,
+@@ -263,7 +250,6 @@ export default function RegisterPage() {
+         body: JSON.stringify({
+           orgId,
+           orgName: form.companyName.trim(),
+-          packageSlug: form.packageSlug,
+         }),
+       });
+       if (!finalizeRes.ok) {
+@@ -323,7 +309,7 @@ export default function RegisterPage() {
+       <h1 className="mkt-h3" style={{ fontSize: "1.375rem" }}>Set up Aurevyn</h1>
+ 
+       <div className="mkt-register-steps">
+-        {[1, 2, 3, 4, 5].map((s) => (
++        {[1, 2, 3, 4].map((s) => (
+           <div key={s} className="mkt-register-steps__item">
+             <div className={`mkt-register-steps__bar ${step >= s ? "mkt-register-steps__bar--active" : ""}`} />
+             <span className="mkt-mono mkt-register-steps__label">{STEP_LABELS[s - 1]}</span>
+@@ -573,40 +559,6 @@ export default function RegisterPage() {
+       )}
+ 
+       {step === 4 && (
+-        <div>
+-          <h2 className="mkt-h3" style={{ fontSize: "1rem", marginBottom: 12 }}>Select package</h2>
+-
+-          <div className="mkt-register-packages">
+-            {packages.map((pkg) => (
+-              <div
+-                key={pkg.id}
+-                onClick={() => update("packageSlug", pkg.slug)}
+-                className={`mkt-card mkt-register-package ${form.packageSlug === pkg.slug ? "mkt-register-package--active" : ""}`}
+-              >
+-                <h3 className="mkt-h3" style={{ fontSize: "1rem" }}>{pkg.name}</h3>
+-                <p className="mkt-num" style={{ color: "var(--mkt-brass-light)", fontWeight: 700, marginTop: 6 }}>
+-                  {pkg.price}
+-                </p>
+-                <p style={{ fontSize: "0.8125rem", color: "var(--mkt-paper-faint)", marginTop: 8 }}>
+-                  {pkg.engine_slugs.length} engines included
+-                </p>
+-              </div>
+-            ))}
+-          </div>
+-          {packages.length === 0 && (
+-            <p className="mkt-dim mkt-mono" style={{ fontSize: "0.8125rem" }}>Loading packages…</p>
+-          )}
+-
+-          <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+-            <button onClick={() => setStep(3)} className="mkt-btn mkt-btn--ghost">Back</button>
+-            <button onClick={goToStep5} disabled={!step4Valid} className="mkt-btn mkt-btn--primary" style={{ flex: 1 }}>
+-              Continue
+-            </button>
+-          </div>
+-        </div>
+-      )}
+-
+-      {step === 5 && (
+         <div>
+           <h2 className="mkt-h3" style={{ fontSize: "1.0625rem", color: "var(--mkt-brass-light)" }}>
+             Review & confirm
+@@ -621,17 +573,17 @@ export default function RegisterPage() {
+             <div><span className="mkt-dim">Locations</span><span>{form.branches}</span></div>
+             <div><span className="mkt-dim">Owner</span><span>{form.fullName}</span></div>
+             <div><span className="mkt-dim">Email</span><span>{form.email}</span></div>
+-            <div><span className="mkt-dim">Package</span><span>{packages.find((p) => p.slug === form.packageSlug)?.name}</span></div>
++            <div><span className="mkt-dim">Trial</span><span>Every engine unlocked, free. Pay only for the engines and seats you keep.</span></div>
+           </div>
+ 
+           {error && <div className="mkt-alert-box" style={{ marginTop: 14 }}>{error}</div>}
+ 
+           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+-            <button onClick={() => setStep(4)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
++            <button onClick={() => setStep(3)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
+             <button
+               className="mkt-btn mkt-btn--primary"
+               style={{ flex: 1 }}
+-              disabled={loading || !step1Valid || !step2Valid || !step3Valid || !step4Valid}
++              disabled={loading || !step1Valid || !step2Valid || !step3Valid}
+               onClick={handleRegistration}
+             >
+               {loading ? "Creating organization…" : "Create organization"}
+diff --git a/src/components/SystemHealthSection.tsx b/src/components/SystemHealthSection.tsx
+index d62efe1..8b53a6e 100644
+--- a/src/components/SystemHealthSection.tsx
++++ b/src/components/SystemHealthSection.tsx
+@@ -45,7 +45,6 @@ export default function SystemHealthSection() {
+     { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
+     { name: "Authentication", detail: "Auth service", status: "checking" },
+     { name: "Database", detail: "PostgreSQL", status: "checking" },
+-    { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
+     { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
+     { name: "AI Services", detail: "Claude API", status: "checking" },
+     { name: "Org Module", detail: "Organizations", status: "checking" },
+@@ -68,7 +67,6 @@ export default function SystemHealthSection() {
+       { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
+       { name: "Authentication", detail: "Auth service", status: "checking" },
+       { name: "Database", detail: "PostgreSQL", status: "checking" },
+-      { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
+       { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
+       { name: "AI Services", detail: "Claude API", status: "checking" },
+       { name: "Org Module", detail: "Organizations", status: "checking" },
+@@ -145,7 +143,6 @@ export default function SystemHealthSection() {
+       { name: "Authentication", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/auth/v1/health" },
+       { name: "Storage", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/storage/v1/status" },
+       { name: "AI Services", url: "https://api.anthropic.com" },
+-      { name: "Edge Functions", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/functions/v1/on-new-org", method: "POST" },
+     ];
+ 
+     await Promise.all(httpChecks.map(async ({ name, url, method = "GET" }) => {
+diff --git a/supabase/config.toml b/supabase/config.toml
+deleted file mode 100644
+index 3013074..0000000
+--- a/supabase/config.toml
++++ /dev/null
+@@ -1,33 +0,0 @@
+-
+-[functions.on-new-org]
+-enabled = true
+-verify_jwt = false
+-import_map = "./functions/on-new-org/deno.json"
+-# Uncomment to specify a custom file path to the entrypoint.
+-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+-entrypoint = "./functions/on-new-org/index.ts"
+-# Specifies static files to be bundled with the function. Supports glob patterns.
+-# For example, if you want to serve static HTML pages in your function:
+-# static_files = [ "./functions/on-new-org/*.html" ]
+-
+-[functions.on-overdue-invoice]
+-enabled = true
+-verify_jwt = false
+-import_map = "./functions/on-overdue-invoice/deno.json"
+-# Uncomment to specify a custom file path to the entrypoint.
+-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+-entrypoint = "./functions/on-overdue-invoice/index.ts"
+-# Specifies static files to be bundled with the function. Supports glob patterns.
+-# For example, if you want to serve static HTML pages in your function:
+-# static_files = [ "./functions/on-overdue-invoice/*.html" ]
+-
+-[functions.on-system-alert]
+-enabled = true
+-verify_jwt = false
+-import_map = "./functions/on-system-alert/deno.json"
+-# Uncomment to specify a custom file path to the entrypoint.
+-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+-entrypoint = "./functions/on-system-alert/index.ts"
+-# Specifies static files to be bundled with the function. Supports glob patterns.
+-# For example, if you want to serve static HTML pages in your function:
+-# static_files = [ "./functions/on-system-alert/*.html" ]
+diff --git a/supabase/functions/.vscode/settings.json b/supabase/functions/.vscode/settings.json
+deleted file mode 100644
+index 1535e13..0000000
+--- a/supabase/functions/.vscode/settings.json
++++ /dev/null
+@@ -1,5 +0,0 @@
+-{
+-  "deno.enable": true,
+-  "deno.lint": true,
+-  "deno.unstable": true
+-}
+\ No newline at end of file
+diff --git a/supabase/functions/deno.json b/supabase/functions/deno.json
+deleted file mode 100644
+index 2fb7052..0000000
+--- a/supabase/functions/deno.json
++++ /dev/null
+@@ -1,5 +0,0 @@
+-{
+-  "compilerOptions": {
+-    "lib": ["deno.window"]
+-  }
+-}
+\ No newline at end of file
+diff --git a/supabase/functions/on-new-org/.npmrc b/supabase/functions/on-new-org/.npmrc
+deleted file mode 100644
+index 48c6388..0000000
+--- a/supabase/functions/on-new-org/.npmrc
++++ /dev/null
+@@ -1,3 +0,0 @@
+-# Configuration for private npm package dependencies
+-# For more information on using private registries with Edge Functions, see:
+-# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
+diff --git a/supabase/functions/on-new-org/deno.json b/supabase/functions/on-new-org/deno.json
+deleted file mode 100644
+index db206e8..0000000
+--- a/supabase/functions/on-new-org/deno.json
++++ /dev/null
+@@ -1,6 +0,0 @@
+-{
+-  "imports": {
+-    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+-    "@supabase/server": "npm:@supabase/server@^1"
+-  }
+-}
+diff --git a/supabase/functions/on-new-org/index.ts b/supabase/functions/on-new-org/index.ts
+deleted file mode 100644
+index 1f01448..0000000
+--- a/supabase/functions/on-new-org/index.ts
++++ /dev/null
+@@ -1,50 +0,0 @@
+-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+-
+-Deno.serve(async (req) => {
+-  try {
+-    const body = await req.text();
+-    console.log("Received body:", body);
+-
+-    let record;
+-    try {
+-      const parsed = JSON.parse(body);
+-      record = parsed.record ?? parsed;
+-    } catch {
+-      console.log("Failed to parse body");
+-      return new Response("Bad request", { status: 400 });
+-    }
+-
+-    console.log("Record:", JSON.stringify(record));
+-
+-    const supabase = createClient(
+-      Deno.env.get("SUPABASE_URL") ?? "",
+-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+-    );
+-
+-    const { error: notifError } = await supabase.from("notifications").insert({
+-      type: "new_org",
+-      title: "New Organization Registered",
+-      message: `${record.name ?? "Unknown"} from ${record.location ?? "Unknown"} has joined the platform.`,
+-    });
+-
+-    if (notifError) console.log("Notification error:", notifError.message);
+-
+-    const { error: actError } = await supabase.from("activity").insert({
+-      icon: "🏢",
+-      title: "New organization registered",
+-      sub: record.name ?? "Unknown",
+-    });
+-
+-    if (actError) console.log("Activity error:", actError.message);
+-
+-    return new Response(JSON.stringify({ ok: true }), {
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  } catch (error) {
+-    console.log("Error:", error.message);
+-    return new Response(JSON.stringify({ error: error.message }), {
+-      status: 500,
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  }
+-});
+\ No newline at end of file
+diff --git a/supabase/functions/on-overdue-invoice/.npmrc b/supabase/functions/on-overdue-invoice/.npmrc
+deleted file mode 100644
+index 48c6388..0000000
+--- a/supabase/functions/on-overdue-invoice/.npmrc
++++ /dev/null
+@@ -1,3 +0,0 @@
+-# Configuration for private npm package dependencies
+-# For more information on using private registries with Edge Functions, see:
+-# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
+diff --git a/supabase/functions/on-overdue-invoice/deno.json b/supabase/functions/on-overdue-invoice/deno.json
+deleted file mode 100644
+index db206e8..0000000
+--- a/supabase/functions/on-overdue-invoice/deno.json
++++ /dev/null
+@@ -1,6 +0,0 @@
+-{
+-  "imports": {
+-    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+-    "@supabase/server": "npm:@supabase/server@^1"
+-  }
+-}
+diff --git a/supabase/functions/on-overdue-invoice/index.ts b/supabase/functions/on-overdue-invoice/index.ts
+deleted file mode 100644
+index 12f32e1..0000000
+--- a/supabase/functions/on-overdue-invoice/index.ts
++++ /dev/null
+@@ -1,40 +0,0 @@
+-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+-
+-Deno.serve(async (req) => {
+-  try {
+-    const payload = await req.json();
+-    const record = payload.record;
+-
+-    if (record.status !== "overdue") {
+-      return new Response(JSON.stringify({ skipped: true }), {
+-        headers: { "Content-Type": "application/json" },
+-      });
+-    }
+-
+-    const supabase = createClient(
+-      Deno.env.get("SUPABASE_URL")!,
+-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+-    );
+-
+-    await supabase.from("notifications").insert({
+-      type: "overdue_invoice",
+-      title: "Payment Overdue",
+-      message: `${record.org_name} has an overdue invoice of ${record.amount}.`,
+-    });
+-
+-    await supabase.from("activity").insert({
+-      icon: "⚠",
+-      title: "Invoice overdue",
+-      sub: `${record.amount} from ${record.org_name}`,
+-    });
+-
+-    return new Response(JSON.stringify({ ok: true }), {
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  } catch (error) {
+-    return new Response(JSON.stringify({ error: error.message }), {
+-      status: 500,
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  }
+-});
+\ No newline at end of file
+diff --git a/supabase/functions/on-system-alert/.npmrc b/supabase/functions/on-system-alert/.npmrc
+deleted file mode 100644
+index 48c6388..0000000
+--- a/supabase/functions/on-system-alert/.npmrc
++++ /dev/null
+@@ -1,3 +0,0 @@
+-# Configuration for private npm package dependencies
+-# For more information on using private registries with Edge Functions, see:
+-# https://supabase.com/docs/guides/functions/import-maps#importing-from-private-registries
+diff --git a/supabase/functions/on-system-alert/deno.json b/supabase/functions/on-system-alert/deno.json
+deleted file mode 100644
+index db206e8..0000000
+--- a/supabase/functions/on-system-alert/deno.json
++++ /dev/null
+@@ -1,6 +0,0 @@
+-{
+-  "imports": {
+-    "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
+-    "@supabase/server": "npm:@supabase/server@^1"
+-  }
+-}
+diff --git a/supabase/functions/on-system-alert/index.ts b/supabase/functions/on-system-alert/index.ts
+deleted file mode 100644
+index 9d87591..0000000
+--- a/supabase/functions/on-system-alert/index.ts
++++ /dev/null
+@@ -1,47 +0,0 @@
+-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+-
+-Deno.serve(async (_req) => {
+-  try {
+-    const supabase = createClient(
+-      Deno.env.get("SUPABASE_URL")!,
+-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+-    );
+-
+-    // Check for overdue invoices
+-    const { data: overdueInvoices } = await supabase
+-      .from("invoices")
+-      .select("*")
+-      .eq("status", "overdue");
+-
+-    if (overdueInvoices && overdueInvoices.length > 0) {
+-      await supabase.from("notifications").insert({
+-        type: "system_alert",
+-        title: "Overdue Invoices Alert",
+-        message: `${overdueInvoices.length} invoice${overdueInvoices.length > 1 ? "s are" : " is"} currently overdue.`,
+-      });
+-    }
+-
+-    // Check for critical orgs
+-    const { data: criticalOrgs } = await supabase
+-      .from("organizations")
+-      .select("*")
+-      .eq("status", "critical");
+-
+-    if (criticalOrgs && criticalOrgs.length > 0) {
+-      await supabase.from("notifications").insert({
+-        type: "system_alert",
+-        title: "Critical Organizations",
+-        message: `${criticalOrgs.length} organization${criticalOrgs.length > 1 ? "s require" : " requires"} immediate attention.`,
+-      });
+-    }
+-
+-    return new Response(JSON.stringify({ ok: true }), {
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  } catch (error) {
+-    return new Response(JSON.stringify({ error: error.message }), {
+-      status: 500,
+-      headers: { "Content-Type": "application/json" },
+-    });
+-  }
+-});
+\ No newline at end of file
+-- 
+2.43.0
+

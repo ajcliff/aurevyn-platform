@@ -17,12 +17,15 @@ import { createClient } from "@/lib/supabase";
 import { getOrgSettings, getOrgLogoUrl } from "@/lib/orgSettings";
 import { getMyOrganizations, type MyOrgMembership } from "@/lib/runtime/getMyOrganizations";
 import AskOrgBrain from "@/components/AskOrgBrain";
-import { applyThemeColors, clearCustomThemeColors } from "@/lib/themeColors";
+import { applyThemeColors, applyBuiltinTheme } from "@/lib/themeColors";
 import { getOrgCustomTheme } from "@/lib/orgCustomTheme";
 import { getThemePresets } from "@/lib/themePresets";
 import { useSessionExpiryGuard } from "@/lib/useSessionExpiryGuard";
 import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
 import QuickNotesWidget from "@/components/QuickNotesWidget";
+import TrialCountdownBanner from "@/components/TrialCountdownBanner";
+import PackageSelectionGate from "@/components/PackageSelectionGate";
+import { getTrialInfo } from "@/lib/trial";
 import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
 import { ENGINE_ICONS, NAV_LABELS, SEGMENT_TO_ENGINE, SEGMENT_ICONS, PLATFORM_SEGMENTS } from "@/lib/engineMeta";
 
@@ -57,6 +60,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
   const [notFound, setNotFound] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [trialExpired, setTrialExpired] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -77,6 +81,11 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
       setOrganization(runtime.organization);
       setEngines(runtime.engines);
       setMembership(myMembership);
+      // Trial/plan gate: the founder is never gated
+      if (!myMembership?.isFounder) {
+        const trial = await getTrialInfo(orgId);
+        if (active) setTrialExpired(trial.expired);
+      }
       setLoading(false);
 
       const settings = await getOrgSettings(orgId);
@@ -84,24 +93,15 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
         setLogoUrl(getOrgLogoUrl(settings.logo_path));
 
         if (settings.theme === "custom") {
-          document.documentElement.removeAttribute("data-theme");
           const custom = await getOrgCustomTheme(orgId);
-          if (custom && active) {
-            applyThemeColors(custom);
-            localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: custom }));
-          }
+          if (custom && active) applyThemeColors(custom, orgId);
         } else if (settings.theme_preset_id) {
-          document.documentElement.removeAttribute("data-theme");
           const presets = await getThemePresets();
           const preset = presets.find(p => p.id === settings.theme_preset_id);
-          if (preset && active) {
-            applyThemeColors(preset);
-            localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "colors", colors: preset }));
-          }
+          if (preset && active) applyThemeColors(preset, orgId);
+          else if (active) applyBuiltinTheme("rift-valley", orgId);
         } else {
-          clearCustomThemeColors();
-          document.documentElement.setAttribute("data-theme", settings.theme);
-          localStorage.setItem("aurevyn-active-theme", JSON.stringify({ mode: "builtin", name: settings.theme }));
+          applyBuiltinTheme(settings.theme, orgId);
         }
       }
 
@@ -128,11 +128,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
     }
 
     load();
-    return () => {
-      active = false;
-      document.documentElement.removeAttribute("data-theme");
-      clearCustomThemeColors();
-    };
+    return () => { active = false; };
   }, [orgId]);
 
   if (loading) {
@@ -305,6 +301,21 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);
         />
         <MobileViewOnlyBanner />
         <QuickNotesWidget orgId={orgId} />
+        <TrialCountdownBanner orgId={orgId} />
+        {trialExpired && (
+          canManageTeam(membership) ? (
+            <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "var(--bg-base)", overflowY: "auto" }}>
+              <PackageSelectionGate orgId={orgId} orgName={organization.name} onConfirmed={() => setTrialExpired(false)} />
+            </div>
+          ) : (
+            <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "var(--bg-base)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "var(--text-primary)" }}>
+              <div>
+                <h2 style={{ marginBottom: 8 }}>Trial ended</h2>
+                <p style={{ color: "var(--text-secondary)", maxWidth: 380 }}>Your organization&apos;s free trial has ended. Ask an owner or admin to choose a plan to keep using AUREVYN.</p>
+              </div>
+            </div>
+          )
+        )}
       </PageHeaderProvider>
     </EngineProvider>
   );

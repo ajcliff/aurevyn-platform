@@ -21,7 +21,7 @@ const founderCommands: CommandItem[] = [
   { id: "organizations", label: "Organizations", icon: "🏢", path: "/dashboard/organizations" },
   { id: "company", label: "Company", icon: "🏢", path: "/dashboard/company" },
   { id: "actions", label: "Quick Actions", icon: "✦", path: "/dashboard/actions" },
-  { id: "packages", label: "Packages", icon: "📦", path: "/dashboard/packages" },
+  { id: "licensing", label: "Licensing", icon: "🎟", path: "/dashboard/licensing" },
   { id: "billing", label: "Billing", icon: "💳", path: "/dashboard/billing" },
   { id: "finance", label: "Finance", icon: "💰", path: "/dashboard/finance" },
   { id: "messages", label: "Messages", icon: "✉", path: "/dashboard/messages" },

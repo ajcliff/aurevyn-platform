@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getTrialInfo } from "@/lib/trial";
 
 type Props = {
@@ -11,6 +12,7 @@ export default function TrialCountdownBanner({ orgId }: Props) {
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [inGracePeriod, setInGracePeriod] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     getTrialInfo(orgId).then((info) => {
@@ -28,9 +30,13 @@ export default function TrialCountdownBanner({ orgId }: Props) {
     <div
       style={{
         position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
+        bottom: 16,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "max-content",
+        maxWidth: "calc(100vw - 24px)",
+        borderRadius: 10,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
         zIndex: 9997,
         background: inGracePeriod ? "#dc2626" : "#f5b800",
         color: inGracePeriod ? "#fff" : "#1a1200",
@@ -48,6 +54,12 @@ export default function TrialCountdownBanner({ orgId }: Props) {
           ? `Your trial ended — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left to pick a plan before access pauses.`
           : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left in your free trial.`}
       </span>
+      <button
+        onClick={() => router.push(`/org/${orgId}/engines`)}
+        style={{ background: "rgba(0,0,0,0.18)", border: "none", color: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer", padding: "4px 10px", borderRadius: 6, flexShrink: 0 }}
+      >
+        Choose plan
+      </button>
       <button
         onClick={() => setDismissed(true)}
         style={{

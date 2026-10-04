@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { requireOrgAdmin } from "@/lib/server/guards";
+import { applyDiscounts } from "@/lib/server/offers";
 
 // Trial → paid conversion under the licensing model. Every write here is
 // founder-only at the RLS level (organization_engines, organizations,
@@ -10,6 +12,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 // seats being one of that engine's tier sizes. One user = one seat.
 export async function POST(req: NextRequest) {
   const { orgId, orgName, selections } = await req.json();
+
+  const access = orgId ? await requireOrgAdmin(orgId) : null;
+  if (!access) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
 
   if (!orgId || !Array.isArray(selections) || selections.length === 0) {
     return NextResponse.json({ error: "Pick at least one engine." }, { status: 400 });
@@ -26,6 +31,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Couldn't load engine pricing." }, { status: 500 });
   }
 
+  const { data: freeSeatOffers } = await supabaseAdmin
+    .from("org_offers").select("engine_id, value").eq("org_id", orgId).eq("status", "active").eq("kind", "free_seats");
+  const bonusFor = (engineId: string) =>
+    (freeSeatOffers ?? []).filter((o) => o.engine_id === engineId).reduce((n, o) => n + Number(o.value), 0);
+
   const chosen: { engine: { id: string; name: string; slug: string }; seats: number; price: number }[] = [];
   for (const sel of selections) {
     const engine = engines.find((e) => e.id === sel.engineId);
@@ -40,7 +50,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    chosen.push({ engine, seats: sel.seats, price: Number(tier.price) });
+    const { price: discounted } = await applyDiscounts(orgId, engine.id, Number(tier.price));
+    chosen.push({ engine, seats: sel.seats, price: discounted });
   }
 
   // AI Insights only makes sense on top of another engine
@@ -76,7 +87,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       const { error } = await supabaseAdmin
         .from("organization_engines")
-        .update({ enabled: true, licensed_seats: c.seats, subscription_tier: "licensed" })
+        .update({ enabled: true, licensed_seats: c.seats + bonusFor(c.engine.id), subscription_tier: "licensed" })
         .eq("id", existing.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     } else {
@@ -85,7 +96,7 @@ export async function POST(req: NextRequest) {
         engine_id: c.engine.id,
         engine_slug: c.engine.slug,
         enabled: true,
-        licensed_seats: c.seats,
+        licensed_seats: c.seats + bonusFor(c.engine.id),
         subscription_tier: "licensed",
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });

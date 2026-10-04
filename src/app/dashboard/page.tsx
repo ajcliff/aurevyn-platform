@@ -185,7 +185,7 @@ export default function Home() {
                   <span className={f.vitalValue}>{orgs.length}</span>
                   <span className={f.vitalSub}>{activeOrgs} operational</span>
                 </button>
-                <button className={f.vital} onClick={() => router.push("/dashboard/packages")}>
+                <button className={f.vital} onClick={() => router.push("/dashboard/licensing")}>
                   <span className={f.vitalLabel}>Packages</span>
                   <span className={f.vitalValue}>{packages.length}</span>
                   <span className={f.vitalSub}>{subscriptions} subscriptions</span>

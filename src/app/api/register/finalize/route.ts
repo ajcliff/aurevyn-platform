@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { requireOrgMember } from "@/lib/server/guards";
 
 // organization_engines and notifications are both founder-only tables at the
 // RLS level (a regular org member can read organization_engines but never
@@ -11,6 +12,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 // both here, server-side with the service role, fixes that at the source.
 export async function POST(req: NextRequest) {
   const { orgId, orgName } = await req.json();
+
+  const access = orgId ? await requireOrgMember(orgId) : null;
+  if (!access) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
 
   if (!orgId) {
     return NextResponse.json({ error: "Missing orgId." }, { status: 400 });

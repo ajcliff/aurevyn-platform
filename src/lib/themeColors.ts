@@ -56,45 +56,127 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
 };
 
 function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  const bigint = parseInt(clean, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
+  const [r, g, b] = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function relativeLuminance(hex: string): number {
-  const clean = hex.replace("#", "");
-  const r = parseInt(clean.substring(0, 2), 16) / 255;
-  const g = parseInt(clean.substring(2, 4), 16) / 255;
-  const b = parseInt(clean.substring(4, 6), 16) / 255;
+function hexToRgb(hex: string): [number, number, number] {
+  let clean = hex.replace("#", "");
+  if (clean.length === 3) clean = clean.split("").map(c => c + c).join("");
+  const n = parseInt(clean, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+// WCAG relative luminance (gamma-corrected)
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map(v => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-// Applies a full theme by setting CSS custom properties directly on <html>,
-// including the derived glow/shadow/contrast values the base 16 fields don't cover.
-export function applyThemeColors(colors: ThemeColors) {
-  const root = document.documentElement;
-  for (const [key, value] of Object.entries(colors)) {
-    root.style.setProperty(`--${key.replace(/_/g, "-")}`, value);
-  }
-  root.style.setProperty("--gold-glow", hexToRgba(colors.gold, 0.15));
-  root.style.setProperty("--gold-glow-strong", hexToRgba(colors.gold, 0.3));
-  root.style.setProperty("--gold-contrast", relativeLuminance(colors.gold) > 0.5 ? "#0a0a0f" : "#ffffff");
-  root.style.setProperty("--green-glow", hexToRgba(colors.green, 0.2));
-  root.style.setProperty("--shadow-gold", `0 0 20px ${hexToRgba(colors.gold, 0.15)}`);
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-// Clears any inline overrides so a built-in preset's static CSS block takes over cleanly
+function mix(hex: string, target: string, amount: number): string {
+  const [r1, g1, b1] = hexToRgb(hex);
+  const [r2, g2, b2] = hexToRgb(target);
+  return rgbToHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);
+}
+
+// Nudges `fg` toward white or black (whichever direction the background allows)
+// until it reaches `min` contrast against `bg`.
+function ensureContrast(fg: string, bg: string, min: number): string {
+  if (contrastRatio(fg, bg) >= min) return fg;
+  const target = luminance(bg) < 0.4 ? "#ffffff" : "#000000";
+  for (let step = 1; step <= 20; step++) {
+    const candidate = mix(fg, target, step * 0.05);
+    if (contrastRatio(candidate, bg) >= min) return candidate;
+  }
+  return target;
+}
+
+// Guarantees a theme is usable no matter what colors were picked: text is readable,
+// accent buttons stand out from the page, and borders are visible. Runs on every apply,
+// so a bad preset or custom color can never produce invisible buttons or text.
+export function sanitizeThemeColors(c: ThemeColors): ThemeColors {
+  const out = { ...c };
+  out.text_primary = ensureContrast(out.text_primary, out.bg_base, 7);
+  out.text_secondary = ensureContrast(out.text_secondary, out.bg_card, 4.5);
+  out.text_muted = ensureContrast(out.text_muted, out.bg_card, 3);
+  out.gold = ensureContrast(out.gold, out.bg_base, 3);
+  out.gold_light = ensureContrast(out.gold_light, out.bg_base, 3.5);
+  out.border = ensureContrast(out.border, out.bg_base, 1.25);
+  out.border_light = ensureContrast(out.border_light, out.bg_base, 1.6);
+  out.green = ensureContrast(out.green, out.bg_base, 3);
+  out.amber = ensureContrast(out.amber, out.bg_base, 3);
+  out.red = ensureContrast(out.red, out.bg_base, 3);
+  return out;
+}
+
+// Every CSS variable a theme needs, including derived ones. Single source of truth:
+// this exact map is applied live AND cached, so the pre-paint script reproduces the
+// theme perfectly instead of a half-applied version.
+export function themeToCssVars(input: ThemeColors): Record<string, string> {
+  const colors = sanitizeThemeColors(input);
+  const vars: Record<string, string> = {};
+  for (const [key, value] of Object.entries(colors)) {
+    vars[`--${key.replace(/_/g, "-")}`] = value;
+  }
+  // Text on accent buttons: whichever of dark/light reads better on the accent
+  const darkText = "#0a0a0f";
+  vars["--gold-contrast"] = contrastRatio(colors.gold, darkText) >= contrastRatio(colors.gold, "#ffffff") ? darkText : "#ffffff";
+  vars["--gold-glow"] = hexToRgba(colors.gold, 0.15);
+  vars["--gold-glow-strong"] = hexToRgba(colors.gold, 0.3);
+  vars["--green-glow"] = hexToRgba(colors.green, 0.2);
+  vars["--shadow-gold"] = `0 0 20px ${hexToRgba(colors.gold, 0.15)}`;
+  return vars;
+}
+
+export const THEME_CACHE_KEY = "aurevyn-active-theme";
+
+export type CachedTheme =
+  | { mode: "builtin"; name: string }
+  | { mode: "vars"; vars: Record<string, string> };
+
+// `scope` is an org id for org-space themes, omitted for the founder dashboard,
+// so each space paints its own saved theme before first render.
+export function cacheTheme(theme: CachedTheme, scope?: string) {
+  try { localStorage.setItem(scope ? `${THEME_CACHE_KEY}:${scope}` : THEME_CACHE_KEY, JSON.stringify(theme)); } catch {}
+}
+
+// Applies a full custom theme and persists it so the next page load paints it immediately
+export function applyThemeColors(colors: ThemeColors, scope?: string) {
+  const root = document.documentElement;
+  const vars = themeToCssVars(colors);
+  root.removeAttribute("data-theme");
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+  cacheTheme({ mode: "vars", vars }, scope);
+}
+
+// Applies one of the built-in themes and persists it
+export function applyBuiltinTheme(name: string, scope?: string) {
+  clearCustomThemeColors();
+  document.documentElement.setAttribute("data-theme", name);
+  cacheTheme({ mode: "builtin", name }, scope);
+}
+
+// Clears inline overrides so a built-in theme's static CSS block takes over cleanly
 export function clearCustomThemeColors() {
   const root = document.documentElement;
   for (const field of THEME_COLOR_FIELDS) {
     root.style.removeProperty(`--${field.key.replace(/_/g, "-")}`);
   }
-  root.style.removeProperty("--gold-glow");
-  root.style.removeProperty("--gold-glow-strong");
-  root.style.removeProperty("--gold-contrast");
-  root.style.removeProperty("--green-glow");
-  root.style.removeProperty("--shadow-gold");
+  for (const k of ["--gold-glow", "--gold-glow-strong", "--gold-contrast", "--green-glow", "--shadow-gold"]) {
+    root.style.removeProperty(k);
+  }
 }

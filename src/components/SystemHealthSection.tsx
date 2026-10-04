@@ -45,7 +45,6 @@ export default function SystemHealthSection() {
     { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
     { name: "Authentication", detail: "Auth service", status: "checking" },
     { name: "Database", detail: "PostgreSQL", status: "checking" },
-    { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
     { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
     { name: "AI Services", detail: "Claude API", status: "checking" },
     { name: "Org Module", detail: "Organizations", status: "checking" },
@@ -68,7 +67,6 @@ export default function SystemHealthSection() {
       { name: "Supabase API", detail: "REST & Realtime", status: "checking" },
       { name: "Authentication", detail: "Auth service", status: "checking" },
       { name: "Database", detail: "PostgreSQL", status: "checking" },
-      { name: "Edge Functions", detail: "Serverless functions", status: "checking" },
       { name: "Billing Engine", detail: "Payment hooks", status: "checking" },
       { name: "AI Services", detail: "Claude API", status: "checking" },
       { name: "Org Module", detail: "Organizations", status: "checking" },
@@ -145,7 +143,6 @@ export default function SystemHealthSection() {
       { name: "Authentication", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/auth/v1/health" },
       { name: "Storage", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/storage/v1/status" },
       { name: "AI Services", url: "https://api.anthropic.com" },
-      { name: "Edge Functions", url: "https://liqxfdfouuxvokbpvwpk.supabase.co/functions/v1/on-new-org", method: "POST" },
     ];
 
     await Promise.all(httpChecks.map(async ({ name, url, method = "GET" }) => {
