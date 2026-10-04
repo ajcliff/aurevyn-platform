@@ -275,7 +275,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push(`/org/${orgId}`);
+      router.push(`/org/${orgId}/welcome`);
       router.refresh();
     } catch (err) {
       console.error(err);

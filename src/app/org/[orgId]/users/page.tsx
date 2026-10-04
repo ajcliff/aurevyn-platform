@@ -18,6 +18,10 @@ import {
 } from "@/lib/licensing";
 import EmptyState from "@/components/EmptyState";
 
+const usersGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(200px, 1.4fr) 110px minmax(200px, 1.6fr) 170px", gap: 16, alignItems: "center" };
+const roleBadge: React.CSSProperties = { display: "inline-block", padding: "3px 10px", borderRadius: 14, border: "1px solid var(--border-light)", fontSize: 12, fontWeight: 700 };
+const miniChip: React.CSSProperties = { padding: "2px 8px", borderRadius: 10, fontSize: 11, background: "var(--bg-base)", border: "1px solid var(--border-light)", color: "var(--text-secondary)" };
+
 const ROLES: TeamRole[] = ["admin", "manager", "staff"];
 
 export default function UsersPage() {
@@ -31,6 +35,7 @@ export default function UsersPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showDepts, setShowDepts] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -99,57 +104,72 @@ export default function UsersPage() {
       ) : members.length === 0 ? (
         <EmptyState icon="👥" message="No users yet." />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {members.map((m) => (
-            <div key={m.id} style={{ ...cardStyle, display: "grid", gridTemplateColumns: "1.2fr 1fr auto", gap: 16, alignItems: "start" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{m.full_name || m.email}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{m.email}</div>
-              </div>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--bg-card)" }}>
+          <div style={{ ...usersGrid, padding: "10px 16px", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>
+            <span>User</span><span>Role</span><span>Engine licenses</span><span />
+          </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {overview.map((e) => {
-                  const has = e.licensedUserIds.includes(m.user_id);
-                  return (
-                    <button
-                      key={e.engineId}
-                      onClick={() => toggleLicense(m, e)}
-                      title={has ? "Click to revoke license" : "Click to assign license"}
-                      style={{
-                        padding: "3px 10px",
-                        borderRadius: 14,
-                        fontSize: 11,
-                        cursor: "pointer",
-                        border: "1px solid var(--border)",
-                        background: has ? "var(--gold)" : "transparent",
-                        color: has ? "#07070f" : "var(--text-muted)",
-                        fontWeight: has ? 700 : 400,
-                      }}
-                    >
-                      {e.engineName}
-                    </button>
-                  );
-                })}
-              </div>
+          {members.map((m) => {
+            const name = m.full_name || m.email || "Unknown";
+            const held = overview.filter((e) => e.licensedUserIds.includes(m.user_id));
+            const isOpen = openId === m.id;
+            return (
+              <div key={m.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                <div style={{ ...usersGrid, padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <div aria-hidden="true" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--gold)", color: "var(--gold-contrast)", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                      {m.full_name && <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</div>}
+                    </div>
+                  </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {m.role === "owner" ? (
-                  <span style={{ color: "var(--red, #e5604a)", fontWeight: 700, fontSize: 12 }}>Owner</span>
-                ) : (
-                  <>
-                    <select
-                      value={m.role}
-                      onChange={(e) => handleRoleChange(m, e.target.value as TeamRole)}
-                      style={smallInputStyle}
-                    >
-                      {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <button style={ghostButton} onClick={() => handleRemove(m)}>Remove</button>
-                  </>
+                  <div>
+                    {m.role === "owner" ? (
+                      <span style={{ ...roleBadge, color: "var(--gold)", borderColor: "var(--gold)" }}>Owner</span>
+                    ) : (
+                      <select value={m.role} onChange={(e) => handleRoleChange(m, e.target.value as TeamRole)} style={smallInputStyle} aria-label={`Role for ${name}`}>
+                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{held.length} of {overview.length}</span>
+                    {held.slice(0, 3).map((e) => <span key={e.engineId} style={miniChip}>{e.engineName}</span>)}
+                    {held.length > 3 && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>+{held.length - 3} more</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button style={ghostButton} onClick={() => setOpenId(isOpen ? null : m.id)} aria-expanded={isOpen}>{isOpen ? "Done" : "Manage"}</button>
+                    {m.role !== "owner" && <button style={ghostButton} onClick={() => handleRemove(m)}>Remove</button>}
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <div style={{ padding: "4px 16px 16px 64px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {overview.map((e) => {
+                      const has = e.licensedUserIds.includes(m.user_id);
+                      const full = !has && e.seatsUsed >= e.licensedSeats;
+                      return (
+                        <button
+                          key={e.engineId}
+                          onClick={() => toggleLicense(m, e)}
+                          disabled={full}
+                          title={full ? "No seats left. Buy more on the Engines page." : has ? "Click to revoke license" : "Click to assign license"}
+                          style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12, cursor: full ? "not-allowed" : "pointer", border: "1px solid var(--border-light)", background: has ? "var(--gold)" : "transparent", color: has ? "var(--gold-contrast)" : "var(--text-secondary)", fontWeight: has ? 700 : 500, opacity: full ? 0.5 : 1 }}
+                        >
+                          {has ? "✓ " : ""}{e.engineName}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

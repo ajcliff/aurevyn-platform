@@ -108,31 +108,31 @@ export default function PricelistsPage() {
         <button style={buttonGold} onClick={() => setShowNew(true)}>+ Pricelist</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 2fr" : "1fr", gap: 20 }}>
-        <div className="card" style={cardStyle}>
-          <h3 style={{ marginBottom: 12 }}>Pricelists</h3>
-          {pricelists.map((pl) => (
-            <div
-              key={pl.id}
-              onClick={() => openPricelist(pl)}
-              style={{
-                padding: "10px 8px",
-                borderRadius: 8,
-                cursor: "pointer",
-                background: selected?.id === pl.id ? "var(--bg-elevated)" : "transparent",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{pl.name}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{pl.description || "No description"}</div>
-            </div>
-          ))}
-          {pricelists.length === 0 && (
-            <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 12 }}>
-              No pricelists yet. Create one for Wholesale, VIP, or branch-specific pricing.
-            </div>
-          )}
-        </div>
+      <div style={{ display: "grid", gap: 20 }}>
+        {pricelists.length === 0 ? (
+          <div className="card" style={{ ...cardStyle, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+            No pricelists yet. Create one for Wholesale, VIP, or branch-specific pricing.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+            {pricelists.map((pl) => {
+              const active = selected?.id === pl.id;
+              return (
+                <button
+                  key={pl.id}
+                  onClick={() => openPricelist(pl)}
+                  aria-pressed={active}
+                  className="card"
+                  style={{ ...cardStyle, textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, border: active ? "1px solid var(--gold)" : undefined, color: "var(--text-primary)", fontFamily: "inherit" }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>{pl.name}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>{pl.description || "No description"}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>{active ? "Editing prices ↓" : "Edit prices →"}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {selected && (
           <div className="card" style={cardStyle}>

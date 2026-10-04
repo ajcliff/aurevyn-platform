@@ -183,19 +183,25 @@ export default function FleetPage() {
           <h3>Vehicles</h3>
           <button style={buttonGold} onClick={() => setShowNewVehicle(true)}>+ Vehicle</button>
         </div>
-        {vehicles.map((v) => (
-          <div key={v.id} style={{ ...rowStyle, gridTemplateColumns: "1fr 1fr 1fr 1fr auto" }}>
-            <span>{v.name}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "capitalize" }}>{v.type}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{v.plate_number || "—"}</span>
-            <span style={{ fontSize: 12, color: v.status === "active" ? "#3dd68c" : "var(--text-muted)", textTransform: "capitalize" }}>
-              {v.status}
-            </span>
-            <button style={ghostButtonSm} onClick={() => handleRetireVehicle(v)}>
-              {v.status === "active" ? "Mark Inactive" : "Mark Active"}
-            </button>
-          </div>
-        ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
+          {vehicles.map((v) => (
+            <div key={v.id} style={{ border: "1px solid var(--border-light)", borderRadius: 12, padding: 14, background: "var(--bg-base)", display: "flex", flexDirection: "column", gap: 8, opacity: v.status === "active" ? 1 : 0.65 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{v.name}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: v.status === "active" ? "#3dd68c" : "var(--text-muted)", textTransform: "capitalize" }}>
+                  <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: "currentColor" }} />{v.status}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border-light)", color: "var(--text-secondary)", textTransform: "capitalize" }}>{v.type}</span>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border-light)", color: "var(--text-secondary)", fontFamily: "monospace" }}>{v.plate_number || "No plate"}</span>
+              </div>
+              <button style={{ ...ghostButtonSm, alignSelf: "flex-start" }} onClick={() => handleRetireVehicle(v)}>
+                {v.status === "active" ? "Mark Inactive" : "Mark Active"}
+              </button>
+            </div>
+          ))}
+        </div>
         {vehicles.length === 0 && <EmptyState icon="🚐" message="No vehicles added yet." />}
       </div>
 
@@ -204,27 +210,30 @@ export default function FleetPage() {
           <h3>Active Deliveries</h3>
           <button style={buttonGold} onClick={() => setShowNewDelivery(true)}>+ Delivery</button>
         </div>
-        {activeDeliveries.map((d) => (
-          <div key={d.id} style={{ ...rowStyle, gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto" }}>
-            <span>{d.delivery_number}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{d.customer_name || "—"}</span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              {d.vehicles?.name || "No vehicle"}{d.vehicles?.plate_number ? ` (${d.vehicles.plate_number})` : ""}
-            </span>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{d.employees?.full_name || "No driver"}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: STATUS_COLORS[d.status] }}>
-              {STATUS_LABELS[d.status]}
-            </span>
-            <span style={{ display: "flex", gap: 6 }}>
-              {STATUS_FLOW.indexOf(d.status) < STATUS_FLOW.length - 1 && (
-                <button style={ghostButtonSm} onClick={() => handleAdvanceStatus(d)}>
-                  Mark {STATUS_LABELS[STATUS_FLOW[STATUS_FLOW.indexOf(d.status) + 1]]}
-                </button>
-              )}
-              <button style={ghostButtonSm} onClick={() => handleCancelDelivery(d)}>Cancel</button>
-            </span>
-          </div>
-        ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {activeDeliveries.map((d) => (
+            <div key={d.id} style={{ border: "1px solid var(--border-light)", borderLeft: `4px solid ${STATUS_COLORS[d.status]}`, borderRadius: 12, padding: 14, background: "var(--bg-base)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{d.delivery_number}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLORS[d.status] }}>{STATUS_LABELS[d.status]}</span>
+              </div>
+              <div style={{ fontSize: 13 }}>{d.customer_name || "No customer"}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                🚐 {d.vehicles?.name || "No vehicle"}{d.vehicles?.plate_number ? ` (${d.vehicles.plate_number})` : ""}
+                <br />
+                👤 {d.employees?.full_name || "No driver"}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                {STATUS_FLOW.indexOf(d.status) < STATUS_FLOW.length - 1 && (
+                  <button style={ghostButtonSm} onClick={() => handleAdvanceStatus(d)}>
+                    Mark {STATUS_LABELS[STATUS_FLOW[STATUS_FLOW.indexOf(d.status) + 1]]}
+                  </button>
+                )}
+                <button style={ghostButtonSm} onClick={() => handleCancelDelivery(d)}>Cancel</button>
+              </div>
+            </div>
+          ))}
+        </div>
         {activeDeliveries.length === 0 && <EmptyState icon="🚚" message="No active deliveries." />}
       </div>
 

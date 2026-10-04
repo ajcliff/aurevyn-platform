@@ -175,12 +175,15 @@ export default function WelcomePage() {
     burstConfetti();
     setDismissing(true);
 
-    const supabase = createClient();
-    const updatePromise = supabase.from('organizations').update({ onboarding_completed: true }).eq('id', orgId);
-    const [{ error }] = await Promise.all([updatePromise, new Promise((r) => setTimeout(r, 600))]);
+    const updatePromise = fetch('/api/org/complete-onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    });
+    const [res] = await Promise.all([updatePromise.catch(() => null), new Promise((r) => setTimeout(r, 600))]);
 
-    if (error) {
-      console.error('Failed to mark onboarding_completed:', error);
+    if (!res || !res.ok) {
+      console.error('Failed to mark onboarding_completed');
     }
     router.push(`/org/${orgId}`);
   }

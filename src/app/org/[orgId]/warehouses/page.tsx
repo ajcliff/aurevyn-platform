@@ -150,46 +150,36 @@ export default function WarehousesPage() {
         </div>
       </div>
 
-      <div className="card" style={{ ...cardStyle, marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 12 }}>Warehouses</h3>
-
-        {warehouses.map((w) => (
-          <div
-            key={w.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 1fr 1fr auto",
-              alignItems: "center",
-              padding: "10px 8px",
-              borderBottom: "1px solid var(--border)",
-              gap: 10,
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>
-                {w.name} {w.is_default && <span style={{ color: "var(--gold)", fontSize: 11 }}>(Default)</span>}
+      <h3 style={{ marginBottom: 12 }}>Warehouses</h3>
+      {warehouses.length === 0 ? (
+        <div className="card" style={{ ...cardStyle, marginBottom: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+          No warehouses yet. Add your first location with “+ Warehouse”.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 24 }}>
+          {warehouses.map((w) => (
+            <div key={w.id} className="card" style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 10, border: w.is_default ? "1px solid var(--gold)" : undefined }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{w.name}</div>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: w.status === "active" ? "var(--green)" : "var(--text-muted)", textTransform: "capitalize" }}>
+                  <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: "50%", background: "currentColor" }} />{w.status}
+                </span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{w.address || "No address set"}</div>
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{w.code || "—"}</div>
-            <div style={{ fontSize: 11, color: w.status === "active" ? "var(--green)" : "var(--text-muted)" }}>
-              {w.status}
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {w.is_default && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "var(--gold)", color: "var(--gold-contrast)" }}>DEFAULT</span>}
+                {w.code && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, border: "1px solid var(--border-light)", color: "var(--text-secondary)" }}>{w.code}</span>}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>{w.address || "No address set"}</div>
               {!w.is_default && (
-                <button style={ghostButton} onClick={() => handleSetDefault(w.id)}>
-                  Make Default
-                </button>
-              )}
-              {!w.is_default && (
-                <button style={dangerBtn} onClick={() => handleDeleteWarehouse(w)}>
-                  Delete
-                </button>
+                <div style={{ display: "flex", gap: 6, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                  <button style={ghostButton} onClick={() => handleSetDefault(w.id)}>Make Default</button>
+                  <button style={dangerBtn} onClick={() => handleDeleteWarehouse(w)}>Delete</button>
+                </div>
               )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="card" style={cardStyle}>
         <h3 style={{ marginBottom: 12 }}>Recent Transfers</h3>

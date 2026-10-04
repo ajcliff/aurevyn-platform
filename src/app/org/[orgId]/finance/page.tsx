@@ -351,46 +351,25 @@ async function load() {
 
   return (
     <div style={{ overflowY: "auto", height: "100%" }}>
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Finance</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-            Accounts, transactions, and cash position for {organization.name}.
-          </p>
-        </div>
-      <div style={{ display: "flex", gap: 10 }}>
-          <a href={`/org/${organization.id}/finance/invoices`} style={ghostButton}>
-            View Invoices →
-          </a>
-          <a href={`/org/${organization.id}/finance/chart-of-accounts`} style={ghostButton}>
-            Chart of Accounts →
-          </a>
-          <a href={`/org/${organization.id}/finance/reports/profit-loss`} style={ghostButton}>
-            Profit & Loss →
-          </a>
-          <a href={`/org/${organization.id}/finance/reports/balance-sheet`} style={ghostButton}>
-            Balance Sheet →
-          </a>
-          <a href={`/org/${organization.id}/finance/cheques`} style={ghostButton}>
-            Pending Cheques →
-          </a>
-          <a href={`/org/${organization.id}/finance/creditors`} style={ghostButton}>
-            Creditors →
-          </a>
-          <a href={`/org/${organization.id}/finance/reports/vat`} style={ghostButton}>
-            VAT Summary →
-          </a>
-          <a href={`/org/${organization.id}/finance/statutory`} style={ghostButton}>
-            Statutory Remittance →
-          </a>
-          <a href={`/org/${organization.id}/finance/unattributed`} style={ghostButton}>
-            Unattributed Cash →
-          </a>
-          <a href={`/org/${organization.id}/finance/trial-balance`} style={ghostButton}>
-            Trial Balance →
-          </a>
-        </div>
+<div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Finance</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+          Accounts, transactions, and cash position for {organization.name}.
+        </p>
       </div>
+
+      <nav aria-label="Finance sections" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14, padding: 16, marginBottom: 20, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+        {FINANCE_LINKS.map((group) => (
+          <div key={group.label}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {group.items.map((l) => (
+                <a key={l.path} href={`/org/${organization.id}/finance/${l.path}`} style={linkChip}>{l.label}</a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
         <div className="card" style={cardStyle}>
@@ -767,6 +746,28 @@ const iconBtn: React.CSSProperties = {
   fontSize: 11,
   cursor: "pointer",
   color: "var(--text-secondary)",
+};
+
+const FINANCE_LINKS = [
+  { label: "Sales", items: [{ label: "Invoices", path: "invoices" }] },
+  { label: "Reports", items: [
+    { label: "Profit & Loss", path: "reports/profit-loss" },
+    { label: "Balance Sheet", path: "reports/balance-sheet" },
+    { label: "Trial Balance", path: "trial-balance" },
+    { label: "VAT Summary", path: "reports/vat" },
+  ] },
+  { label: "Money", items: [
+    { label: "Chart of Accounts", path: "chart-of-accounts" },
+    { label: "Pending Cheques", path: "cheques" },
+    { label: "Creditors", path: "creditors" },
+    { label: "Unattributed Cash", path: "unattributed" },
+  ] },
+  { label: "Payroll & tax", items: [{ label: "Statutory Remittance", path: "statutory" }] },
+];
+
+const linkChip: React.CSSProperties = {
+  display: "inline-block", padding: "5px 10px", fontSize: 12, fontWeight: 600, textDecoration: "none",
+  color: "var(--text-primary)", background: "var(--bg-base)", border: "1px solid var(--border-light)", borderRadius: 8, whiteSpace: "nowrap",
 };
 
 const ghostButton: React.CSSProperties = {

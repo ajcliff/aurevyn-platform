@@ -983,7 +983,7 @@ const { header } = usePageHeader();
           </div>
         </div>
 
-        <div style={{ flex: 1, overflow: "hidden", padding: "0 20px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 20px 20px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           {children}
         </div>
       </main>
