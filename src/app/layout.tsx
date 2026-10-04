@@ -1,16 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import PwaManager from "@/components/PwaManager";
 
-const inter = Inter({
-  subsets: ["latin"],
+// Fonts are bundled in src/fonts so builds and the installed app never depend on Google's servers
+const inter = localFont({
+  src: "../fonts/inter-latin-wght-normal.woff2",
+  weight: "100 900",
   variable: "--font-inter",
+  display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
+const spaceGrotesk = localFont({
+  src: "../fonts/space-grotesk-latin-wght-normal.woff2",
+  weight: "300 700",
   variable: "--font-heading",
+  display: "swap",
 });
 
 export const viewport: Viewport = {
