@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/#engines", label: "Engines" },
   { href: "/#industries", label: "Industries" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/download", label: "Download" },
 ];
 
 export default function MarketingNav() {

@@ -1,0 +1,30 @@
+name: Desktop release
+
+# Push a tag like  desktop-v1.0.0  to build the Windows installer and publish it
+# to the public aurevyn-releases repo (where the website download button and
+# in-app auto-update read from).
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: npm version ($env:GITHUB_REF_NAME -replace '^desktop-v','') --no-git-tag-version
+      - name: Build and publish installer
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}

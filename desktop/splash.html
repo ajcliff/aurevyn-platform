@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>AUREVYN</title>
+<style>
+  html,body{margin:0;height:100%;background:#1A0F14;color:#F3E9ED;font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;-webkit-app-region:drag}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    background:radial-gradient(ellipse at 50% 40%,#2a1822 0%,#1A0F14 65%)}
+  .stage{position:relative;width:110px;height:110px;display:grid;place-items:center}
+  .glow{position:absolute;inset:12px;border-radius:50%;background:#C9A227;filter:blur(30px);opacity:.35;animation:b 2.4s ease-in-out infinite}
+  .orbit{position:absolute;inset:4px;animation:s 2.2s linear infinite}
+  .dot{position:absolute;top:-4px;left:calc(50% - 5px);width:10px;height:10px;border-radius:50%;background:#E6C65A;box-shadow:0 0 12px #C9A227}
+  .core{position:relative;width:56px;height:56px;border-radius:16px;background:#C9A227;color:#1A0F14;display:grid;place-items:center;font-weight:800;font-size:28px;animation:u 2.4s ease-in-out infinite}
+  .brand{font-weight:800;letter-spacing:.32em;text-indent:.32em;font-size:12px}
+  .bar{width:150px;height:3px;border-radius:3px;background:#3D2530;overflow:hidden}
+  .bar span{display:block;height:100%;width:40%;background:linear-gradient(90deg,transparent,#C9A227,transparent);animation:l 1.3s ease-in-out infinite}
+  @keyframes s{to{transform:rotate(360deg)}}@keyframes b{0%,100%{transform:scale(.85);opacity:.22}50%{transform:scale(1.15);opacity:.45}}
+  @keyframes u{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-4px) rotate(3deg)}}
+  @keyframes l{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+</style></head>
+<body>
+  <div class="stage"><span class="glow"></span><span class="orbit"><span class="dot"></span></span><span class="core">A</span></div>
+  <div class="brand">AUREVYN</div>
+  <div class="bar"><span></span></div>
+</body></html>

@@ -43,3 +43,7 @@ next-env.d.ts
 supabase/.temp/
 *.zip
 *.patch
+
+# desktop app
+/desktop/node_modules
+/desktop/dist

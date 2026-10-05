@@ -1,0 +1,79 @@
+{
+  "name": "aurevyn-desktop",
+  "version": "1.0.0",
+  "description": "AUREVYN desktop app",
+  "main": "main.js",
+  "author": "AUREVYN",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.aurevyn.desktop",
+    "productName": "AUREVYN",
+    "copyright": "AUREVYN",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "config.json",
+      "splash.html",
+      "offline.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AUREVYN",
+      "license": "build/license.txt",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "AUREVYN-Setup.exe"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ajcliff",
+        "repo": "aurevyn-releases",
+        "releaseType": "release"
+      }
+    ],
+    "electronLanguages": [
+      "en-US",
+      "en-GB",
+      "sw"
+    ],
+    "compression": "maximum"
+  }
+}

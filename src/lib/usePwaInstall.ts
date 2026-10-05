@@ -16,6 +16,8 @@ if (typeof window !== "undefined") {
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
+  // Inside the desktop app there is nothing to install
+  if (navigator.userAgent.includes("AurevynDesktop")) return true;
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 

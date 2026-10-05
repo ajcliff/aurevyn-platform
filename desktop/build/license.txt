@@ -1,0 +1,7 @@
+AUREVYN END USER LICENSE AGREEMENT
+
+By installing AUREVYN you agree to the AUREVYN Terms of Service and Privacy Policy, available on the AUREVYN website, which govern your use of the software and the AUREVYN service.
+
+This application is a desktop shell for the hosted AUREVYN service. It requires an AUREVYN account and an internet connection. The software is provided "as is". AUREVYN may update the application automatically to deliver fixes and improvements.
+
+You may not copy, resell, reverse engineer or redistribute the application except as permitted by law.
