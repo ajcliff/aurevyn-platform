@@ -16,6 +16,7 @@ import {
   type Broadcast,
 } from "@/lib/employeeHub";
 import EmptyState from "@/components/EmptyState";
+import SharedWithMe from "@/components/SharedWithMe";
 import { formatError } from "@/lib/errorFormat";
 
 const LEAVE_TYPES = ["annual", "sick", "unpaid"];
@@ -257,6 +258,8 @@ export default function MyProfilePage() {
           </div>
         )}
       </div>
+
+      <SharedWithMe orgId={organization.id} />
 
       {/* Broadcasts */}
       <div className="card" style={{ ...cardStyle, marginTop: 14 }}>

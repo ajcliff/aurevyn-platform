@@ -430,7 +430,7 @@ export default function FinancePage() {
                 <button key={type} onClick={() => setNewTx(p => ({ ...p, type: type as "income" | "expense" }))}
                   style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "12px", fontWeight: 600, textTransform: "capitalize",
                     background: newTx.type === type ? (type === "income" ? "#3dd68c" : "#ef4444") : "var(--bg-elevated)",
-                    color: newTx.type === type ? "#07070f" : "var(--text-muted)",
+                    color: newTx.type === type ? "var(--gold-contrast)" : "var(--text-muted)",
                   }}>{type}</button>
               ))}
             </div>

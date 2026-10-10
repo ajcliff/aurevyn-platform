@@ -266,7 +266,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
         borderRadius: 8,
         border: "1px solid var(--border)",
         background: active ? "var(--gold)" : "var(--bg-elevated)",
-        color: active ? "#07070f" : "var(--text-secondary)",
+        color: active ? "var(--gold-contrast)" : "var(--text-secondary)",
         fontSize: 11,
         fontWeight: active ? 700 : 500,
         cursor: "pointer",
@@ -297,7 +297,7 @@ const inputStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "9px 18px",

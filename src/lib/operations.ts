@@ -27,6 +27,8 @@ export type OpsProject = {
   start_date: string | null;
   due_date: string | null;
   created_at: string;
+  visibility?: "org" | "restricted";
+  created_by?: string | null;
 };
 
 export type OpsTask = {

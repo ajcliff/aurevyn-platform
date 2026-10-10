@@ -28,6 +28,8 @@ import TrialCountdownBanner from "@/components/TrialCountdownBanner";
 import PackageSelectionGate from "@/components/PackageSelectionGate";
 import { getTrialInfo } from "@/lib/trial";
 import { canManageTeam, canManageOrgSettings } from "@/lib/permissions";
+import { countUnreadForOrg } from "@/lib/mail";
+import { useOrgErrorCapture } from "@/lib/useOrgErrorCapture";
 import { ENGINE_ICONS, NAV_LABELS, SEGMENT_TO_ENGINE, SEGMENT_ICONS, PLATFORM_SEGMENTS } from "@/lib/engineMeta";
 
 const MOBILE_BREAKPOINT = 900;
@@ -62,6 +64,7 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [trialExpired, setTrialExpired] = useState(false);
+  useOrgErrorCapture(orgId);
 
   useEffect(() => {
     let active = true;
@@ -273,6 +276,7 @@ const canManageOrgSettingsAccess = canManageOrgSettings(membership);
         path: `/org/${orgId}/${seg}`,
       })),
     { id: "me", label: "Self Service", icon: "👤", path: `/org/${orgId}/me` },
+    { id: "mail", label: "Mail", icon: "📬", path: `/org/${orgId}/mail` },
     ...(canManageTeamAccess ? [{ id: "users", label: "Users", icon: "🧑‍🤝‍🧑", path: `/org/${orgId}/users` }, { id: "billing", label: "Billing", icon: "🧾", path: `/org/${orgId}/billing` }] : []),
   ];
 
@@ -353,6 +357,15 @@ function OrgShell({
 const canManageTeamAccess = canManageTeam(membership);
 const canManageOrgSettingsAccess = canManageOrgSettings(membership);
 const { header } = usePageHeader();  
+  const [unreadMail, setUnreadMail] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => countUnreadForOrg(orgId).then((n) => { if (active) setUnreadMail(n); }).catch(() => {});
+    refresh();
+    const t = setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30000);
+    return () => { active = false; clearInterval(t); };
+  }, [orgId, pathname]);
 
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -693,6 +706,14 @@ const { header } = usePageHeader();
             active={pathname.startsWith(`/org/${orgId}/me`)}
             showLabel={showLabels}
           />
+          <SidebarLink
+            href={`/org/${orgId}/mail`}
+            label="Mail"
+            icon="📬"
+            active={pathname.startsWith(`/org/${orgId}/mail`)}
+            showLabel={showLabels}
+            badge={unreadMail}
+          />
           {canManageTeamAccess && (
             <SidebarLink
               href={`/org/${orgId}/users`}
@@ -1007,6 +1028,7 @@ function SidebarLink({
   active,
   showLabel,
   indent,
+  badge,
 }: {
   href: string;
   label: string;
@@ -1014,6 +1036,7 @@ function SidebarLink({
   active: boolean;
   showLabel: boolean;
   indent?: boolean;
+  badge?: number;
 }) {
   return (
     <Link
@@ -1035,7 +1058,15 @@ function SidebarLink({
       }}
     >
       <span>{icon}</span>
-      {showLabel && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>}
+      {showLabel && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{label}</span>}
+      {!!badge && badge > 0 && (
+        <span
+          aria-label={`${badge} unread`}
+          style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", background: active ? "var(--gold-contrast)" : "var(--gold)", color: active ? "var(--gold)" : "var(--gold-contrast)" }}
+        >
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </Link>
   );
 }

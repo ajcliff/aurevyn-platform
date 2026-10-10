@@ -182,7 +182,7 @@ const smallInputStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "7px 14px",

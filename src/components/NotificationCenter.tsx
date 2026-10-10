@@ -97,7 +97,7 @@ export default function NotificationCenter({ onClose }: { onClose: () => void })
             {unread > 0 && (
               <span style={{
                 background: "var(--gold)",
-                color: "#07070f",
+                color: "var(--gold-contrast)",
                 fontSize: "10px",
                 fontWeight: 700,
                 padding: "2px 7px",

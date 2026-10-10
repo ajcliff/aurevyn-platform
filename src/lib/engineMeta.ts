@@ -45,6 +45,7 @@ export const PLATFORM_SEGMENTS = new Set([
   "team",
   "engines",
   "billing",
+  "mail",
   "welcome",
   "summary",
 ]);
@@ -73,6 +74,7 @@ export const NAV_LABELS: Record<string, string> = {
   fleet: "Fleet & Delivery",
   automation: "Automation",
   me: "Self Service",
+  mail: "Mail",
   users: "Users",
   team: "Users",
   engines: "Engines",

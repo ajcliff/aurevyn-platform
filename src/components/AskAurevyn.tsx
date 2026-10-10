@@ -223,7 +223,7 @@ const data = await response.json();
           <button onClick={() => send(input)} disabled={loading || !dataLoaded} style={{
             width: "36px", height: "36px", borderRadius: "10px", border: "none",
             background: loading || !dataLoaded ? "var(--bg-elevated)" : "var(--gold)",
-            color: loading || !dataLoaded ? "var(--text-muted)" : "#07070f",
+            color: loading || !dataLoaded ? "var(--text-muted)" : "var(--gold-contrast)",
             fontSize: "14px", cursor: loading || !dataLoaded ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>➤</button>

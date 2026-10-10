@@ -31,6 +31,7 @@ export default function BillingPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [seats, setSeats] = useState(0);
+  const [unlimitedEngines, setUnlimitedEngines] = useState(0);
   const [tab, setTab] = useState<"invoices" | "documents">("invoices");
   const [docFilter, setDocFilter] = useState("all");
   const [showPay, setShowPay] = useState(false);
@@ -52,7 +53,12 @@ export default function BillingPage() {
     getOrganizations().then(setOrgs);
     const supabase = createClient();
     supabase.from("organization_engines").select("licensed_seats").eq("enabled", true)
-      .then(({ data }) => setSeats((data ?? []).reduce((n, r) => n + (r.licensed_seats ?? 0), 0)));
+      .then(({ data }) => {
+        const rows = data ?? [];
+        // 999,999 means "Unlimited": count those separately instead of adding them up
+        setSeats(rows.filter(r => (r.licensed_seats ?? 0) < 999999).reduce((n, r) => n + (r.licensed_seats ?? 0), 0));
+        setUnlimitedEngines(rows.filter(r => (r.licensed_seats ?? 0) >= 999999).length);
+      });
     const channel = supabase.channel("invoices-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, () => {
         getInvoices().then(setInvoices);
@@ -159,7 +165,7 @@ export default function BillingPage() {
             <div className={`${f.vital} ${f.vitalStatic}`}>
               <span className={f.vitalLabel}>Licensed seats</span>
               <span className={f.vitalValue}>{seats.toLocaleString("en-KE")}</span>
-              <span className={f.vitalSub}>across all organizations</span>
+              <span className={f.vitalSub}>{unlimitedEngines > 0 ? `+ ${unlimitedEngines} unlimited engine licence${unlimitedEngines === 1 ? "" : "s"}` : "across all organizations"}</span>
             </div>
             <div className={`${f.vital} ${f.vitalStatic}`}>
               <span className={f.vitalLabel}>Collected</span>

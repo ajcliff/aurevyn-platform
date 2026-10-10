@@ -265,7 +265,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
         borderRadius: 8,
         border: "1px solid var(--border)",
         background: active ? "var(--gold)" : "var(--bg-elevated)",
-        color: active ? "#07070f" : "var(--text-secondary)",
+        color: active ? "var(--gold-contrast)" : "var(--text-secondary)",
         fontSize: 11,
         fontWeight: active ? 700 : 500,
         cursor: "pointer",

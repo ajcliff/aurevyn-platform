@@ -334,7 +334,7 @@ function CreateUserModal({
                   opacity: full ? 0.4 : 1,
                   border: "1px solid var(--border)",
                   background: picked ? "var(--gold)" : "transparent",
-                  color: picked ? "#07070f" : "var(--text-secondary)",
+                  color: picked ? "var(--gold-contrast)" : "var(--text-secondary)",
                 }}
               >
                 {e.engineName} ({e.licensedSeats - e.seatsUsed} left)
@@ -439,7 +439,7 @@ function DepartmentsModal({
                           cursor: "pointer",
                           border: "1px solid var(--border)",
                           background: editEngineIds.has(e.engineId) ? "var(--gold)" : "transparent",
-                          color: editEngineIds.has(e.engineId) ? "#07070f" : "var(--text-muted)",
+                          color: editEngineIds.has(e.engineId) ? "var(--gold-contrast)" : "var(--text-muted)",
                         }}
                       >
                         {e.engineName}
@@ -463,7 +463,7 @@ const cardStyle: React.CSSProperties = { background: "var(--bg-card)", border: "
 const labelSmall: React.CSSProperties = { fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 4, marginTop: 10 };
 const fullInput: React.CSSProperties = { width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-base)", color: "var(--text-primary)", fontSize: 13, marginBottom: 4 };
 const smallInputStyle: React.CSSProperties = { padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-base)", color: "var(--text-primary)", fontSize: 12 };
-const buttonGold: React.CSSProperties = { background: "var(--gold)", color: "#07070f", border: "none", borderRadius: 10, padding: "8px 16px", fontWeight: 700, fontSize: 12, cursor: "pointer" };
+const buttonGold: React.CSSProperties = { background: "var(--gold)", color: "var(--gold-contrast)", border: "none", borderRadius: 10, padding: "8px 16px", fontWeight: 700, fontSize: 12, cursor: "pointer" };
 const ghostButton: React.CSSProperties = { padding: "7px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer" };
 const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 };
 const modalStyle: React.CSSProperties = { width: 480, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, maxHeight: "85vh", overflowY: "auto" };

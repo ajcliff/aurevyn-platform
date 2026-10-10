@@ -210,7 +210,7 @@ export default function AskOrgBrain({
               borderRadius: "10px",
               border: "none",
               background: loading || !dataLoaded ? "var(--bg-elevated)" : "var(--gold)",
-              color: loading || !dataLoaded ? "var(--text-muted)" : "#07070f",
+              color: loading || !dataLoaded ? "var(--text-muted)" : "var(--gold-contrast)",
               cursor: loading || !dataLoaded ? "not-allowed" : "pointer",
             }}
           >

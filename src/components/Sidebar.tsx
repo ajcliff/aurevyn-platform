@@ -38,7 +38,8 @@ const navGroups: NavGroup[] = [
   {
     label: "System",
     items: [
-      { id: "messages", label: "Messages", path: "/dashboard/messages" },
+      { id: "mail", label: "Mail", path: "/dashboard/mail" },
+      { id: "messages", label: "Contact form", path: "/dashboard/messages" },
       { id: "error-logs", label: "Error logs", path: "/dashboard/error-logs" },
       { id: "control", label: "Control center", path: "/dashboard/control" },
       { id: "settings", label: "Settings", path: "/dashboard/settings" },

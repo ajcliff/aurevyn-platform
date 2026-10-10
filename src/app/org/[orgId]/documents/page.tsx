@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ShareDialog from "@/components/ShareDialog";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import {
   getDocuments,
@@ -26,6 +27,7 @@ const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 export default function DocumentsPage() {
   const { organization, membership } = useEngine();
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [view, setView] = useState<"active" | "archived">("active");
@@ -183,7 +185,7 @@ export default function DocumentsPage() {
         {filtered.map((doc) => (
           <div key={doc.id} className="card" style={cardStyle}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
-            <div style={{ fontWeight: 600, fontSize: 13, wordBreak: "break-word" }}>{doc.name}</div>
+            <div style={{ fontWeight: 600, fontSize: 13, wordBreak: "break-word" }}>{doc.visibility === "restricted" ? "🔒 " : ""}{doc.name}</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
               {CATEGORY_LABELS[doc.category]} · {formatSize(doc.file_size)}
             </div>
@@ -210,6 +212,9 @@ export default function DocumentsPage() {
               >
                 View
               </button>
+              {view === "active" && (
+                <button onClick={() => setSharingId(doc.id)} style={{ ...ghostButton, textAlign: "center" }}>Share</button>
+              )}
               {view === "active" ? (
                 <button style={dangerBtn} onClick={() => handleRequestDeletion(doc)}>
                   Request deletion
@@ -231,6 +236,15 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+      {sharingId && (
+        <ShareDialog
+          orgId={organization.id}
+          type="document"
+          id={sharingId}
+          onClose={() => setSharingId(null)}
+          onChanged={(v) => setDocuments((prev) => prev.map((d) => (d.id === sharingId ? { ...d, visibility: v } : d)))}
+        />
+      )}
     </div>
   );
 }
@@ -244,7 +258,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
         borderRadius: 8,
         border: "1px solid var(--border)",
         background: active ? "var(--gold)" : "var(--bg-elevated)",
-        color: active ? "#07070f" : "var(--text-secondary)",
+        color: active ? "var(--gold-contrast)" : "var(--text-secondary)",
         fontSize: 11,
         fontWeight: active ? 700 : 500,
         cursor: "pointer",
@@ -273,7 +287,7 @@ const selectStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "9px 18px",

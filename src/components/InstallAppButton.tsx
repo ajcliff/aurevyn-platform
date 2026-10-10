@@ -1,43 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { usePwaInstall } from "@/lib/usePwaInstall";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
+// Points to the real desktop installer (/download). Hidden inside the desktop app itself.
 // "menu" matches the founder top-bar dropdown; "sidebar" matches the org sidebar footer
 export default function InstallAppButton({ variant, showLabel = true, menuClassName }: { variant: "menu" | "sidebar"; showLabel?: boolean; menuClassName?: string }) {
-  const { installed, canPrompt, showIosHint, promptInstall } = usePwaInstall();
-  const [hint, setHint] = useState(false);
-
-  if (installed || (!canPrompt && !showIosHint)) return null;
-
-  const onClick = () => (canPrompt ? promptInstall() : setHint((h) => !h));
-
-  const iosHint = hint && (
-    <div role="note" style={{ fontSize: 11, lineHeight: 1.4, color: "var(--text-secondary)", padding: "6px 8px" }}>
-      Tap the Share button in Safari, then &quot;Add to Home Screen&quot;.
-    </div>
-  );
+  const [inDesktopApp, setInDesktopApp] = useState(true); // hidden until we know, to avoid a flash
+  useEffect(() => { setInDesktopApp(navigator.userAgent.includes("AurevynDesktop")); }, []);
+  if (inDesktopApp) return null;
 
   if (variant === "menu") {
-    return (
-      <>
-        <button className={menuClassName} role="menuitem" onClick={onClick}>⬇ Install app</button>
-        {iosHint}
-      </>
-    );
+    return <Link className={menuClassName} role="menuitem" href="/download">⬇ Get the desktop app</Link>;
   }
-
   return (
-    <>
-      <button
-        onClick={onClick}
-        title="Install AUREVYN as an app"
-        style={{ width: "100%", marginTop: 6, padding: "8px 8px", background: "transparent", border: "1px solid var(--gold)", borderRadius: 8, color: "var(--gold)", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: showLabel ? "flex-start" : "center", gap: 8 }}
-      >
-        <span>⬇</span>
-        {showLabel && <span>Install app</span>}
-      </button>
-      {iosHint}
-    </>
+    <Link
+      href="/download"
+      title="Download the AUREVYN desktop app for Windows"
+      style={{ width: "100%", marginTop: 6, padding: "8px 8px", background: "transparent", border: "1px solid var(--gold)", borderRadius: 8, color: "var(--gold)", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: showLabel ? "flex-start" : "center", gap: 8, boxSizing: "border-box" }}
+    >
+      <span>⬇</span>
+      {showLabel && <span>Desktop app</span>}
+    </Link>
   );
 }

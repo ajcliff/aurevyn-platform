@@ -14,6 +14,8 @@ export type ApprovalRequest = {
   description: string | null;
   amount: number | null;
   status: ApprovalStatus;
+  approvers_notified_at?: string | null;
+  requester_notified_at?: string | null;
   decided_by_name: string | null;
   decided_at: string | null;
   source: string;
@@ -77,6 +79,12 @@ export async function createApprovalRequest(input: {
 
   if (error) throw error;
 
+  // Email the approvers so this doesn't wait for someone to log in (no-op until email is set up)
+  fetch("/api/org/approvals/notify", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId: input.orgId, requestId: data.id, event: "created" }),
+  }).catch(() => {});
+
   await logActivity({
     icon: "📝",
     title: `${input.type[0].toUpperCase()}${input.type.slice(1)} request submitted`,
@@ -105,6 +113,11 @@ export async function decideApprovalRequest(
     .eq("id", id);
 
   if (error) throw error;
+
+  fetch("/api/org/approvals/notify", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId, requestId: id, event: "decided" }),
+  }).catch(() => {});
 
   await logActivity({
     icon: status === "approved" ? "✅" : "❌",

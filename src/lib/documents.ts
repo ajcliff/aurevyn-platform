@@ -14,6 +14,8 @@ export type Document = {
   file_size: number | null;
   uploaded_by_name: string | null;
   status: DocumentStatus;
+  visibility?: "org" | "restricted";
+  created_by?: string | null;
   archived_at: string | null;
   archive_expires_at: string | null;
   created_at: string;

@@ -23,14 +23,17 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// Hidden from search engines unless ALLOW_INDEXING=true is set on the host.
+// Staging and previews stay unlisted by default; set it to "true" on production at launch.
+const allowIndexing = process.env.ALLOW_INDEXING === "true";
+
 export const metadata: Metadata = {
-  title: "AUREVYN — The POS System for Africa",
-  description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
+  robots: allowIndexing ? { index: true, follow: true } : { index: false, follow: false },
+  title: "AUREVYN — The POS System for Africa",  description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",
   icons: {
     icon: "/icon.png",
     apple: "/apple-touch-icon.png",
   },
-  appleWebApp: { capable: true, title: "AUREVYN", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "AUREVYN — The POS System for Africa",
     description: "Not an ERP. A POS that runs your whole business — sell, track stock, and see your cash, free for 30 days.",

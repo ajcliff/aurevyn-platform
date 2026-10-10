@@ -109,7 +109,7 @@ export default function UnattributedCashPage() {
                 disabled={!selected[l.lineId] || savingId === l.lineId}
                 style={{
                   background: "var(--gold)",
-                  color: "#07070f",
+                  color: "var(--gold-contrast)",
                   border: "none",
                   borderRadius: 8,
                   padding: "6px 12px",

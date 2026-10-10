@@ -132,7 +132,7 @@ const selectStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "9px 18px",

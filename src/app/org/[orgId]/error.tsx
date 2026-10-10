@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { logError } from "@/lib/errorLog";
 import { formatError } from "@/lib/errorFormat";
 
 export default function OrgError({
@@ -11,7 +13,31 @@ export default function OrgError({
   reset: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [report, setReport] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const params = useParams<{ orgId: string }>();
+  const orgId = params?.orgId ?? null;
+  const logged = useRef(false);
   const message = formatError(error);
+
+  // Page crashes always reach the founder's Error Logs, with this org attached
+  useEffect(() => {
+    if (logged.current) return;
+    logged.current = true;
+    logError({ source: "org/page-crash", message, code: error.digest ?? null, orgId, context: { url: window.location.pathname }, severity: "critical" });
+  }, [message, error.digest, orgId]);
+
+  async function sendReport() {
+    if (!orgId) return;
+    setReport("sending");
+    try {
+      const body = [`Page crashed: ${message}`, error.digest ? `Digest: ${error.digest}` : null, `Page: ${window.location.pathname}`, `Time: ${new Date().toLocaleString()}`].filter(Boolean).join("\n");
+      const res = await fetch("/api/org/mail", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, action: "send", kind: "support", category: "error", subject: "Problem report: page crashed", body }),
+      });
+      setReport(res.ok ? "sent" : "failed");
+    } catch { setReport("failed"); }
+  }
 
   useEffect(() => {
     // Still log to the browser console for anyone who does have dev tools open —
@@ -108,10 +134,19 @@ export default function OrgError({
           >
             {copied ? "Copied ✓" : "Copy error details"}
           </button>
+          {orgId && (
+            <button
+              onClick={sendReport}
+              disabled={report === "sending" || report === "sent"}
+              style={{ background: "transparent", color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: 12, cursor: report === "sent" ? "default" : "pointer" }}
+            >
+              {report === "sent" ? "Sent to support ✓" : report === "sending" ? "Sending…" : report === "failed" ? "Try again" : "Tell AUREVYN"}
+            </button>
+          )}
         </div>
 
         <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 14 }}>
-          If this keeps happening, copy the error details above and share them — no terminal access needed.
+          This was recorded automatically. Tap "Tell AUREVYN" to send a note to support and get a reply in Mail.
         </div>
       </div>
     </div>

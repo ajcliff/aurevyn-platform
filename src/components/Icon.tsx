@@ -8,6 +8,8 @@ const paths: Record<string, ReactNode> = {
   packages: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" /><path d="M4 7.5l8 4.5 8-4.5M12 12v9" /></>,
   billing: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M7 15h4" /></>,
   finance: <><path d="M3 17l5-5 4 3 8-8" /><path d="M15 7h5v5" /></>,
+  mail: <><path d="M3 13l3-8h12l3 8" /><path d="M3 13v6h18v-6h-5l-1 2h-6l-1-2z" /></>,
+  licensing: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M9 6v12" /></>,
   messages: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
   "error-logs": <><path d="M12 4l9.5 16h-19L12 4z" /><path d="M12 10v4M12 17.5v.01" /></>,
   control: <path d="M3 12h4l3-8 4 16 3-8h4" />,

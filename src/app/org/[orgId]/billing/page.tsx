@@ -128,7 +128,7 @@ export default function OrgBillingPage() {
                           <select value={claimMethod} onChange={e => setClaimMethod(e.target.value)} aria-label="Payment method" style={{ padding: 6, borderRadius: 6, background: "var(--bg-base)", color: "var(--text-primary)", border: "1px solid var(--border-light)" }}>
                             {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
                           </select>
-                          <input value={claimRef} onChange={e => setClaimRef(e.target.value)} placeholder="M-Pesa code or bank reference" aria-label="Payment reference" style={{ flex: 1, minWidth: 200, padding: 6, borderRadius: 6, background: "var(--bg-base)", color: "var(--text-primary)", border: "1px solid var(--border-light)" }} />
+                          <input value={claimRef} onChange={e => setClaimRef(e.target.value)} placeholder={claimMethod === "M-Pesa" ? "M-Pesa confirmation code" : claimMethod === "Bank transfer" ? "Bank transfer reference" : claimMethod === "Cheque" ? "Cheque number" : claimMethod === "Cash" ? "Who received it / receipt note" : "Payment reference"} aria-label="Payment reference" style={{ flex: 1, minWidth: 200, padding: 6, borderRadius: 6, background: "var(--bg-base)", color: "var(--text-primary)", border: "1px solid var(--border-light)" }} />
                           <button style={{ ...btn, background: "var(--gold)", color: "var(--gold-contrast)", borderColor: "var(--gold)" }} disabled={claimBusy || !claimRef.trim()} onClick={() => submitClaim(inv.id)}>{claimBusy ? "Sending…" : "Send"}</button>
                         </div>
                         {claimError && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 6 }} role="alert">{claimError}</div>}

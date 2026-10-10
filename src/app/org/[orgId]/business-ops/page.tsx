@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ShareDialog from "@/components/ShareDialog";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import Drawer from "@/components/Drawer";
 import EmptyState from "@/components/EmptyState";
@@ -100,6 +101,7 @@ export default function BusinessOpsPage() {
   // Project drawer (new + detail)
   const [showNewProject, setShowNewProject] = useState(false);
   const [selectedProject, setSelectedProject] = useState<OpsProject | null>(null);
+  const [sharingProjectId, setSharingProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState(false);
 
   const [projName, setProjName] = useState("");
@@ -420,7 +422,7 @@ export default function BusinessOpsPage() {
                       style={{ ...rowStyle, ...projectGridCols, cursor: "pointer" }}
                     >
                       <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {p.name}
+                        {p.visibility === "restricted" ? "🔒 " : ""}{p.name}
                       </span>
                       <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                         {team ? team.name : "—"}
@@ -517,6 +519,19 @@ export default function BusinessOpsPage() {
         </div>
       </Drawer>
 
+      {sharingProjectId && (
+        <ShareDialog
+          orgId={organization.id}
+          type="project"
+          id={sharingProjectId}
+          onClose={() => setSharingProjectId(null)}
+          onChanged={(v) => {
+            setProjects((prev) => prev.map((p) => (p.id === sharingProjectId ? { ...p, visibility: v } : p)));
+            setSelectedProject((prev) => (prev && prev.id === sharingProjectId ? { ...prev, visibility: v } : prev));
+          }}
+        />
+      )}
+
       {/* Project Drawer */}
       <Drawer
         open={projectDrawerOpen}
@@ -611,6 +626,9 @@ export default function BusinessOpsPage() {
         ) : (
           selectedProject && (
             <>
+              <button style={{ ...ghostButton, marginBottom: 12 }} onClick={() => setSharingProjectId(selectedProject.id)}>
+                {selectedProject.visibility === "restricted" ? "🔒 Shared with selected people" : "🏢 Shared with everyone"} · Share
+              </button>
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <select
                   value={selectedProject.status}
@@ -778,7 +796,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
         borderRadius: 8,
         border: "1px solid var(--border)",
         background: active ? "var(--gold)" : "var(--bg-elevated)",
-        color: active ? "#07070f" : "var(--text-secondary)",
+        color: active ? "var(--gold-contrast)" : "var(--text-secondary)",
         fontSize: 11,
         fontWeight: active ? 700 : 500,
         cursor: "pointer",
@@ -892,7 +910,7 @@ const labelStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "9px 18px",

@@ -71,6 +71,14 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
     setLoading(false);
   }
 
+  // Deep link from the notification email: ?focus=<requestId> opens that request straight away
+  useEffect(() => {
+    if (requests.length === 0) return;
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    const target = focus ? requests.find((r) => r.id === focus) : null;
+    if (target) setViewingRequest(target);
+  }, [requests]);
+
   const pending = requests.filter((r) => r.status === "pending");
   const approvedThisMonth = requests.filter((r) => {
     if (r.status !== "approved" || !r.decided_at) return false;
@@ -601,7 +609,7 @@ const inputStyle: React.CSSProperties = {
 
 const buttonGold: React.CSSProperties = {
   background: "var(--gold)",
-  color: "#07070f",
+  color: "var(--gold-contrast)",
   border: "none",
   borderRadius: 10,
   padding: "9px 18px",
