@@ -17,6 +17,14 @@ const statusVar: Record<string, string> = {
   critical: "var(--red)",
 };
 
+// Plan text for the table: licensed, or the days left on the free trial.
+function planText(org: Organization): string {
+  if (org.package_confirmed_at) return planLabel(org);
+  if (!org.trial_ends_at) return planLabel(org);
+  const daysLeft = Math.ceil((new Date(org.trial_ends_at).getTime() - Date.now()) / 86_400_000);
+  return daysLeft > 0 ? `${planLabel(org)} · ${daysLeft}d left` : "Trial ended";
+}
+
 export default function OrganizationsPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [search, setSearch] = useState("");
@@ -172,24 +180,36 @@ export default function OrganizationsPage() {
               {orgs.length === 0 ? "Organizations appear here as people register." : "Try a different search or status filter."}
             </div>
           ) : (
-            <div className={f.tableWrap}>
-              <table className={f.ledger}>
-                <thead>
-                  <tr><th>Organization</th><th>Location</th><th>Plan</th><th>Revenue</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                  {filtered.map(org => (
-                    <tr key={org.id} className={`${f.clickable} ${selectedOrg?.id === org.id ? f.selected : ""}`} onClick={() => openOrg(org)}>
-                      <td><button className={f.cellBtn} onClick={e => { e.stopPropagation(); openOrg(org); }}>{org.name}</button></td>
-                      <td className={f.cellMuted}>{org.location}</td>
-                      <td className={f.cellMuted} style={{ textTransform: "capitalize" }}>{planLabel(org)}</td>
-                      <td className={f.cellMuted}>{org.revenue}</td>
-                      <td><span className={f.pill} data-status={org.status}>{org.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {[
+                { title: "Paid", rows: filtered.filter(o => o.package_confirmed_at) },
+                { title: "On free trial", rows: filtered.filter(o => !o.package_confirmed_at) },
+              ].filter(g => g.rows.length > 0).map(group => (
+                <section key={group.title} style={{ marginBottom: 28 }}>
+                  <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", opacity: 0.7, margin: "0 0 8px" }}>
+                    {group.title} · {group.rows.length}
+                  </h2>
+                  <div className={f.tableWrap}>
+                    <table className={f.ledger}>
+                      <thead>
+                        <tr><th>Organization</th><th>Location</th><th>Plan</th><th>Revenue</th><th>Status</th></tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map(org => (
+                          <tr key={org.id} className={`${f.clickable} ${selectedOrg?.id === org.id ? f.selected : ""}`} onClick={() => openOrg(org)}>
+                            <td><button className={f.cellBtn} onClick={e => { e.stopPropagation(); openOrg(org); }}>{org.name}</button></td>
+                            <td className={f.cellMuted}>{org.location}</td>
+                            <td className={f.cellMuted}>{planText(org)}</td>
+                            <td className={f.cellMuted}>{org.revenue}</td>
+                            <td><span className={f.pill} data-status={org.status}>{org.status}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))}
+            </>
           )}
         </div>
       </main>

@@ -201,7 +201,7 @@ export default function RegisterPage() {
         .maybeSingle();
 
       const trialEndsAt = new Date();
-      const TRIAL_DAYS = 2; // TEMPORARY for testing — restore to 30 before launch
+      const TRIAL_DAYS = 30;
       trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
 
       const { data: organization, error: orgError } = await supabase
