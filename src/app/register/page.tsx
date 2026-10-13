@@ -8,23 +8,12 @@ import { PACKAGE_ENGINES } from "@/lib/packageEngines";
 import { COUNTRIES, OTHER_OPTION } from "@/lib/locations";
 import AuthShell from "@/components/marketing/AuthShell";
 
-const INDUSTRIES = [
-  "Retail",
-  "Healthcare",
-  "Education",
-  "Real Estate",
-  "General Business",
-  "Other",
-];
+const INDUSTRIES = ["Retail", "General Business"];
 
 // Maps the industry a customer selects at signup to a blueprint slug
 const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
   Retail: "retail",
-  Healthcare: "clinic",
-  Education: "school",
-  "Real Estate": "property",
   "General Business": "sme",
-  Other: "sme",
 };
 
 const STEP_LABELS = ["Business", "Account", "Confirm"];

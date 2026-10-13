@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 const ROWS = [
   { label: "Time to first sale", aurevyn: "Same day", legacy: "Weeks to quarters" },
-  { label: "Setup", aurevyn: "Pick an industry blueprint", legacy: "Custom consultant build-out" },
+  { label: "Setup", aurevyn: "Sign up and every engine is on, free for 30 days", legacy: "Custom consultant build-out" },
   { label: "Local payments", aurevyn: "M-Pesa native", legacy: "Bolt-on integration" },
   { label: "Pricing", aurevyn: "Flat, per organization", legacy: "Per-seat, per-module" },
   { label: "Works offline", aurevyn: "Yes, at the till", legacy: "Rarely" },

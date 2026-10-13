@@ -6,46 +6,24 @@ import Link from "next/link";
 const BLUEPRINTS = [
   {
     industry: "Retail",
-    detail: "POS, inventory, and pricelists tuned for multi-branch shops and franchises.",
+    detail: "POS, stock and suppliers for shops, supermarkets and multi-branch chains.",
     accent: "var(--mkt-blueprint)",
     accentGlow: "var(--mkt-blueprint-glow)",
     configured: [
-      "Barcode-ready POS with split payment and M-Pesa till reconciliation",
-      "Multi-branch stock levels with automatic reorder alerts",
-      "Loyalty points and customer purchase history",
+      "Barcode-ready POS with split payments and M-Pesa reconciliation",
+      "Stock across warehouses and branches, with reorder alerts and stock-takes",
+      "Suppliers, purchasing and pricelists in one place",
     ],
   },
   {
-    industry: "Healthcare",
-    detail: "Patient records, appointments, and billing configured around clinic workflows.",
+    industry: "General Business",
+    detail: "Books, customers and staff for any business that sells, invoices and hires.",
     accent: "var(--mkt-brass-light)",
     accentGlow: "var(--mkt-brass-glow)",
     configured: [
-      "Patient records with visit history and prescriptions",
-      "Appointment scheduling by provider and room",
-      "Insurance and cash billing in one ledger",
-    ],
-  },
-  {
-    industry: "Education",
-    detail: "Enrollment, fees, and staff payroll set up the way a school actually runs.",
-    accent: "var(--mkt-blueprint)",
-    accentGlow: "var(--mkt-blueprint-glow)",
-    configured: [
-      "Student enrollment and term-based fee tracking",
-      "Staff payroll aligned to the academic calendar",
-      "Per-term and per-class reporting",
-    ],
-  },
-  {
-    industry: "Distribution",
-    detail: "Warehousing, transfers, and route-level reporting across multiple sites.",
-    accent: "var(--mkt-brass-light)",
-    accentGlow: "var(--mkt-brass-glow)",
-    configured: [
-      "Warehouse-to-warehouse stock transfers",
-      "Route-level delivery and sales reporting",
-      "Supplier ledger and bulk order management",
+      "Invoicing and finance with VAT, expenses and cashflow",
+      "Customer records and sales follow-up",
+      "Employees and payroll, with approvals and shared documents",
     ],
   },
 ];
@@ -58,15 +36,14 @@ export default function IndustriesSection() {
       <div className="mkt-container">
         <div className="mkt-industries__head">
           <div>
-            <div className="mkt-eyebrow mkt-eyebrow--brass">Sheet 02 / Blueprints</div>
+            <div className="mkt-eyebrow mkt-eyebrow--brass">Sheet 02 / Who it is for</div>
             <h2 className="mkt-h2" style={{ marginTop: 14 }}>
-              Configured for your industry, not a blank canvas.
+              Built for the way you trade.
             </h2>
           </div>
           <p className="mkt-body" style={{ maxWidth: 360 }}>
-            A blueprint is a pre-wired set of engines, fields, and reports
-            for how your industry actually operates. Click one to see what's
-            already set up.
+            Every account gets every engine, free for 30 days. Click one to see
+            what you will use most.
           </p>
         </div>
 
@@ -99,14 +76,14 @@ export default function IndustriesSection() {
                 <div className="mkt-industries__detail-wrap" style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}>
                   <div className="mkt-industries__detail-inner">
                     <div className="mkt-industries__detail">
-                      <div className="mkt-tag mkt-industries__tag" style={{ marginBottom: 12 }}>Pre-configured for you</div>
+                      <div className="mkt-tag mkt-industries__tag" style={{ marginBottom: 12 }}>What you get</div>
                       <ul className="mkt-industries__ul">
                         {b.configured.map((c) => (
                           <li key={c}>{c}</li>
                         ))}
                       </ul>
                       <Link href="/register" className="mkt-btn mkt-btn--ghost mkt-btn--sm" style={{ marginTop: 14 }}>
-                        Start with the {b.industry} blueprint
+                        Start your free trial
                       </Link>
                     </div>
                   </div>
