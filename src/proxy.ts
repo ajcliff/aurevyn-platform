@@ -13,6 +13,12 @@ export async function proxy(req: NextRequest) {
   const res = NextResponse.next();
   const pathname = req.nextUrl.pathname;
 
+  // The installed desktop app is a workspace, not the marketing site: open on login
+  // (the login page forwards people who are already signed in)
+  if (pathname === "/" && req.headers.get("user-agent")?.includes("AurevynDesktop")) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   // Allow public routes
   if (isPublicRoute(pathname)) {
     return res;

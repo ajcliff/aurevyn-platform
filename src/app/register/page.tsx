@@ -17,19 +17,6 @@ const INDUSTRIES = [
   "Other",
 ];
 
-const BUSINESS_TYPES = [
-  "Sole Proprietorship",
-  "Partnership",
-  "Private Limited Company",
-  "Public Limited Company",
-  "NGO / Non-profit",
-  "Government / Public Institution",
-  "Other",
-];
-
-const COMPANY_SIZES = ["1–5 employees", "6–20 employees", "21–50 employees", "51–200 employees", "200+ employees"];
-const BRANCH_COUNTS = ["Single location", "2–5 locations", "6–20 locations", "20+ locations"];
-
 // Maps the industry a customer selects at signup to a blueprint slug
 const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
   Retail: "retail",
@@ -40,16 +27,11 @@ const INDUSTRY_TO_BLUEPRINT_SLUG: Record<string, string> = {
   Other: "sme",
 };
 
-const STEP_LABELS = ["Business", "Profile", "Account", "Confirm"];
+const STEP_LABELS = ["Business", "Account", "Confirm"];
 
 type Form = {
   companyName: string;
   industry: string;
-  businessType: string;
-  companySize: string;
-  branches: string;
-  taxId: string;
-  website: string;
   fullName: string;
   phone: string;
   email: string;
@@ -69,11 +51,6 @@ export default function RegisterPage() {
   const [form, setForm] = useState<Form>({
     companyName: "",
     industry: "",
-    businessType: "",
-    companySize: "",
-    branches: "",
-    taxId: "",
-    website: "",
     fullName: "",
     phone: "",
     email: "",
@@ -111,20 +88,12 @@ export default function RegisterPage() {
     const errs: Record<string, string> = {};
     if (!form.companyName.trim()) errs.companyName = "Company name is required";
     if (!form.industry) errs.industry = "Please select an industry";
-    if (!form.businessType) errs.businessType = "Please select a business type";
     if (!resolvedCountry) errs.country = "Country is required";
     if (!resolvedCity) errs.city = "City is required";
     return errs;
-  }, [form.companyName, form.industry, form.businessType, resolvedCountry, resolvedCity]);
+  }, [form.companyName, form.industry, resolvedCountry, resolvedCity]);
 
   const step2Errors = useMemo(() => {
-    const errs: Record<string, string> = {};
-    if (!form.companySize) errs.companySize = "Please select company size";
-    if (!form.branches) errs.branches = "Please select number of locations";
-    return errs;
-  }, [form.companySize, form.branches]);
-
-  const step3Errors = useMemo(() => {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = "Full name is required";
     if (!form.phone.trim()) errs.phone = "Phone number is required";
@@ -140,30 +109,23 @@ export default function RegisterPage() {
 
   const step1Valid = Object.keys(step1Errors).length === 0;
   const step2Valid = Object.keys(step2Errors).length === 0;
-  const step3Valid = Object.keys(step3Errors).length === 0;
 
   const goToStep2 = () => {
     setFieldErrors(step1Errors);
-    setTouched((t) => ({ ...t, companyName: true, industry: true, businessType: true, country: true, city: true }));
+    setTouched((t) => ({ ...t, companyName: true, industry: true, country: true, city: true }));
     if (step1Valid) setStep(2);
   };
 
   const goToStep3 = () => {
     setFieldErrors(step2Errors);
-    setTouched((t) => ({ ...t, companySize: true, branches: true }));
-    if (step2Valid) setStep(3);
-  };
-
-  const goToStep4 = () => {
-    setFieldErrors(step3Errors);
     setTouched((t) => ({ ...t, fullName: true, phone: true, email: true, password: true, confirmPassword: true }));
-    if (step3Valid) setStep(4);
+    if (step2Valid) setStep(3);
   };
 
   const handleRegistration = async () => {
     // Defensive re-check — never allow submission with an incomplete/invalid form,
     // even if someone reaches this step some other way.
-    if (!step1Valid || !step2Valid || !step3Valid) {
+    if (!step1Valid || !step2Valid) {
       setError("Please complete every field correctly before continuing.");
       return;
     }
@@ -213,11 +175,7 @@ export default function RegisterPage() {
           status: "operational",
           revenue: "0",
           blueprint_id: blueprint?.id ?? null,
-          business_type: form.businessType,
-          company_size: form.companySize,
-          branch_count: form.branches,
-          tax_id: form.taxId.trim() || null,
-          website: form.website.trim() || null,
+          industry: form.industry,
           trial_ends_at: trialEndsAt.toISOString(),
         })
         .select()
@@ -233,6 +191,7 @@ export default function RegisterPage() {
         role: "owner",
         full_name: form.fullName.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
       });
 
       if (membershipError) throw membershipError;
@@ -309,7 +268,7 @@ export default function RegisterPage() {
       <h1 className="mkt-h3" style={{ fontSize: "1.375rem" }}>Set up Aurevyn</h1>
 
       <div className="mkt-register-steps">
-        {[1, 2, 3, 4].map((s) => (
+        {[1, 2, 3].map((s) => (
           <div key={s} className="mkt-register-steps__item">
             <div className={`mkt-register-steps__bar ${step >= s ? "mkt-register-steps__bar--active" : ""}`} />
             <span className="mkt-mono mkt-register-steps__label">{STEP_LABELS[s - 1]}</span>
@@ -331,38 +290,19 @@ export default function RegisterPage() {
           />
           {touched.companyName && fieldErrors.companyName && <div className="mkt-form-error">{fieldErrors.companyName}</div>}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label className="mkt-field-label">Industry</label>
-              <select
-                value={form.industry}
-                onChange={(e) => update("industry", e.target.value)}
-                onBlur={() => markTouched("industry")}
-                className="mkt-input"
-              >
-                <option value="">Select…</option>
-                {INDUSTRIES.map((i) => (
-                  <option key={i} value={i}>{i}</option>
-                ))}
-              </select>
-              {touched.industry && fieldErrors.industry && <div className="mkt-form-error">{fieldErrors.industry}</div>}
-            </div>
-            <div>
-              <label className="mkt-field-label">Business type</label>
-              <select
-                value={form.businessType}
-                onChange={(e) => update("businessType", e.target.value)}
-                onBlur={() => markTouched("businessType")}
-                className="mkt-input"
-              >
-                <option value="">Select…</option>
-                {BUSINESS_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              {touched.businessType && fieldErrors.businessType && <div className="mkt-form-error">{fieldErrors.businessType}</div>}
-            </div>
-          </div>
+          <label className="mkt-field-label">Industry</label>
+          <select
+            value={form.industry}
+            onChange={(e) => update("industry", e.target.value)}
+            onBlur={() => markTouched("industry")}
+            className="mkt-input"
+          >
+            <option value="">Select…</option>
+            {INDUSTRIES.map((i) => (
+              <option key={i} value={i}>{i}</option>
+            ))}
+          </select>
+          {touched.industry && fieldErrors.industry && <div className="mkt-form-error">{fieldErrors.industry}</div>}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
@@ -429,71 +369,6 @@ export default function RegisterPage() {
 
       {step === 2 && (
         <div>
-          <h2 className="mkt-h3" style={{ fontSize: "1rem", marginBottom: 4 }}>Business profile</h2>
-          <p className="mkt-body" style={{ fontSize: "0.8125rem", marginBottom: 10 }}>
-            Helps us configure Aurevyn to fit how your business actually runs.
-          </p>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label className="mkt-field-label">Company size</label>
-              <select
-                value={form.companySize}
-                onChange={(e) => update("companySize", e.target.value)}
-                onBlur={() => markTouched("companySize")}
-                className="mkt-input"
-              >
-                <option value="">Select…</option>
-                {COMPANY_SIZES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              {touched.companySize && fieldErrors.companySize && <div className="mkt-form-error">{fieldErrors.companySize}</div>}
-            </div>
-            <div>
-              <label className="mkt-field-label">Locations / branches</label>
-              <select
-                value={form.branches}
-                onChange={(e) => update("branches", e.target.value)}
-                onBlur={() => markTouched("branches")}
-                className="mkt-input"
-              >
-                <option value="">Select…</option>
-                {BRANCH_COUNTS.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-              {touched.branches && fieldErrors.branches && <div className="mkt-form-error">{fieldErrors.branches}</div>}
-            </div>
-          </div>
-
-          <label className="mkt-field-label">Business registration / Tax PIN <span className="mkt-dim">(optional)</span></label>
-          <input
-            placeholder="e.g. KRA PIN, RC number"
-            value={form.taxId}
-            onChange={(e) => update("taxId", e.target.value)}
-            className="mkt-input"
-          />
-
-          <label className="mkt-field-label">Website <span className="mkt-dim">(optional)</span></label>
-          <input
-            placeholder="https://"
-            value={form.website}
-            onChange={(e) => update("website", e.target.value)}
-            className="mkt-input"
-          />
-
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button onClick={() => setStep(1)} className="mkt-btn mkt-btn--ghost">Back</button>
-            <button onClick={goToStep3} disabled={!step2Valid} className="mkt-btn mkt-btn--primary" style={{ flex: 1 }}>
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div>
           <h2 className="mkt-h3" style={{ fontSize: "1rem", marginBottom: 4 }}>Contact & account</h2>
 
           <label className="mkt-field-label">Full name</label>
@@ -550,15 +425,15 @@ export default function RegisterPage() {
           {touched.confirmPassword && fieldErrors.confirmPassword && <div className="mkt-form-error">{fieldErrors.confirmPassword}</div>}
 
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button onClick={() => setStep(2)} className="mkt-btn mkt-btn--ghost">Back</button>
-            <button onClick={goToStep4} disabled={!step3Valid} className="mkt-btn mkt-btn--primary" style={{ flex: 1 }}>
+            <button onClick={() => setStep(1)} className="mkt-btn mkt-btn--ghost">Back</button>
+            <button onClick={goToStep3} disabled={!step2Valid} className="mkt-btn mkt-btn--primary" style={{ flex: 1 }}>
               Continue
             </button>
           </div>
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div>
           <h2 className="mkt-h3" style={{ fontSize: "1.0625rem", color: "var(--mkt-brass-light)" }}>
             Review & confirm
@@ -567,23 +442,21 @@ export default function RegisterPage() {
           <div className="mkt-register-review">
             <div><span className="mkt-dim">Organization</span><span>{form.companyName}</span></div>
             <div><span className="mkt-dim">Industry</span><span>{form.industry}</span></div>
-            <div><span className="mkt-dim">Business type</span><span>{form.businessType}</span></div>
             <div><span className="mkt-dim">Location</span><span>{resolvedCity}, {resolvedCountry}</span></div>
-            <div><span className="mkt-dim">Company size</span><span>{form.companySize}</span></div>
-            <div><span className="mkt-dim">Locations</span><span>{form.branches}</span></div>
             <div><span className="mkt-dim">Owner</span><span>{form.fullName}</span></div>
             <div><span className="mkt-dim">Email</span><span>{form.email}</span></div>
+            <div><span className="mkt-dim">Phone</span><span>{form.phone}</span></div>
             <div><span className="mkt-dim">Trial</span><span>Every engine unlocked, free. Pay only for the engines and seats you keep.</span></div>
           </div>
 
           {error && <div className="mkt-alert-box" style={{ marginTop: 14 }}>{error}</div>}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            <button onClick={() => setStep(3)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
+            <button onClick={() => setStep(2)} className="mkt-btn mkt-btn--ghost" disabled={loading}>Back</button>
             <button
               className="mkt-btn mkt-btn--primary"
               style={{ flex: 1 }}
-              disabled={loading || !step1Valid || !step2Valid || !step3Valid}
+              disabled={loading || !step1Valid || !step2Valid}
               onClick={handleRegistration}
             >
               {loading ? "Creating organization…" : "Create organization"}

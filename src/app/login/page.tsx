@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/marketing/AuthShell";
@@ -15,6 +15,21 @@ function LoginInner() {
   const supabase = createClient();
 
   const expired = searchParams.get("reason") === "expired";
+
+  // Already signed in (e.g. reopening the desktop app): go straight to the workspace
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      if (user.email?.toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase()) {
+        router.replace("/dashboard");
+        return;
+      }
+      const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", user.id).limit(1).maybeSingle();
+      if (membership?.org_id) router.replace(`/org/${membership.org_id}`);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {

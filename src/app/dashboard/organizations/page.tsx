@@ -39,6 +39,7 @@ export default function OrganizationsPage() {
   const [allEngines, setAllEngines] = useState<Engine[]>([]);
   const [orgEngines, setOrgEngines] = useState<OrgEngine[]>([]);
   const [engineBusy, setEngineBusy] = useState<string | null>(null);
+  const [ownerRow, setOwnerRow] = useState<{ org_id: string; full_name: string | null; email: string | null; phone: string | null } | null>(null);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -82,6 +83,21 @@ export default function OrganizationsPage() {
     if (!selectedOrg) { setOrgEngines([]); return; }
     getOrgEngines(selectedOrg.id).then(setOrgEngines).catch(err => setActionError(formatError(err)));
   }, [selectedOrg?.id]);
+
+  // Who to contact: the org's owner, as entered at signup
+  useEffect(() => {
+    if (!selectedOrg) return;
+    createClient()
+      .from("org_users")
+      .select("org_id, full_name, email, phone")
+      .eq("org_id", selectedOrg.id)
+      .eq("role", "owner")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setOwnerRow(data));
+  }, [selectedOrg?.id]);
+  const owner = selectedOrg && ownerRow?.org_id === selectedOrg.id ? ownerRow : null;
 
   const filtered = orgs.filter(o => {
     const q = search.toLowerCase();
@@ -226,8 +242,12 @@ export default function OrganizationsPage() {
           {drawerTab === "overview" && (
             <DrawerFieldList
               items={[
+                { label: "Owner", value: owner?.full_name || "—" },
+                { label: "Email", value: owner?.email || "—" },
+                { label: "Phone", value: owner?.phone || "—" },
+                { label: "Industry", value: selectedOrg.industry || "—" },
                 { label: "Location", value: selectedOrg.location },
-                { label: "Plan", value: planLabel(selectedOrg) },
+                { label: "Plan", value: planText(selectedOrg) },
                 { label: "Revenue", value: selectedOrg.revenue },
                 { label: "Status", value: selectedOrg.status, accent: statusVar[selectedOrg.status] },
                 { label: "Created", value: new Date(selectedOrg.created_at).toLocaleDateString("en-KE") },

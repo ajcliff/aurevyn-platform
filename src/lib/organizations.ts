@@ -9,6 +9,7 @@ export type Organization = {
   package: string;
   package_confirmed_at?: string | null;
   trial_ends_at?: string | null;
+  industry?: string | null;
   created_at: string;
 };
 
