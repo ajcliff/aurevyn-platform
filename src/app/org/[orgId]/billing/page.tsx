@@ -28,6 +28,8 @@ export default function OrgBillingPage() {
   const [claimRef, setClaimRef] = useState("");
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimBusy, setClaimBusy] = useState(false);
+  const [payBusy, setPayBusy] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const allowed = canManageTeam(membership);
 
@@ -41,6 +43,34 @@ export default function OrgBillingPage() {
       setLoading(false);
     });
   }, [allowed, organization.id]);
+
+  // Coming back from checkout: the payment is confirmed by Paystack's webhook a moment
+  // after the redirect, so refresh invoices and receipts a few times until it lands.
+  useEffect(() => {
+    if (!allowed || !new URLSearchParams(window.location.search).get("reference")) return;
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      const [inv, rec] = await Promise.all([getInvoices(), getReceipts()]);
+      setInvoices(inv.filter(i => i.org_id === organization.id));
+      setReceipts(rec.filter(r => r.org_id === organization.id));
+      if (tries >= 6) clearInterval(timer);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [allowed, organization.id]);
+
+  async function payNow(invoiceId: string) {
+    setPayBusy(invoiceId); setPayError(null);
+    try {
+      const res = await fetch("/api/org/pay-invoice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orgId: organization.id, invoiceId }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.url) throw new Error(json.error ?? "Could not start the payment.");
+      window.location.href = json.url;
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Something went wrong.");
+      setPayBusy(null);
+    }
+  }
 
   async function submitClaim(invoiceId: string) {
     setClaimBusy(true); setClaimError(null);
@@ -116,6 +146,9 @@ export default function OrgBillingPage() {
                     <td style={{ ...cell, whiteSpace: "nowrap", textAlign: "right" }}>
                       <button style={btn} onClick={() => downloadInvoicePdf(inv)}>Invoice</button>{" "}
                       {receipt && <button style={btn} onClick={() => downloadReceiptPdf(receipt, inv, organization.name)}>Receipt</button>}
+                      {inv.status !== "paid" && !inv.claimed_at && (
+                        <button style={{ ...btn, marginLeft: 6, background: "var(--gold)", color: "var(--gold-contrast)", borderColor: "var(--gold)" }} disabled={payBusy === inv.id} onClick={() => payNow(inv.id)}>{payBusy === inv.id ? "Opening…" : "Pay now"}</button>
+                      )}
                       {inv.status !== "paid" && (inv.claimed_at
                         ? <span style={{ fontSize: 11, color: "var(--amber)", marginLeft: 6 }}>Payment sent, awaiting confirmation</span>
                         : <button style={{ ...btn, marginLeft: 6, borderColor: "var(--gold)", color: "var(--gold)" }} onClick={() => { setClaiming(claiming === inv.id ? null : inv.id); setClaimError(null); }}>I&apos;ve paid</button>)}
@@ -142,8 +175,9 @@ export default function OrgBillingPage() {
           </table>
         </div>
       )}
+      {payError && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 12 }} role="alert">{payError}</div>}
       <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 16 }}>
-        Pay AUREVYN by M-Pesa or bank transfer, then press "I've paid" with your payment reference. Your receipt appears here once we confirm it.
+        Press "Pay now" to pay by M-Pesa or card. Your receipt appears here as soon as the payment goes through. If you paid another way (M-Pesa to us directly, bank transfer, cash or cheque), press "I've paid" with your payment reference and your receipt appears once we confirm it.
       </p>
     </div>
   );
