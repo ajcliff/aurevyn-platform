@@ -9,102 +9,74 @@ type Props = {
   selectedWarehouseId?: string;
 };
 
-export default function ProductGrid({
-  products,
-  addToCart,
-  stockLevels,
-  selectedWarehouseId,
-}: Props) {
+const COLUMNS = "1fr 90px 120px";
+
+// Dense rows rather than cards: more products on screen, one tap to add
+export default function ProductGrid({ products, addToCart, stockLevels, selectedWarehouseId }: Props) {
+  if (products.length === 0) {
+    return <div style={{ color: "var(--text-muted)", padding: 20 }}>No products match.</div>;
+  }
+
   return (
-    <div
-      style={{
-        overflowY: "auto",
-        maxHeight: "calc(100vh - 220px)",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <style>{`.pos-row:hover { background: var(--bg-elevated); }`}</style>
+
       <div
         style={{
           display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fill,minmax(220px,1fr))",
-          gap: "12px",
+          gridTemplateColumns: COLUMNS,
+          gap: 12,
+          padding: "6px 12px",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          borderBottom: "1px solid var(--border)",
         }}
       >
-        {products.map((product) => {
-          const branchStock =
-            selectedWarehouseId && stockLevels?.[product.id!]
-              ? stockLevels[product.id!][selectedWarehouseId] ?? 0
-              : Number(product.stock_quantity);
+        <span>Product</span>
+        <span style={{ textAlign: "right" }}>Stock</span>
+        <span style={{ textAlign: "right" }}>Price</span>
+      </div>
 
-          const lowStock = branchStock <= Number(product.low_stock_threshold);
+      {products.map((product) => {
+        const branchStock =
+          selectedWarehouseId && stockLevels?.[product.id!]
+            ? stockLevels[product.id!][selectedWarehouseId] ?? 0
+            : Number(product.stock_quantity);
+        const lowStock = branchStock <= Number(product.low_stock_threshold);
 
-          return (
-            <div
-              key={product.id}
-              onClick={() => addToCart(product)}
-              style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                borderRadius: "12px",
-                padding: "14px",
-                cursor: "pointer",
-                transition: "0.2s",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  marginBottom: "8px",
-                }}
-              >
+        return (
+          <div
+            key={product.id}
+            className="pos-row"
+            onClick={() => addToCart(product)}
+            style={{
+              display: "grid",
+              gridTemplateColumns: COLUMNS,
+              gap: 12,
+              alignItems: "center",
+              padding: "11px 12px",
+              borderBottom: "1px solid var(--border)",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {product.name}
               </div>
-
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "var(--text-secondary)",
-                  marginBottom: "6px",
-                }}
-              >
-                SKU: {product.sku}
-              </div>
-
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                {product.category}
-              </div>
-
-              <div
-                style={{
-                  marginTop: "12px",
-                  fontSize: "18px",
-                  color: "var(--gold)",
-                  fontWeight: 700,
-                }}
-              >
-                KES {Number(product.unit_price).toLocaleString()}
-              </div>
-
-              <div
-                style={{
-                  marginTop: "8px",
-                  color: lowStock ? "#ef4444" : "#3dd68c",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
-              >
-                Stock: {branchStock}{selectedWarehouseId ? " (this branch)" : ""}
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                {product.sku}
+                {product.category ? ` · ${product.category}` : ""}
               </div>
             </div>
-          );
-        })}
-      </div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 600, color: lowStock ? "#ef4444" : "#3dd68c" }}>
+              {branchStock}
+            </div>
+            <div style={{ textAlign: "right", fontSize: 15, fontWeight: 700, color: "var(--gold)" }}>
+              KES {Number(product.unit_price).toLocaleString()}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

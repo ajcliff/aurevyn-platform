@@ -61,6 +61,9 @@ type CartItem = {
   quantity: number;
 };
 
+const UNCATEGORIZED = "Uncategorized";
+const categoryOf = (p: InventoryProduct) => p.category?.trim() || UNCATEGORIZED;
+
 export default function POSPage() {
  const { orgId: orgIdFromUrl } = useParams<{ orgId: string }>();
 
@@ -107,6 +110,7 @@ const averageSale =
   const [tab, setTab] = useState<"sales" | "history">("sales");
 
   const [search, setSearch] = useState("");
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
 
@@ -241,10 +245,22 @@ if (orgId) {
   }, [orgId]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
+    const q = search.trim().toLowerCase();
+    return products.filter(
+      (p) =>
+        (!openCategory || categoryOf(p) === openCategory) &&
+        (!q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q))
     );
-  }, [products, search]);
+  }, [products, search, openCategory]);
+
+  // Same drawers as Inventory: one per product category
+  const drawers = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) counts.set(categoryOf(p), (counts.get(categoryOf(p)) ?? 0) + 1);
+    return [...counts.entries()]
+      .sort(([a], [b]) => (a === UNCATEGORIZED ? 1 : b === UNCATEGORIZED ? -1 : a.localeCompare(b)))
+      .map(([name, count]) => ({ name, count }));
+  }, [products]);
 
   const cartTotal = useMemo(() => {
     return cart.reduce(
@@ -566,10 +582,15 @@ return (
       {/* Main column */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ flexShrink: 0 }}>
-          <h1 className={s.pageTitle}>Point of Sale</h1>
-          <p className={s.pageSub}>
-            Sell products, manage transactions and process payments
-          </p>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
+            <h1 className={s.pageTitle} style={{ margin: 0 }}>Point of Sale</h1>
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13, color: "var(--text-secondary)" }}>
+              <span>Today <strong style={{ color: "var(--text-primary)" }}>KES {todayRevenue.toLocaleString()}</strong></span>
+              <span><strong style={{ color: "var(--text-primary)" }}>{transactionCount}</strong> sale{transactionCount === 1 ? "" : "s"}</span>
+              <span>Average <strong style={{ color: "var(--text-primary)" }}>KES {Math.round(averageSale).toLocaleString()}</strong></span>
+            </div>
+          </div>
+
           {pendingSyncCount > 0 && (
             <div
               style={{
@@ -581,7 +602,7 @@ return (
                 borderRadius: 8,
                 padding: "6px 10px",
                 display: "inline-block",
-                marginBottom: 8,
+                marginBottom: 10,
               }}
             >
               {syncing
@@ -590,67 +611,13 @@ return (
             </div>
           )}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(140px,1fr))",
-              gap: "12px",
-              marginTop: "16px",
-              marginBottom: "16px",
-            }}
-          >
-            <div className={s.card}>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Today's Revenue
-              </div>
-              <div style={{ fontSize: "22px", fontWeight: 700 }}>
-                KES {todayRevenue.toLocaleString()}
-              </div>
-            </div>
-
-            <div className={s.card}>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Transactions
-              </div>
-              <div style={{ fontSize: "22px", fontWeight: 700 }}>
-                {transactionCount}
-              </div>
-            </div>
-
-            <div className={s.card}>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Average Sale
-              </div>
-              <div style={{ fontSize: "22px", fontWeight: 700 }}>
-                KES {Math.round(averageSale).toLocaleString()}
-              </div>
-            </div>
-
-            <div className={s.card}>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Products
-              </div>
-              <div style={{ fontSize: "22px", fontWeight: 700 }}>
-                {products.length}
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              marginBottom: "16px",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
             <input
               className={s.input}
-              placeholder="Search products..."
+              placeholder="Search name or SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "240px" }}
+              style={{ flex: "1 1 220px", maxWidth: 320 }}
             />
 
             {warehouses.length > 1 && (
@@ -658,7 +625,7 @@ return (
                 className={s.input}
                 value={selectedWarehouseId}
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                style={{ width: "180px" }}
+                style={{ width: 180 }}
               >
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -668,40 +635,51 @@ return (
               </select>
             )}
 
-            <div style={{ display: "flex", gap: "6px" }}>
-              <button
-                className={tab === "sales" ? s.filterBtnActive : s.filterBtn}
-                onClick={() => setTab("sales")}
-              >
-                Sales
-              </button>
+            <div style={{ flex: 1 }} />
 
-              <button
-                className={tab === "history" ? s.filterBtnActive : s.filterBtn}
-                onClick={() => setTab("history")}
-              >
-                History
-              </button>
-
-<button
-                className={s.filterBtn}
-                onClick={() => window.open(`/org/${orgId}/pos/return`, "_self")}
-              >
-                Returns
-              </button>
-
-              <button
-                className={s.filterBtn}
-                onClick={() => window.open(`/org/${orgId}/pos/summary`, "_self")}
-              >
-                Sales Summary
-              </button>
-
-              <button className={s.filterBtn} onClick={handleExportSalesCSV}>
-                Export CSV
-              </button>
-            </div>
+            <button className={tab === "sales" ? s.filterBtnActive : s.filterBtn} onClick={() => setTab("sales")}>
+              Sales
+            </button>
+            <button className={tab === "history" ? s.filterBtnActive : s.filterBtn} onClick={() => setTab("history")}>
+              History
+            </button>
+            <button className={s.filterBtn} onClick={() => window.open(`/org/${orgId}/pos/return`, "_self")}>
+              Returns
+            </button>
+            <button className={s.filterBtn} onClick={() => window.open(`/org/${orgId}/pos/summary`, "_self")}>
+              Sales Summary
+            </button>
+            <button className={s.filterBtn} onClick={handleExportSalesCSV}>
+              Export CSV
+            </button>
           </div>
+
+          {tab === "sales" && drawers.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14, maxHeight: 118, overflowY: "auto" }}>
+              {drawers.map((drawer) => (
+                <div
+                  key={drawer.name}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setOpenCategory(openCategory === drawer.name ? null : drawer.name)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOpenCategory(openCategory === drawer.name ? null : drawer.name); }}
+                  className={s.card}
+                  style={{
+                    padding: "8px 14px",
+                    cursor: "pointer",
+                    minWidth: 110,
+                    borderColor: openCategory === drawer.name ? "var(--gold)" : undefined,
+                  }}
+                >
+                  <div style={{ height: 3, width: 24, background: "var(--border)", borderRadius: 2, marginBottom: 6 }} />
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{drawer.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    {drawer.count} item{drawer.count === 1 ? "" : "s"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Scrollable content area */}
@@ -742,7 +720,7 @@ return (
       {/* Cart panel */}
       <div
         style={{
-          width: 320,
+          width: 340,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
@@ -769,47 +747,29 @@ return (
           {cart.map((item) => (
             <div
               key={item.productId}
-              style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border)",
-                borderRadius: "10px",
-                padding: "10px",
-                marginBottom: "10px",
-              }}
+              style={{ padding: "10px 4px", borderBottom: "1px solid var(--border)" }}
             >
-              <div style={{ fontSize: "13px", fontWeight: 600 }}>{item.name}</div>
-
-              <div
-                style={{
-                  marginTop: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button className={s.filterBtn} onClick={() => decreaseQty(item.productId)}>
-                    -
-                  </button>
-                  <div style={{ minWidth: "24px", textAlign: "center" }}>{item.quantity}</div>
-                  <button className={s.filterBtn} onClick={() => increaseQty(item.productId)}>
-                    +
-                  </button>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
+                <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 600, whiteSpace: "nowrap" }}>
+                  KES {(item.quantity * item.price).toLocaleString()}
                 </div>
-
-                <button className={s.btnGhost} onClick={() => removeItem(item.productId)}>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button className={s.filterBtn} onClick={() => decreaseQty(item.productId)}>-</button>
+                  <div style={{ minWidth: 24, textAlign: "center" }}>{item.quantity}</div>
+                  <button className={s.filterBtn} onClick={() => increaseQty(item.productId)}>+</button>
+                </div>
+                <button className={s.btnGhost} style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => removeItem(item.productId)}>
                   Remove
                 </button>
-              </div>
-
-              <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--gold)" }}>
-                KES {(item.quantity * item.price).toLocaleString()}
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ padding: "16px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+        <div style={{ padding: 16, borderTop: "1px solid var(--border)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           <CustomerSelector
             orgId={orgId}
             value={selectedCustomer?.id || ""}
@@ -820,56 +780,35 @@ return (
             refreshKey={customerRefreshKey}
           />
 
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-              Pricelist for this sale
-            </div>
+          <div style={{ display: "flex", gap: 8 }}>
             <select
               value={pricelistOverride}
               onChange={(e) => setPricelistOverride(e.target.value)}
               className={s.input}
-              style={{ width: "100%" }}
+              aria-label="Pricelist for this sale"
+              style={{ flex: 1, minWidth: 0 }}
             >
               <option value="">
-                {selectedCustomer?.pricelist_id ? "Customer's assigned pricelist" : "Base price"}
+                {selectedCustomer?.pricelist_id ? "Pricelist: customer's own" : "Pricelist: base price"}
               </option>
-              <option value="base">Base price</option>
+              <option value="base">Pricelist: base price</option>
               {pricelists.map((pl) => (
                 <option key={pl.id} value={pl.id}>
-                  {pl.name}
+                  Pricelist: {pl.name}
                 </option>
               ))}
             </select>
+            <button className={s.btnGhost} onClick={() => setShowCustomerModal(true)}>
+              + Customer
+            </button>
           </div>
 
-          <button
-            className={s.btnGhost}
-            style={{ width: "100%", marginTop: 8 }}
-            onClick={() => setShowCustomerModal(true)}
-          >
-            + New Customer
-          </button>
-
-          <br />
-          <br />
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "12px",
-              fontWeight: 700,
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4, fontWeight: 700 }}>
             <span>Total</span>
-            <span>KES {cartTotal.toLocaleString()}</span>
+            <span style={{ fontSize: 20 }}>KES {cartTotal.toLocaleString()}</span>
           </div>
 
-          <button
-            className={s.btnGold}
-            onClick={() => setCheckoutOpen(true)}
-            style={{ width: "100%" }}
-          >
+          <button className={s.btnGold} onClick={() => setCheckoutOpen(true)} style={{ width: "100%", padding: "12px 0" }}>
             Checkout
           </button>
         </div>
