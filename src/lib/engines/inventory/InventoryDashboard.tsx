@@ -370,7 +370,12 @@ export default function InventoryDashboard() {
         </div>
       )}
 
-      <AddProductModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreated={loadInventory} />
+      <AddProductModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onCreated={loadInventory}
+        categories={Array.from(new Set(products.map((p) => p.category).filter((c): c is string => !!c))).sort()}
+      />
       <EditProductModal product={editingProduct} onClose={() => setEditingProduct(null)} onUpdated={loadInventory} />
       <MovementHistory />
     </div>

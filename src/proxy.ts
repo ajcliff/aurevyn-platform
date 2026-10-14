@@ -33,8 +33,9 @@ export async function proxy(req: NextRequest) {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            res.cookies.set(name, value);
+          // Keep the cookie options (maxAge/expires) so the session survives closing the app
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options);
           });
         },
       },
