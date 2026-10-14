@@ -139,6 +139,21 @@ async function handleSaveCustomTheme() {
         </p>
       </div>
 
+      <div className="card" style={{ ...cardStyle, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <div style={{ fontWeight: 600 }}>Two-factor sign-in</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            Ask for a code from an authenticator app each time you sign in. Recommended for owners and admins.
+          </div>
+        </div>
+        <a
+          href={`/account/security?next=${encodeURIComponent(`/org/${organization.id}/settings`)}`}
+          style={{ whiteSpace: "nowrap", fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 10, padding: "8px 14px", textDecoration: "none" }}
+        >
+          Manage
+        </a>
+      </div>
+
       <div
         className="card"
         style={{ ...cardStyle, marginBottom: 20, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}

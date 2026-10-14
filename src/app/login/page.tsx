@@ -11,25 +11,59 @@ function LoginInner() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [chooseOrgId, setChooseOrgId] = useState<string | null>(null);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
   const expired = searchParams.get("reason") === "expired";
 
+  // Sends a signed-in user to the right place; asks for the 2FA code first when they have it on
+  async function routeSignedIn(userId: string, userEmail: string | undefined, fresh: boolean) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const { data: f } = await supabase.auth.mfa.listFactors();
+      const totp = f?.totp?.[0];
+      if (totp) {
+        setMfaFactorId(totp.id);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", userId).limit(1).maybeSingle();
+
+    if (userEmail?.trim().toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase()) {
+      // Founder who also owns a workspace: let them pick which side to enter
+      if (membership?.org_id) {
+        setChooseOrgId(membership.org_id);
+        setLoading(false);
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+      return;
+    }
+
+    if (membership?.org_id) {
+      router.push(`/org/${membership.org_id}`);
+      router.refresh();
+      return;
+    }
+
+    if (fresh) {
+      setError("No organization found for this account.");
+      setLoading(false);
+    }
+  }
+
   // Already signed in (e.g. reopening the desktop app): go straight to the workspace
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (user.email?.toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase()) {
-        // Founder who also owns a workspace: let them pick which side to enter
-        if (membership?.org_id) setChooseOrgId(membership.org_id);
-        else router.replace("/dashboard");
-        return;
-      }
-      if (membership?.org_id) router.replace(`/org/${membership.org_id}`);
+      await routeSignedIn(user.id, user.email, false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -42,46 +76,81 @@ function LoginInner() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
-      setError(error.message);
+    if (error || !data.user) {
+      setError(error?.message ?? "Sign in failed.");
       setLoading(false);
       return;
     }
 
-    const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase();
-
-    const { data: membership } = await supabase
-      .from("org_users")
-      .select("org_id")
-      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (email.trim().toLowerCase() === founderEmail) {
-      if (membership?.org_id) {
-        setChooseOrgId(membership.org_id);
-        setLoading(false);
-        return;
-      }
-      router.push("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    if (membership?.org_id) {
-      router.push(`/org/${membership.org_id}`);
-      router.refresh();
-      return;
-    }
-
-    setError("No organization found for this account.");
-    setLoading(false);
+    await routeSignedIn(data.user.id, data.user.email, true);
   };
+
+  const handleMfa = async () => {
+    if (!mfaFactorId || mfaCode.length !== 6) return;
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code: mfaCode });
+    if (error) {
+      setError("That code didn't match. Wait for the next one and try again.");
+      setMfaCode("");
+      setLoading(false);
+      return;
+    }
+    setMfaFactorId(null);
+    setMfaCode("");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    await routeSignedIn(user.id, user.email, true);
+  };
+
+  if (mfaFactorId) {
+    return (
+      <AuthShell>
+        <div className="mkt-eyebrow" style={{ marginBottom: 6 }}>Two-factor</div>
+        <h1 className="mkt-h3" style={{ fontSize: "1.375rem" }}>Enter your code</h1>
+        <p className="mkt-body" style={{ fontSize: "0.875rem", marginTop: 6, marginBottom: 4 }}>
+          Open your authenticator app and enter the 6-digit code for AUREVYN.
+        </p>
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          maxLength={6}
+          value={mfaCode}
+          onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => e.key === "Enter" && handleMfa()}
+          placeholder="123456"
+          className="mkt-input"
+          style={{ marginTop: 12 }}
+        />
+        {error && <div className="mkt-alert-box" style={{ marginTop: 14 }}>{error}</div>}
+        <button onClick={handleMfa} disabled={loading || mfaCode.length !== 6} className="mkt-btn mkt-btn--primary mkt-btn--full" style={{ marginTop: 18 }}>
+          {loading ? "Checking…" : "Verify"}
+        </button>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setMfaFactorId(null);
+              setError("");
+            }}
+            className="mkt-mono"
+            style={{ background: "none", border: "none", color: "var(--mkt-paper-faint)", fontSize: "0.75rem", cursor: "pointer" }}
+          >
+            Use a different account
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
 
   if (chooseOrgId) {
     const go = (path: string) => {

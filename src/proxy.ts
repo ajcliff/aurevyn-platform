@@ -55,6 +55,19 @@ export async function proxy(req: NextRequest) {
   const email = user.email;
   const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
 
+  // Two-factor is mandatory for the founder: no founder pages or APIs until the code is entered
+  if (email?.toLowerCase() === founderEmail?.toLowerCase() && !pathname.startsWith("/account/security")) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.currentLevel !== "aal2") {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "mfa_required" }, { status: 401 });
+      }
+      // No authenticator yet → set one up; has one → enter the code at login
+      const target = aal.nextLevel === "aal2" ? "/login" : "/account/security?required=1";
+      return NextResponse.redirect(new URL(target, req.url));
+    }
+  }
+
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isOrgRoute = pathname.startsWith("/org");
 
