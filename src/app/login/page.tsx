@@ -10,6 +10,7 @@ function LoginInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [chooseOrgId, setChooseOrgId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -21,11 +22,13 @@ function LoginInner() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", user.id).limit(1).maybeSingle();
       if (user.email?.toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase()) {
-        router.replace("/dashboard");
+        // Founder who also owns a workspace: let them pick which side to enter
+        if (membership?.org_id) setChooseOrgId(membership.org_id);
+        else router.replace("/dashboard");
         return;
       }
-      const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", user.id).limit(1).maybeSingle();
       if (membership?.org_id) router.replace(`/org/${membership.org_id}`);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,17 +55,23 @@ function LoginInner() {
 
     const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase();
 
-    if (email.toLowerCase() === founderEmail) {
-      router.push("/dashboard");
-      router.refresh();
-      return;
-    }
-
     const { data: membership } = await supabase
       .from("org_users")
       .select("org_id")
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-      .single();
+      .limit(1)
+      .maybeSingle();
+
+    if (email.trim().toLowerCase() === founderEmail) {
+      if (membership?.org_id) {
+        setChooseOrgId(membership.org_id);
+        setLoading(false);
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
 
     if (membership?.org_id) {
       router.push(`/org/${membership.org_id}`);
@@ -73,6 +82,40 @@ function LoginInner() {
     setError("No organization found for this account.");
     setLoading(false);
   };
+
+  if (chooseOrgId) {
+    const go = (path: string) => {
+      router.push(path);
+      router.refresh();
+    };
+    return (
+      <AuthShell>
+        <div className="mkt-eyebrow" style={{ marginBottom: 6 }}>Signed in</div>
+        <h1 className="mkt-h3" style={{ fontSize: "1.375rem" }}>Where to?</h1>
+        <p className="mkt-body" style={{ fontSize: "0.875rem", marginTop: 6, marginBottom: 16 }}>
+          This account runs AUREVYN and also owns a business workspace.
+        </p>
+        <button onClick={() => go("/dashboard")} className="mkt-btn mkt-btn--primary mkt-btn--full">
+          AUREVYN Founder console
+        </button>
+        <button onClick={() => go(`/org/${chooseOrgId}`)} className="mkt-btn mkt-btn--ghost mkt-btn--full" style={{ marginTop: 10 }}>
+          My business workspace
+        </button>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setChooseOrgId(null);
+            }}
+            className="mkt-mono"
+            style={{ background: "none", border: "none", color: "var(--mkt-paper-faint)", fontSize: "0.75rem", cursor: "pointer" }}
+          >
+            Sign out
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell>

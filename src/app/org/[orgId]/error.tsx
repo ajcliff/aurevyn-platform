@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { logError } from "@/lib/errorLog";
 import { formatError } from "@/lib/errorFormat";
+import { isStaleChunkError, autoReloadOnce } from "@/lib/chunkReload";
 
 export default function OrgError({
   error,
@@ -18,13 +19,21 @@ export default function OrgError({
   const orgId = params?.orgId ?? null;
   const logged = useRef(false);
   const message = formatError(error);
+  const stale = isStaleChunkError(error);
+  const [reloading, setReloading] = useState(false);
+
+  // A new version was deployed while this page was open: reload once, quietly
+  useEffect(() => {
+    if (stale && autoReloadOnce()) setReloading(true);
+  }, [stale]);
 
   // Page crashes always reach the founder's Error Logs, with this org attached
   useEffect(() => {
     if (logged.current) return;
+    if (reloading) return;
     logged.current = true;
     logError({ source: "org/page-crash", message, code: error.digest ?? null, orgId, context: { url: window.location.pathname }, severity: "critical" });
-  }, [message, error.digest, orgId]);
+  }, [message, error.digest, orgId, reloading]);
 
   async function sendReport() {
     if (!orgId) return;
@@ -84,8 +93,13 @@ export default function OrgError({
       >
         <div style={{ fontSize: 28, marginBottom: 10 }}>⚠️</div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8 }}>
-          Something went wrong
+          {stale ? "A new version of AUREVYN is available" : "Something went wrong"}
         </div>
+        {stale && (
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Reload to pick up the update. Your data is safe.
+          </div>
+        )}
         <div
           style={{
             fontSize: 12,
@@ -105,7 +119,7 @@ export default function OrgError({
 
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button
-            onClick={reset}
+            onClick={() => window.location.reload()}
             style={{
               background: "var(--gold)",
               color: "var(--gold-contrast)",
@@ -116,6 +130,12 @@ export default function OrgError({
               fontSize: 12,
               cursor: "pointer",
             }}
+          >
+            {reloading ? "Updating…" : "Reload page"}
+          </button>
+          <button
+            onClick={reset}
+            style={{ background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 18px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
           >
             Try again
           </button>

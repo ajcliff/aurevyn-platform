@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatError } from "@/lib/errorFormat";
+import { isStaleChunkError, autoReloadOnce } from "@/lib/chunkReload";
 
 export default function RootError({
   error,
@@ -12,6 +13,12 @@ export default function RootError({
 }) {
   const [copied, setCopied] = useState(false);
   const message = formatError(error);
+
+  const stale = isStaleChunkError(error);
+
+  useEffect(() => {
+    if (stale) autoReloadOnce();
+  }, [stale]);
 
   useEffect(() => {
     console.error("Root error:", error);
@@ -78,7 +85,7 @@ export default function RootError({
 
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button
-            onClick={reset}
+            onClick={() => window.location.reload()}
             style={{
               background: "#C9A227",
               color: "#1A0F14",
@@ -89,6 +96,12 @@ export default function RootError({
               fontSize: 12,
               cursor: "pointer",
             }}
+          >
+            Reload page
+          </button>
+          <button
+            onClick={reset}
+            style={{ background: "transparent", color: "#A08B94", border: "1px solid #3D2530", borderRadius: 10, padding: "9px 18px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
           >
             Try again
           </button>

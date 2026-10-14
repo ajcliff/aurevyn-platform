@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatError } from "@/lib/errorFormat";
+import { isStaleChunkError, autoReloadOnce } from "@/lib/chunkReload";
 
 export default function DashboardError({
   error,
@@ -12,6 +13,10 @@ export default function DashboardError({
 }) {
   const [copied, setCopied] = useState(false);
   const message = formatError(error);
+
+  useEffect(() => {
+    if (isStaleChunkError(error)) autoReloadOnce();
+  }, [error]);
 
   useEffect(() => {
     // Still log to the browser console for anyone who does have dev tools open —
@@ -79,7 +84,7 @@ export default function DashboardError({
 
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button
-            onClick={reset}
+            onClick={() => window.location.reload()}
             style={{
               background: "var(--gold)",
               color: "var(--gold-contrast)",
@@ -90,6 +95,12 @@ export default function DashboardError({
               fontSize: 12,
               cursor: "pointer",
             }}
+          >
+            Reload page
+          </button>
+          <button
+            onClick={reset}
+            style={{ background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 18px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
           >
             Try again
           </button>
