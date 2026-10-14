@@ -119,7 +119,8 @@ export async function getSaleItems(saleId: string) {
 export async function createSale(
   sale: PosSale,
   client?: ReturnType<typeof createClient>,
-  financeAccountId?: string
+  financeAccountId?: string,
+  opts?: { onCredit?: boolean }
 ) {
   const supabase = client ?? createClient();
 
@@ -190,7 +191,7 @@ export async function createSale(
   }
 
   if ((sale.status ?? "completed") === "completed") {
-    await postSaleJournal({ ...saleData, cogs_amount: cogsAmount, financeAccountId });
+    await postSaleJournal({ ...saleData, cogs_amount: cogsAmount, financeAccountId, onCredit: opts?.onCredit });
   }
 
   return saleData;

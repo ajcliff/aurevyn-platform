@@ -243,10 +243,14 @@ export async function postSaleJournal(sale: {
   cogs_amount?: number;
   created_at?: string;
   financeAccountId?: string | null;
+  onCredit?: boolean;
 }): Promise<void> {
   const supabase = createClient();
 
-  const assetAccountId = await getAssetAccountId(supabase, sale.org_id, sale.financeAccountId ?? null);
+  // A credit sale puts the money owed on Accounts Receivable instead of cash
+  const assetAccountId = sale.onCredit
+    ? await getOrCreateDefaultAccount(supabase, sale.org_id, "1100", "Accounts Receivable", "asset")
+    : await getAssetAccountId(supabase, sale.org_id, sale.financeAccountId ?? null);
   const revenueAccountId = await getOrCreateDefaultAccount(supabase, sale.org_id, "4000", "Sales Revenue", "income");
 
   const total = Number(sale.total);
@@ -625,4 +629,41 @@ export async function getTrialBalance(orgId: string): Promise<TrialBalance> {
     totalCredits,
     balanced: Math.abs(totalDebits - totalCredits) < 0.01,
   };
+}
+
+
+// Posts a payment received from a credit customer: debit the account the money
+// landed in (bank / M-Pesa / cash), credit Accounts Receivable.
+export async function postReceivablePaymentJournal(input: {
+  orgId: string;
+  customerId: string;
+  customerName: string;
+  amount: number;
+  date: string;
+  financeAccountId?: string | null;
+}): Promise<void> {
+  if (input.amount <= 0) return;
+  const supabase = createClient();
+
+  const arAccountId = await getOrCreateDefaultAccount(supabase, input.orgId, "1100", "Accounts Receivable", "asset");
+  const assetAccountId = await getAssetAccountId(supabase, input.orgId, input.financeAccountId ?? null);
+
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .insert({
+      org_id: input.orgId,
+      source_type: "customer_payment",
+      source_id: input.customerId,
+      description: `Payment from ${input.customerName}`,
+      date: input.date,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: lineError } = await supabase.from("journal_lines").insert([
+    { entry_id: entry.id, org_id: input.orgId, coa_id: assetAccountId, debit: input.amount, credit: 0 },
+    { entry_id: entry.id, org_id: input.orgId, coa_id: arAccountId, debit: 0, credit: input.amount },
+  ]);
+  if (lineError) throw lineError;
 }

@@ -749,7 +749,7 @@ const iconBtn: React.CSSProperties = {
 };
 
 const FINANCE_LINKS = [
-  { label: "Sales", items: [{ label: "Invoices", path: "invoices" }] },
+  { label: "Sales", items: [{ label: "Invoices", path: "invoices" }, { label: "Credit Customers", path: "customers" }] },
   { label: "Reports", items: [
     { label: "Profit & Loss", path: "reports/profit-loss" },
     { label: "Balance Sheet", path: "reports/balance-sheet" },

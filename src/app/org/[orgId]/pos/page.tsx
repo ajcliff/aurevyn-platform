@@ -26,6 +26,7 @@ import {
 import { getWarehouses, getStockLevelsMap, type Warehouse } from "@/lib/warehouses";
 import { getEffectivePrice, getPricelists, type Pricelist } from "@/lib/pricelists";
 import { type Customer } from "@/lib/customers";
+import { getCreditBalance, reserveCredit, linkCreditToSale, cancelCredit, creditErrorMessage } from "@/lib/customerCredit";
 
 import s from "@/styles/layout.module.css";
 import ReceiptModal from "@/components/pos/ReceiptModal";
@@ -145,6 +146,17 @@ const [selectedDiscountId, setSelectedDiscountId] =
   useState("");
 
 const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+const [onCredit, setOnCredit] = useState(false);
+useEffect(() => {
+  const id = selectedCustomer?.id;
+  if (!id || !selectedCustomer?.credit_limit) return;
+  let active = true;
+  getCreditBalance(id).then((b) => { if (active) setCreditBalance(b); });
+  return () => { active = false; };
+}, [selectedCustomer?.id, selectedCustomer?.credit_limit, checkoutOpen]);
+const [creditBalance, setCreditBalance] = useState(0);
+const creditLimit = Number(selectedCustomer?.credit_limit ?? 0);
+const creditAvailable = Math.max(0, creditLimit - creditBalance);
 
   const supabase = createClient();
 
@@ -418,7 +430,16 @@ function handleExportSalesCSV() {
       return;
     }
 
-    if (!paymentValid || paymentLines.length === 0) {
+    if (onCredit) {
+      if (!selectedCustomer?.id || creditLimit <= 0) {
+        alert("Pick a customer with a credit limit to sell on credit.");
+        return;
+      }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        alert("Credit sales need a connection so the customer's balance is checked. Take payment now, or wait until you're back online.");
+        return;
+      }
+    } else if (!paymentValid || paymentLines.length === 0) {
       alert("Complete the payment details before finishing the sale");
       return;
     }
@@ -436,7 +457,7 @@ function handleExportSalesCSV() {
         total: item.quantity * item.price
       }));
 
-      const methodSummary = paymentLines.map((l) => methodLabel(l.method)).join(" + ");
+      const methodSummary = onCredit ? "Credit" : paymentLines.map((l) => methodLabel(l.method)).join(" + ");
 
       // Only attribute to a specific bank/mobile-money/cash account when the
       // whole sale used one payment method — a split-tender sale (part cash,
@@ -445,7 +466,7 @@ function handleExportSalesCSV() {
       // back to the generic "Unspecified Cash" bucket in that case, same as
       // before this change.
       const financeAccountId =
-        paymentLines.length === 1 ? resolveFinanceAccountId(paymentLines[0].method) : undefined;
+        !onCredit && paymentLines.length === 1 ? resolveFinanceAccountId(paymentLines[0].method) : undefined;
 
       sale = {
         customer_name:
@@ -488,7 +509,28 @@ function handleExportSalesCSV() {
       // no-op there), so behavior is unchanged outside of small screens.
       const saleClient = isMobileViewport() ? createClient({ allowMobileWrites: true }) : createClient();
 
-      const created = await createSale(sale, saleClient, financeAccountId);
+      // Credit: reserve it first (the database refuses anything over the limit), then sell
+      let creditEntryId: string | null = null;
+      if (onCredit && selectedCustomer?.id) {
+        try {
+          creditEntryId = await reserveCredit(
+            { orgId, customerId: selectedCustomer.id, amount: grandTotal, termsDays: selectedCustomer.credit_terms_days ?? 30, recordedBy: "AUREVYN POS" },
+            saleClient
+          );
+        } catch (creditErr) {
+          alert(creditErrorMessage(creditErr));
+          return;
+        }
+      }
+
+      let created;
+      try {
+        created = await createSale(sale, saleClient, financeAccountId, { onCredit });
+      } catch (saleErr) {
+        if (creditEntryId) await cancelCredit(creditEntryId, saleClient);
+        throw saleErr;
+      }
+      if (creditEntryId) await linkCreditToSale(creditEntryId, created.id, saleClient);
 setCompletedSale({
   ...created,
   id: created.id!,
@@ -496,7 +538,7 @@ setCompletedSale({
   items,
 });
 
-      for (const line of paymentLines) {
+      for (const line of onCredit ? [] : paymentLines) {
         await recordPayment({
           orgId,
           sourceType: "pos_sale",
@@ -529,6 +571,7 @@ await logActivity({
       setPaymentLines([]);
       setPaymentValid(false);
       setChangeDue(0);
+      setOnCredit(false);
 
 const [productsData, salesData, stockLevelsData] =
   await Promise.all([
@@ -550,7 +593,7 @@ setStockLevels(stockLevelsData);
         typeof navigator !== "undefined" && !navigator.onLine ||
         /fetch|network|Failed to fetch/i.test(message);
 
-      if (looksLikeNetworkFailure && sale) {
+      if (looksLikeNetworkFailure && sale && !onCredit) {
         queueOfflineSale(
           sale,
           paymentLines,
@@ -775,6 +818,8 @@ return (
             value={selectedCustomer?.id || ""}
             onChange={(c) => {
               setSelectedCustomer(c);
+              setOnCredit(false);
+              setCreditBalance(0);
               setPricelistOverride(""); // back to automatic (that customer's own pricelist) on switch
             }}
             refreshKey={customerRefreshKey}
@@ -871,7 +916,24 @@ return (
                 <strong>KES {grandTotal.toLocaleString()}</strong>
               </div>
 
-              <div style={{ marginTop: 20 }}>
+              {creditLimit > 0 && (
+                <div style={{ marginTop: 16, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, fontSize: 13 }}>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontWeight: 600 }}>
+                    <input type="checkbox" checked={onCredit} onChange={(e) => setOnCredit(e.target.checked)} />
+                    Sell on credit to {selectedCustomer?.name}
+                  </label>
+                  <div style={{ marginTop: 6, color: "var(--text-muted)", fontSize: 12 }}>
+                    Owes KES {creditBalance.toLocaleString()} · Limit KES {creditLimit.toLocaleString()} · Available KES {creditAvailable.toLocaleString()}
+                  </div>
+                  {onCredit && grandTotal > creditAvailable && (
+                    <div style={{ marginTop: 6, color: "#ef4444", fontWeight: 600, fontSize: 12 }}>
+                      Over the credit limit by KES {(grandTotal - creditAvailable).toLocaleString()}. Take part payment now or remove items.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginTop: 20, display: onCredit ? "none" : "block" }}>
                 <SplitPaymentEditor
                   totalAmount={grandTotal}
                   onChange={(lines, valid, change) => {
@@ -889,13 +951,13 @@ return (
                 <button
                   className={s.btnGold}
                   style={{ flex: 1 }}
-                  disabled={!paymentValid || loading}
+                  disabled={(onCredit ? grandTotal > creditAvailable : !paymentValid) || loading}
                   onClick={async () => {
                     await handleCompleteSale();
                     setCheckoutOpen(false);
                   }}
                 >
-                  {loading ? "Processing..." : "Complete Payment"}
+                  {loading ? "Processing..." : onCredit ? "Complete on Credit" : "Complete Payment"}
                 </button>
               </div>
             </div>

@@ -11,6 +11,11 @@ export interface Customer {
   loyalty_points?: number;
   pricelist_id?: string | null;
 
+  company?: string | null;
+  credit_limit?: number;
+  credit_terms_days?: number;
+  notes?: string | null;
+
   created_at?: string;
 }
 
@@ -39,5 +44,11 @@ export async function createCustomer(customer: Customer) {
 
   if (error) throw error;
 
+  return data;
+}
+export async function updateCustomer(id: string, updates: Partial<Customer>) {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("customers").update(updates).eq("id", id).select().single();
+  if (error) throw error;
   return data;
 }
