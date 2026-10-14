@@ -761,6 +761,7 @@ const FINANCE_LINKS = [
     { label: "Pending Cheques", path: "cheques" },
     { label: "Creditors", path: "creditors" },
     { label: "Petty Cash", path: "petty-cash" },
+    { label: "Reconcile Accounts", path: "reconcile" },
     { label: "Unattributed Cash", path: "unattributed" },
   ] },
   { label: "Payroll & tax", items: [{ label: "Statutory Remittance", path: "statutory" }] },
