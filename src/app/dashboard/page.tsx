@@ -8,7 +8,7 @@ import OrgsNeedingAttention from "@/components/OrgsNeedingAttention";
 import GreetingHeader from "@/components/GreetingHeader";
 import ErrorBanner from "@/components/ErrorBanner";
 import { getOrganizations, updateOrganization, type Organization } from "@/lib/organizations";
-import { getPlatformPaymentsSince } from "@/lib/payments";
+import { getReceipts } from "@/lib/receipts";
 import { formatError } from "@/lib/errorFormat";
 import { createClient } from "@/lib/supabase";
 import { logError } from "@/lib/errorLog";
@@ -26,6 +26,7 @@ export default function Home() {
   const [range, setRange] = useState<Range>("7d");
   const [dailyRevenue, setDailyRevenue] = useState<number[]>([]);
   const [growthPct, setGrowthPct] = useState<number | null>(null);
+  const [monthReceived, setMonthReceived] = useState(0);
 
   const days = range === "7d" ? 7 : 30;
 
@@ -37,15 +38,20 @@ export default function Home() {
       const since = new Date(today);
       since.setDate(since.getDate() - (days * 2 - 1));
 
-      const payments = await getPlatformPaymentsSince(since.toISOString());
+      // AUREVYN's own income: receipts issued when customers pay their invoices
+      // (never the sales rings up inside each customer's business)
+      const allReceipts = await getReceipts();
+      const receipts = allReceipts.filter((r) => new Date(r.paid_at) >= since);
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      setMonthReceived(allReceipts.filter((r) => r.paid_at.slice(0, 7) === thisMonth).reduce((t, r) => t + Number(r.amount_kes), 0));
 
       const buckets: number[] = Array(days * 2).fill(0);
       const startTime = since.getTime();
       const msPerDay = 86400000;
 
-      for (const p of payments) {
-        const dayIndex = Math.floor((new Date(p.created_at).getTime() - startTime) / msPerDay);
-        if (dayIndex >= 0 && dayIndex < buckets.length) buckets[dayIndex] += p.amount;
+      for (const r of receipts) {
+        const dayIndex = Math.floor((new Date(r.paid_at).getTime() - startTime) / msPerDay);
+        if (dayIndex >= 0 && dayIndex < buckets.length) buckets[dayIndex] += Number(r.amount_kes);
       }
 
       const currentPeriod = buckets.slice(days);
@@ -108,10 +114,7 @@ export default function Home() {
     }
   }
 
-  const totalRevenue = orgs.reduce((sum, org) => {
-    const num = parseInt(org.revenue.replace(/[^0-9]/g, "")) || 0;
-    return sum + num;
-  }, 0);
+  const totalRevenue = monthReceived;
 
   const activeOrgs = orgs.filter(o => o.status === "operational").length;
   const flagged = orgs.length - activeOrgs;
@@ -154,7 +157,7 @@ export default function Home() {
                   <div className={f.figLabel}>Monthly revenue</div>
                   <div className={f.fig}>{kes(totalRevenue)}</div>
                   <p className={f.figNote}>
-                    {kes(periodTotal)} in payments over the last {days} days
+                    {kes(periodTotal)} received from customers over the last {days} days
                     {growthPct === null ? "." : (
                       <>
                         , <span className={growthPct >= 0 ? f.up : f.down}>{growthPct >= 0 ? "up" : "down"} {Math.abs(growthPct)}%</span>{" "}

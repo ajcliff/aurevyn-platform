@@ -1,517 +1,283 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getFinanceTransactions, getFinanceExpenses, getCashflow, createTransaction, createExpense, type FinanceTransaction, type FinanceExpense, type CashflowEntry } from "@/lib/finance";
-import { getLedgerPnL, getCashPosition, type LedgerPnL, type CashPosition } from "@/lib/journal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { getReceipts, type Receipt } from "@/lib/receipts";
+import { getInvoices, type Invoice } from "@/lib/invoices";
 import { getOrganizations, type Organization } from "@/lib/organizations";
-import { logActivity } from "@/lib/activity";
+import { getCompanyExpenses, createCompanyExpense, deleteCompanyExpense, type CompanyExpense, type ExpenseCategory } from "@/lib/companyExpenses";
 import { formatError } from "@/lib/errorFormat";
 import ErrorBanner from "@/components/ErrorBanner";
 import s from "@/styles/layout.module.css";
 import PageHeader from "@/components/PageHeader";
-type Tab = "overview" | "transactions" | "expenses" | "cashflow";
 
-const paymentMethodIcons: Record<string, string> = {
-  mpesa: "📱", bank: "🏦", cash: "💵", card: "💳",
-};
+type Tab = "income" | "expenses" | "owed";
+type Range = "month" | "all";
 
-const categoryColors: Record<string, string> = {
-  subscription: "#3dd68c", revenue: "#3dd68c",
-  payroll: "#a78bfa", operations: "#f59e0b",
-  software: "#38bdf8", marketing: "#ec4899",
-  utilities: "#f59e0b", other: "#6b7280",
-};
+const CATEGORIES: ExpenseCategory[] = ["hosting", "domains", "apis", "subscriptions", "software", "legal", "marketing", "other"];
 
-function formatKES(amount: number) {
-  return `KES ${amount.toLocaleString()}`;
-}
+const kes = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
+const today = () => new Date().toISOString().slice(0, 10);
+const monthStart = () => new Date().toISOString().slice(0, 7) + "-01";
 
-function timeAgo(dateStr: string) {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  return `${diff} days ago`;
-}
-
-export default function FinancePage() {
+export default function FounderFinancePage() {
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState("");
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
-  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
-  const [cashflow, setCashflow] = useState<CashflowEntry[]>([]);
-  const [pnl, setPnl] = useState<LedgerPnL>({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
-  const [cashPosition, setCashPosition] = useState<CashPosition>({ total: 0, byAccountId: {}, unattributed: 0 });
-  const [tab, setTab] = useState<Tab>("overview");
-  const [showAddTx, setShowAddTx] = useState(false);
-  const [showAddExpense, setShowAddExpense] = useState(false);
-  const [txFilter, setTxFilter] = useState("all");
-  const [newTx, setNewTx] = useState({ type: "income" as "income" | "expense", amount: "", description: "", category: "", payment_method: "mpesa", date: new Date().toISOString().split("T")[0] });
-  const [newExpense, setNewExpense] = useState({ title: "", amount: "", category: "", vendor: "", payment_method: "mpesa", date: new Date().toISOString().split("T")[0], notes: "", status: "paid" });
-  const [orgsLoading, setOrgsLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
+  const [expenses, setExpenses] = useState<CompanyExpense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("income");
+  const [range, setRange] = useState<Range>("month");
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ date: today(), category: "hosting" as ExpenseCategory, vendor: "", description: "", amount: "", notes: "" });
 
-  useEffect(() => {
-    loadOrgs();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [r, i, o, e] = await Promise.all([getReceipts(), getInvoices(), getOrganizations(), getCompanyExpenses()]);
+      setReceipts(r);
+      setInvoices(i);
+      setOrgs(o);
+      setExpenses(e);
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  async function loadOrgs() {
-    setOrgsLoading(true);
-    setError(null);
-    try {
-      const orgsData = await getOrganizations();
-      setOrgs(orgsData);
-      if (orgsData.length > 0) setSelectedOrgId(orgsData[0].id);
-    } catch (err) {
-      setError(formatError(err));
-    } finally {
-      setOrgsLoading(false);
-    }
-  }
-
   useEffect(() => {
-    if (!selectedOrgId) return;
-    loadFinanceData();
-  }, [selectedOrgId]);
+    load();
+  }, [load]);
 
-  async function loadFinanceData() {
-    setDataLoading(true);
-    setError(null);
+  const orgName = useMemo(() => new Map(orgs.map((o) => [o.id, o.name])), [orgs]);
+  const invoiceById = useMemo(() => new Map(invoices.map((i) => [i.id, i])), [invoices]);
+
+  const from = range === "month" ? monthStart() : "0000-01-01";
+  const inRange = (isoDate: string) => isoDate.slice(0, 10) >= from;
+
+  const rangeReceipts = receipts.filter((r) => inRange(r.paid_at));
+  const rangeExpenses = expenses.filter((e) => inRange(e.date));
+  const totalReceived = rangeReceipts.reduce((t, r) => t + Number(r.amount_kes), 0);
+  const totalSpent = rangeExpenses.reduce((t, e) => t + Number(e.amount), 0);
+  const net = totalReceived - totalSpent;
+
+  const unpaid = invoices.filter((i) => i.status !== "paid");
+  const outstanding = unpaid.reduce((t, i) => t + Number(i.amount_kes ?? 0), 0);
+
+  async function addExpense() {
+    const amount = Number(form.amount);
+    if (!form.description.trim() || !(amount > 0)) return;
+    setSaving(true);
     try {
-      const [txData, expData, cfData, pnlData, cashData] = await Promise.all([
-        getFinanceTransactions(selectedOrgId),
-        getFinanceExpenses(selectedOrgId),
-        getCashflow(selectedOrgId),
-        getLedgerPnL(selectedOrgId),
-        getCashPosition(selectedOrgId),
-      ]);
-      setTransactions(txData);
-      setExpenses(expData);
-      setCashflow(cfData);
-      setPnl(pnlData);
-      setCashPosition(cashData);
+      await createCompanyExpense({
+        date: form.date,
+        category: form.category,
+        vendor: form.vendor.trim() || undefined,
+        description: form.description.trim(),
+        amount,
+        currency: "KES",
+        notes: form.notes.trim() || undefined,
+      });
+      setShowAdd(false);
+      setForm({ date: today(), category: "hosting", vendor: "", description: "", amount: "", notes: "" });
+      setTab("expenses");
+      await load();
     } catch (err) {
       setError(formatError(err));
     } finally {
-      setDataLoading(false);
+      setSaving(false);
     }
   }
 
-  const totalIncome = pnl.totalIncome;
-  const totalExpenses = pnl.totalExpenses;
-  const netProfit = pnl.netProfit;
-  const totalInflow = cashflow.filter(c => c.type === "inflow").reduce((sum, c) => sum + c.amount, 0);
-  const totalOutflow = cashflow.filter(c => c.type === "outflow").reduce((sum, c) => sum + c.amount, 0);
-  const netCashflow = totalInflow - totalOutflow;
-
-  const filteredTx = transactions.filter(t => txFilter === "all" || t.type === txFilter);
-
-  const handleAddTx = async () => {
-    if (!newTx.amount || !newTx.description || !selectedOrgId) return;
-    setActionError(null);
+  async function removeExpense(id: string) {
+    if (!window.confirm("Delete this expense?")) return;
     try {
-      const created = await createTransaction({
-        org_id: selectedOrgId,
-        account_id: null,
-        type: newTx.type,
-        amount: parseFloat(newTx.amount),
-        currency: "KES",
-        description: newTx.description,
-        category: newTx.category,
-        reference: "",
-        payment_method: newTx.payment_method,
-        status: "completed",
-        date: newTx.date,
-      });
-      await logActivity({ icon: newTx.type === "income" ? "💰" : "💸", title: `${newTx.type === "income" ? "Income" : "Expense"} recorded`, sub: `${formatKES(parseFloat(newTx.amount))} — ${newTx.description}` });
-      setTransactions(prev => [created, ...prev]);
-      setShowAddTx(false);
-      setNewTx({ type: "income", amount: "", description: "", category: "", payment_method: "mpesa", date: new Date().toISOString().split("T")[0] });
+      await deleteCompanyExpense(id);
+      setExpenses((list) => list.filter((e) => e.id !== id));
     } catch (err) {
-      setActionError(formatError(err));
+      setError(formatError(err));
     }
-  };
+  }
 
-  const handleAddExpense = async () => {
-    if (!newExpense.amount || !newExpense.title || !selectedOrgId) return;
-    setActionError(null);
-    try {
-      const created = await createExpense({
-        org_id: selectedOrgId,
-        title: newExpense.title,
-        amount: parseFloat(newExpense.amount),
-        currency: "KES",
-        category: newExpense.category,
-        vendor: newExpense.vendor,
-        payment_method: newExpense.payment_method,
-        status: newExpense.status,
-        date: newExpense.date,
-        notes: newExpense.notes,
-      });
-      await logActivity({ icon: "💸", title: "Expense recorded", sub: `${formatKES(parseFloat(newExpense.amount))} — ${newExpense.title}` });
-      setExpenses(prev => [created, ...prev]);
-      setShowAddExpense(false);
-      setNewExpense({ title: "", amount: "", category: "", vendor: "", payment_method: "mpesa", date: new Date().toISOString().split("T")[0], notes: "", status: "paid" });
-    } catch (err) {
-      setActionError(formatError(err));
-    }
-  };
-
-  const selectedOrg = orgs.find(o => o.id === selectedOrgId);
+  const th: React.CSSProperties = { textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 10px", borderBottom: "1px solid var(--border)" };
+  const td: React.CSSProperties = { fontSize: 12.5, padding: "9px 10px", borderBottom: "1px solid var(--border)" };
 
   return (
     <div className="page-shell">
-     
       <div className={s.body}>
-        
         <main className="page-main">
-
-          {/* Header */}
           <PageHeader
-  title="Finance Engine"
-  subtitle="Financial management · Income · Expenses · Cashflow"
-  actions={
-    <>
-      <select
-        value={selectedOrgId}
-        onChange={e => setSelectedOrgId(e.target.value)}
-        className={s.input}
-        style={{ width: "180px" }}
-      >
-        {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-      <button className={s.btnGold} onClick={() => setShowAddTx(true)}>+ Transaction</button>
-      <button className={s.btnGhost} onClick={() => setShowAddExpense(true)}>+ Expense</button>
-    </>
-  }
-/>
+            title="AUREVYN finances"
+            subtitle="What customers pay AUREVYN, and what AUREVYN spends. Your own books, not any customer's."
+            actions={
+              <>
+                <select value={range} onChange={(e) => setRange(e.target.value as Range)} className={s.input} style={{ width: 130 }}>
+                  <option value="month">This month</option>
+                  <option value="all">All time</option>
+                </select>
+                <button className={s.btnGold} onClick={() => setShowAdd(true)}>+ Expense</button>
+              </>
+            }
+          />
 
-          {/* Org context */}
-          {selectedOrg && (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: "var(--bg-card)", borderRadius: "10px", border: "1px solid var(--border)" }}>
-              <span style={{ fontSize: "16px" }}>🏢</span>
-              <div>
-                <span style={{ fontSize: "13px", fontWeight: 600 }}>{selectedOrg.name}</span>
-                <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: "8px" }}>{selectedOrg.location} · {selectedOrg.package}</span>
-              </div>
-            </div>
-          )}
+          {error && <ErrorBanner message={error} source="dashboard/finance" onRetry={load} />}
 
-          {error && (
-            <ErrorBanner
-              message={error}
-              source="dashboard/finance"
-              onRetry={selectedOrgId ? loadFinanceData : loadOrgs}
-            />
-          )}
-
-          {orgsLoading ? (
-            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
-              Loading organizations...
-            </div>
-          ) : dataLoading ? (
-            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
-              Loading finance data...
-            </div>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>Loading…</div>
           ) : (
-          <>
-          {/* Summary cards */}
-          <div className={s.summaryCards}>
-            {[
-              { label: "Total Income", value: formatKES(totalIncome), color: "#3dd68c", sub: "POS, payroll, PO & manual", icon: "📈" },
-              { label: "Total Expenses", value: formatKES(totalExpenses), color: "#ef4444", sub: "POS, payroll, PO & manual", icon: "📉" },
-              { label: "Net Profit", value: formatKES(netProfit), color: netProfit >= 0 ? "#3dd68c" : "#ef4444", sub: netProfit >= 0 ? "Profitable" : "Loss", icon: "💰" },
-              { label: "Net Cashflow", value: formatKES(netCashflow), color: netCashflow >= 0 ? "#3dd68c" : "#ef4444", sub: `↑ ${formatKES(totalInflow)} · ↓ ${formatKES(totalOutflow)}`, icon: "💧" },
-              { label: "Cash Position", value: formatKES(cashPosition.total), color: "#3dd68c", sub: cashPosition.unattributed !== 0 ? `KES ${cashPosition.unattributed.toLocaleString()} unattributed` : "All accounts", icon: "🏦" },
-            ].map((card, i) => (
-              <div key={i} className={s.card} style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{card.label}</span>
-                  <span style={{ fontSize: "16px" }}>{card.icon}</span>
-                </div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: card.color }}>{card.value}</div>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>{card.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--border)", paddingBottom: "0" }}>
-            {(["overview", "transactions", "expenses", "cashflow"] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={{
-                  padding: "8px 16px", borderRadius: "8px 8px 0 0",
-                  border: "none", background: tab === t ? "var(--bg-card)" : "transparent",
-                  color: tab === t ? "var(--gold)" : "var(--text-muted)",
-                  fontSize: "12px", fontWeight: tab === t ? 700 : 400,
-                  cursor: "pointer", fontFamily: "inherit",
-                  borderBottom: tab === t ? "2px solid var(--gold)" : "2px solid transparent",
-                  textTransform: "capitalize",
-                }}
-              >{t}</button>
-            ))}
-          </div>
-
-          {/* OVERVIEW TAB */}
-          {tab === "overview" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {/* Recent transactions */}
-              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>RECENT TRANSACTIONS</div>
-              {transactions.slice(0, 6).map((tx, i) => (
-                <div key={tx.id} style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  padding: "12px 14px", background: "var(--bg-card)",
-                  borderRadius: "10px", border: "1px solid var(--border)",
-                }}>
-                  <div style={{
-                    width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-                    background: tx.type === "income" ? "rgba(61,214,140,0.1)" : "rgba(239,68,68,0.1)",
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
-                  }}>
-                    {paymentMethodIcons[tx.payment_method] ?? "💵"}
+            <>
+              <div className={s.summaryCards}>
+                {[
+                  { label: "Received from customers", value: kes(totalReceived), color: "#3dd68c", sub: `${rangeReceipts.length} payment${rangeReceipts.length === 1 ? "" : "s"}` },
+                  { label: "Spent", value: kes(totalSpent), color: "#ef4444", sub: `${rangeExpenses.length} expense${rangeExpenses.length === 1 ? "" : "s"}` },
+                  { label: "Net", value: kes(net), color: net >= 0 ? "#3dd68c" : "#ef4444", sub: net >= 0 ? "In the black" : "In the red" },
+                  { label: "Still owed to AUREVYN", value: kes(outstanding), color: outstanding > 0 ? "#f59e0b" : "var(--text-primary)", sub: `${unpaid.length} unpaid invoice${unpaid.length === 1 ? "" : "s"}` },
+                ].map((card) => (
+                  <div key={card.label} className={s.card} style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>{card.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: card.color }}>{card.value}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>{card.sub}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "2px" }}>{tx.description}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>
-                      {tx.category} · {tx.payment_method} · {timeAgo(tx.date)}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: tx.type === "income" ? "#3dd68c" : "#ef4444" }}>
-                      {tx.type === "income" ? "+" : "-"}{formatKES(tx.amount)}
-                    </div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "capitalize" }}>{tx.type}</div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Expense breakdown */}
-              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginTop: "8px", marginBottom: "4px" }}>EXPENSE BREAKDOWN</div>
-              {Object.entries(
-                expenses.reduce((acc, e) => {
-                  acc[e.category] = (acc[e.category] ?? 0) + e.amount;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).sort((a, b) => b[1] - a[1]).map(([cat, amount], i) => {
-                const pct = Math.round((amount / expenses.reduce((s, e) => s + e.amount, 0)) * 100) || 0;
-                const color = categoryColors[cat] ?? "#6b7280";
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", width: "80px", textTransform: "capitalize", flexShrink: 0 }}>{cat}</span>
-                    <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: "var(--bg-elevated)", overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: "3px", transition: "width 0.5s ease" }} />
-                    </div>
-                    <span style={{ fontSize: "11px", color, fontWeight: 600, width: "80px", textAlign: "right", flexShrink: 0 }}>{formatKES(amount)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* TRANSACTIONS TAB */}
-          {tab === "transactions" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {["all", "income", "expense"].map(f => (
-                  <button key={f} onClick={() => setTxFilter(f)} className={txFilter === f ? s.filterBtnActive : s.filterBtn} style={{ textTransform: "capitalize" }}>{f}</button>
                 ))}
               </div>
-              {filteredTx.map(tx => (
-                <div key={tx.id} style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  padding: "12px 14px", background: "var(--bg-card)",
-                  borderRadius: "10px", border: `1px solid var(--border)`,
-                  borderLeft: `3px solid ${tx.type === "income" ? "#3dd68c" : "#ef4444"}`,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{tx.description}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
-                      {tx.category} · {paymentMethodIcons[tx.payment_method]} {tx.payment_method} · {new Date(tx.date).toLocaleDateString("en-KE")}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: tx.type === "income" ? "#3dd68c" : "#ef4444" }}>
-                      {tx.type === "income" ? "+" : "-"}{formatKES(tx.amount)}
-                    </div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "capitalize" }}>{tx.status}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
-          {/* EXPENSES TAB */}
-          {tab === "expenses" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {expenses.map(expense => (
-                <div key={expense.id} style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  padding: "12px 14px", background: "var(--bg-card)",
-                  borderRadius: "10px", border: "1px solid var(--border)",
-                  borderLeft: "3px solid #ef4444",
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{expense.title}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
-                      {expense.vendor && `${expense.vendor} · `}{expense.category} · {new Date(expense.date).toLocaleDateString("en-KE")}
-                    </div>
-                    {expense.notes && <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px", fontStyle: "italic" }}>{expense.notes}</div>}
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#ef4444" }}>-{formatKES(expense.amount)}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{paymentMethodIcons[expense.payment_method]} {expense.payment_method}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* CASHFLOW TAB */}
-          {tab === "cashflow" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {/* Cashflow summary */}
-              <div style={{ display: "flex", gap: "12px" }}>
-                <div className={s.card} style={{ flex: 1 }}>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>Total Inflow</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#3dd68c" }}>{formatKES(totalInflow)}</div>
-                </div>
-                <div className={s.card} style={{ flex: 1 }}>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>Total Outflow</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#ef4444" }}>{formatKES(totalOutflow)}</div>
-                </div>
-                <div className={s.card} style={{ flex: 1, border: `1px solid ${netCashflow >= 0 ? "rgba(61,214,140,0.3)" : "rgba(239,68,68,0.3)"}` }}>
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>Net Position</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: netCashflow >= 0 ? "#3dd68c" : "#ef4444" }}>{formatKES(netCashflow)}</div>
-                </div>
+              <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)" }}>
+                {([["income", "Income"], ["expenses", "Expenses"], ["owed", "Owed to us"]] as [Tab, string][]).map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setTab(id)}
+                    style={{
+                      padding: "8px 16px", borderRadius: "8px 8px 0 0", border: "none",
+                      background: tab === id ? "var(--bg-card)" : "transparent",
+                      color: tab === id ? "var(--gold)" : "var(--text-muted)",
+                      fontSize: 12, fontWeight: tab === id ? 700 : 400, cursor: "pointer", fontFamily: "inherit",
+                      borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {/* Cashflow entries */}
-              {cashflow.map((entry, i) => (
-                <div key={entry.id} style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  padding: "12px 14px", background: "var(--bg-card)",
-                  borderRadius: "10px", border: "1px solid var(--border)",
-                  borderLeft: `3px solid ${entry.type === "inflow" ? "#3dd68c" : "#ef4444"}`,
-                }}>
-                  <div style={{
-                    width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
-                    background: entry.type === "inflow" ? "rgba(61,214,140,0.1)" : "rgba(239,68,68,0.1)",
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px",
-                  }}>
-                    {entry.type === "inflow" ? "↑" : "↓"}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{entry.description}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{new Date(entry.date).toLocaleDateString("en-KE")}</div>
-                  </div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: entry.type === "inflow" ? "#3dd68c" : "#ef4444" }}>
-                    {entry.type === "inflow" ? "+" : "-"}{formatKES(entry.amount)}
-                  </div>
+              {tab === "income" && (
+                <div className={s.card} style={{ padding: 0, overflow: "hidden" }}>
+                  {rangeReceipts.length === 0 ? (
+                    <div style={{ padding: 30, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
+                      No customer payments {range === "month" ? "this month" : "yet"}. When a business pays an invoice it appears here with its receipt.
+                    </div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>{["Date", "Customer", "Invoice", "Receipt", "Method", "Reference", "Amount"].map((h, i) => <th key={h} style={{ ...th, textAlign: i === 6 ? "right" : "left" }}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {rangeReceipts.map((r) => (
+                          <tr key={r.id}>
+                            <td style={td}>{r.paid_at.slice(0, 10)}</td>
+                            <td style={{ ...td, fontWeight: 600 }}>{orgName.get(r.org_id) ?? "Unknown"}</td>
+                            <td style={td}>{invoiceById.get(r.invoice_id)?.invoice_no ?? "—"}</td>
+                            <td style={td}>{r.receipt_no}</td>
+                            <td style={td}>{r.method}</td>
+                            <td style={{ ...td, color: "var(--text-muted)" }}>{r.reference ?? "—"}</td>
+                            <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#3dd68c" }}>{kes(Number(r.amount_kes))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              ))}
-            </div>
+              )}
+
+              {tab === "expenses" && (
+                <div className={s.card} style={{ padding: 0, overflow: "hidden" }}>
+                  {rangeExpenses.length === 0 ? (
+                    <div style={{ padding: 30, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
+                      No expenses {range === "month" ? "this month" : "yet"}. Add hosting, domains, tools and anything else AUREVYN pays for.
+                    </div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>{["Date", "Category", "Vendor", "Description", "Amount", ""].map((h, i) => <th key={i} style={{ ...th, textAlign: i === 4 ? "right" : "left" }}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {rangeExpenses.map((e) => (
+                          <tr key={e.id}>
+                            <td style={td}>{e.date}</td>
+                            <td style={{ ...td, textTransform: "capitalize" }}>{e.category}</td>
+                            <td style={td}>{e.vendor ?? "—"}</td>
+                            <td style={td}>{e.description}</td>
+                            <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#ef4444" }}>{kes(Number(e.amount))}</td>
+                            <td style={{ ...td, textAlign: "right" }}>
+                              <button onClick={() => removeExpense(e.id)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>Delete</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {tab === "owed" && (
+                <div className={s.card} style={{ padding: 0, overflow: "hidden" }}>
+                  {unpaid.length === 0 ? (
+                    <div style={{ padding: 30, textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>Nothing outstanding. Every invoice is paid.</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>{["Customer", "Invoice", "Due", "Status", "Amount"].map((h, i) => <th key={h} style={{ ...th, textAlign: i === 4 ? "right" : "left" }}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {unpaid.map((i) => (
+                          <tr key={i.id}>
+                            <td style={{ ...td, fontWeight: 600 }}>{orgName.get(i.org_id) ?? i.org_name}</td>
+                            <td style={td}>{i.invoice_no}</td>
+                            <td style={td}>{i.due_date}</td>
+                            <td style={{ ...td, color: i.status === "overdue" ? "#ef4444" : "#f59e0b", textTransform: "capitalize" }}>{i.status}</td>
+                            <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>{kes(Number(i.amount_kes))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                To look at one customer&apos;s own books, open it from <Link href="/dashboard/organizations" style={{ color: "var(--gold)" }}>Organizations</Link>. Nothing you do here touches a customer&apos;s records.
+              </div>
+            </>
           )}
-          </>
+
+          {showAdd && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+              <div style={{ width: 440, maxWidth: "94vw", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, padding: 24 }}>
+                <h2 style={{ marginBottom: 14 }}>Add AUREVYN expense</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input className={s.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ flex: 1 }} />
+                    <select className={s.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ExpenseCategory })} style={{ flex: 1, textTransform: "capitalize" }}>
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <input className={s.input} placeholder="Vendor (e.g. Vercel, Supabase)" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
+                  <input className={s.input} placeholder="What was it for? *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                  <input className={s.input} type="number" min="0" placeholder="Amount (KES) *" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                  <input className={s.input} placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                  <button className={s.btnGhost} style={{ flex: 1 }} onClick={() => setShowAdd(false)}>Cancel</button>
+                  <button className={s.btnGold} style={{ flex: 1 }} onClick={addExpense} disabled={saving}>{saving ? "Saving…" : "Save expense"}</button>
+                </div>
+              </div>
+            </div>
           )}
         </main>
       </div>
-
-      {/* Add Transaction Modal */}
-      {showAddTx && (
-        <div className={s.modal} onClick={() => setShowAddTx(false)}>
-          <div className={s.modalBox} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "15px", fontWeight: 700 }}>New Transaction</div>
-
-            <div style={{ display: "flex", gap: "6px" }}>
-              {["income", "expense"].map(type => (
-                <button key={type} onClick={() => setNewTx(p => ({ ...p, type: type as "income" | "expense" }))}
-                  style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "12px", fontWeight: 600, textTransform: "capitalize",
-                    background: newTx.type === type ? (type === "income" ? "#3dd68c" : "#ef4444") : "var(--bg-elevated)",
-                    color: newTx.type === type ? "var(--gold-contrast)" : "var(--text-muted)",
-                  }}>{type}</button>
-              ))}
-            </div>
-
-            {[
-              { label: "AMOUNT (KES)", key: "amount", placeholder: "e.g. 25000", type: "number" },
-              { label: "DESCRIPTION", key: "description", placeholder: "e.g. Subscription payment" },
-              { label: "CATEGORY", key: "category", placeholder: "e.g. subscription, payroll" },
-            ].map(field => (
-              <div key={field.key}>
-                <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>{field.label}</label>
-                <input type={field.type ?? "text"} value={newTx[field.key as keyof typeof newTx]} onChange={e => setNewTx(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} className={s.input} />
-              </div>
-            ))}
-
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>PAYMENT METHOD</label>
-              <select value={newTx.payment_method} onChange={e => setNewTx(p => ({ ...p, payment_method: e.target.value }))} className={s.input}>
-                {["mpesa", "bank", "cash", "card"].map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>DATE</label>
-              <input type="date" value={newTx.date} onChange={e => setNewTx(p => ({ ...p, date: e.target.value }))} className={s.input} />
-            </div>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={handleAddTx} className={s.btnGold} style={{ flex: 1 }}>Save Transaction</button>
-              <button onClick={() => setShowAddTx(false)} className={s.btnGhost} style={{ flex: 1 }}>Cancel</button>
-            </div>
-            {actionError && (
-              <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Add Expense Modal */}
-      {showAddExpense && (
-        <div className={s.modal} onClick={() => setShowAddExpense(false)}>
-          <div className={s.modalBox} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "15px", fontWeight: 700 }}>New Expense</div>
-
-            {[
-              { label: "TITLE", key: "title", placeholder: "e.g. Office Rent" },
-              { label: "AMOUNT (KES)", key: "amount", placeholder: "e.g. 45000", type: "number" },
-              { label: "CATEGORY", key: "category", placeholder: "e.g. operations, payroll" },
-              { label: "VENDOR", key: "vendor", placeholder: "e.g. Landlord, Safaricom" },
-              { label: "NOTES", key: "notes", placeholder: "Optional notes" },
-            ].map(field => (
-              <div key={field.key}>
-                <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>{field.label}</label>
-                <input type={field.type ?? "text"} value={newExpense[field.key as keyof typeof newExpense] as string} onChange={e => setNewExpense(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} className={s.input} />
-              </div>
-            ))}
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>PAYMENT METHOD</label>
-                <select value={newExpense.payment_method} onChange={e => setNewExpense(p => ({ ...p, payment_method: e.target.value }))} className={s.input}>
-                  {["mpesa", "bank", "cash", "card"].map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "10px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>DATE</label>
-                <input type="date" value={newExpense.date} onChange={e => setNewExpense(p => ({ ...p, date: e.target.value }))} className={s.input} />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={handleAddExpense} className={s.btnGold} style={{ flex: 1 }}>Save Expense</button>
-              <button onClick={() => setShowAddExpense(false)} className={s.btnGhost} style={{ flex: 1 }}>Cancel</button>
-            </div>
-            {actionError && (
-              <div style={{ fontSize: 11, color: "#ef4444" }}>{actionError}</div>
-            )}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
