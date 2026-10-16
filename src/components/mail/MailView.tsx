@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import AttachmentPicker from "@/components/AttachmentPicker";
+import { openAttachment, type Attachment } from "@/lib/attachments";
 import { CATEGORY_LABEL, getMessages, getMyReads, getThreads, isUnread, mailApi, type MailMessage, type MailThread } from "@/lib/mail";
 
 type Props =
   | { mode: "org"; orgId: string }
   | { mode: "founder"; orgId?: undefined };
 
-type Person = { userId: string; name: string | null; email: string | null };
+export type Person = { userId: string; name: string | null; email: string | null };
 
 const field: React.CSSProperties = { padding: "9px 11px", borderRadius: 8, background: "var(--bg-base)", color: "var(--text-primary)", border: "1px solid var(--border-light)", fontSize: 13, fontFamily: "inherit", width: "100%" };
 const btn: React.CSSProperties = { padding: "7px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid var(--border-light)", background: "transparent", color: "var(--text-primary)", fontFamily: "inherit" };
@@ -38,6 +40,8 @@ export default function MailView(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [reply, setReply] = useState("");
+  const [replyFiles, setReplyFiles] = useState<Attachment[]>([]);
+  const [myName, setMyName] = useState("You");
   const [busy, setBusy] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -55,7 +59,7 @@ export default function MailView(props: Props) {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
+    supabase.auth.getUser().then(({ data }) => { setMe(data.user?.id ?? null); setMyName(data.user?.email ?? "You"); });
     (async () => {
       if (founder) {
         const { data } = await supabase.from("organizations").select("id, name").order("name");
@@ -97,8 +101,8 @@ export default function MailView(props: Props) {
 
   async function sendReply() {
     if (!active || !reply.trim()) return;
-    const r = await act({ action: "reply", threadId: active.id, body: reply });
-    if (r) { setReply(""); setMessages(await getMessages(active.id)); loadThreads(); }
+    const r = await act({ action: "reply", threadId: active.id, body: reply, attachmentIds: replyFiles.map(f => f.documentId) });
+    if (r) { setReply(""); setReplyFiles([]); setMessages(await getMessages(active.id)); loadThreads(); }
   }
 
   async function setStatus(status: "open" | "closed") {
@@ -191,6 +195,13 @@ export default function MailView(props: Props) {
                         </div>
                       )}
                       <div style={{ fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</div>
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                          {m.attachments.map(a => (
+                            <button key={a.documentId} style={{ ...btn, padding: "4px 10px" }} onClick={() => openAttachment(orgScope!, { type: "mail", threadId: active.id }, a.documentId).catch(e => setError(e.message))}>📎 {a.name}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -200,6 +211,7 @@ export default function MailView(props: Props) {
                 {error && <div role="alert" style={{ color: "var(--red)", fontSize: 12, marginBottom: 8 }}>{error}</div>}
                 <textarea value={reply} onChange={e => setReply(e.target.value)} rows={3} placeholder={active.status === "closed" ? "Replying will reopen this conversation" : "Write a reply"} aria-label="Reply" style={{ ...field, resize: "vertical" }}
                   onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") sendReply(); }} />
+                {!founder && <div style={{ marginTop: 8 }}><AttachmentPicker orgId={orgScope!} uploaderName={myName} value={replyFiles} onChange={setReplyFiles} /></div>}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                   <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Ctrl+Enter to send</span>
                   <button style={gold} disabled={busy || !reply.trim()} onClick={sendReply}>{busy ? "Sending…" : "Send reply"}</button>
@@ -219,18 +231,20 @@ export default function MailView(props: Props) {
   );
 }
 
-function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSent }: {
+export function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSent, initial }: {
   founder: boolean; endpoint: string; orgId?: string; people: Person[]; orgs: { id: string; name: string }[];
   onClose: () => void; onSent: (threadId: string) => void;
+  initial?: { kind?: "support" | "internal"; subject?: string; body?: string; attachments?: Attachment[] };
 }) {
-  const [kind, setKind] = useState<"support" | "internal">("support");
+  const [kind, setKind] = useState<"support" | "internal">(initial?.kind ?? "support");
   const [toOrg, setToOrg] = useState(orgs[0]?.id ?? "");
   const [picked, setPicked] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
   const [category, setCategory] = useState("general");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(initial?.subject ?? "");
+  const [body, setBody] = useState(initial?.body ?? "");
+  const [files, setFiles] = useState<Attachment[]>(initial?.attachments ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -242,7 +256,7 @@ function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSent }: {
     try {
       const payload = founder
         ? { action: "send", orgId: orgChoice, subject, body, category }
-        : { orgId, action: "send", kind, subject, body, category, toUserIds: picked, ccUserIds: cc };
+        : { orgId, action: "send", kind, subject, body, category, toUserIds: picked, ccUserIds: cc, attachmentIds: files.map(f => f.documentId) };
       const r = await mailApi(endpoint, payload);
       onSent(r.threadId);
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setBusy(false); }
@@ -287,6 +301,7 @@ function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSent }: {
 
         <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" aria-label="Subject" maxLength={200} style={field} />
         <textarea value={body} onChange={e => setBody(e.target.value)} rows={7} placeholder="Write your message" aria-label="Message" style={{ ...field, resize: "vertical" }} />
+        {!founder && orgId && <AttachmentPicker orgId={orgId} uploaderName="Mail" value={files} onChange={setFiles} />}
 
         {error && <div role="alert" style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
         <button style={{ ...gold, padding: 10 }} disabled={busy || !subject.trim() || !body.trim() || needsRecipients || (founder && !orgChoice)} onClick={send}>

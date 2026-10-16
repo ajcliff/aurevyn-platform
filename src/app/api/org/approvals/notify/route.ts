@@ -29,17 +29,36 @@ export async function POST(req: NextRequest) {
   if (event === "created") {
     if (r.status !== "pending" || r.approvers_notified_at) return NextResponse.json({ ok: true, skipped: true });
     const { data: members } = await supabaseAdmin.from("org_users").select("user_id, email, role").eq("org_id", orgId);
-    const to = (members ?? []).filter(m => APPROVER_ROLES.includes(m.role) && m.email && m.user_id !== r.requested_by_user_id).map(m => m.email as string);
+    // A request waiting on a department head goes to that head only; the owners hear about it once the head endorses
+    const to = (members ?? [])
+      .filter(m => r.stage === "department" ? m.user_id === r.dept_head_user_id : APPROVER_ROLES.includes(m.role) && m.user_id !== r.requested_by_user_id)
+      .filter(m => m.email).map(m => m.email as string);
     if (to.length === 0) return NextResponse.json({ ok: true, skipped: true });
 
     const sent = await sendEmail(
       to,
-      `Approval needed: ${r.title}`,
+      `${r.stage === "department" ? "Your endorsement is needed" : "Approval needed"}: ${r.title}`,
       `<h2 style="margin:0 0 8px">${escapeHtml(r.title)}</h2><p><strong>${escapeHtml(r.requested_by_name ?? "A team member")}</strong> asked for your approval in <strong>${escapeHtml(org?.name ?? "your organization")}</strong>${escapeHtml(amount)}.</p>${r.description ? `<p style="color:#555">${escapeHtml(r.description)}</p>` : ""}${actionButtons}`,
       "Review details",
       link
     );
     if (sent) await supabaseAdmin.from("approval_requests").update({ approvers_notified_at: new Date().toISOString() }).eq("id", r.id);
+    return NextResponse.json({ ok: true, emailed: sent });
+  }
+
+  if (event === "endorsed") {
+    // Only that department's head can trigger this, and only once the request has moved on to the final stage
+    if (r.stage !== "final" || !r.dept_head_user_id || r.dept_head_user_id !== access.userId || r.status !== "pending") return NextResponse.json({ ok: true, skipped: true });
+    const { data: members } = await supabaseAdmin.from("org_users").select("user_id, email, role").eq("org_id", orgId);
+    const to = (members ?? []).filter(m => APPROVER_ROLES.includes(m.role) && m.email && m.user_id !== r.requested_by_user_id).map(m => m.email as string);
+    if (to.length === 0) return NextResponse.json({ ok: true, skipped: true });
+    const sent = await sendEmail(
+      to,
+      `Approval needed: ${r.title}`,
+      `<h2 style="margin:0 0 8px">${escapeHtml(r.title)}</h2><p><strong>${escapeHtml(r.requested_by_name ?? "A team member")}</strong> asked for approval${escapeHtml(amount)}. It was endorsed by <strong>${escapeHtml(r.dept_decided_by_name ?? "the department head")}</strong> and now needs your decision.</p>${r.description ? `<p style="color:#555">${escapeHtml(r.description)}</p>` : ""}${actionButtons}`,
+      "Review details",
+      link
+    );
     return NextResponse.json({ ok: true, emailed: sent });
   }
 

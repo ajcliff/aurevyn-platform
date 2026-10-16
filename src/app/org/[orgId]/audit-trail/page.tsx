@@ -60,7 +60,7 @@ function buildRows(trail: TrailEntry[], requests: ApprovalRequest[]): Row[] {
         state: !req || req.status === "pending" ? "awaiting" : req.status === "approved" ? "approved" : "rejected",
         initiatedBy: t.initiated_by_name, initiatedAt: t.initiated_at,
         authorisedBy: decided ? req!.decided_by_name : null, authorisedAt: decided ? req!.decided_at : null,
-        note: req?.status === "rejected" ? "Rejected by" : "",
+        note: req?.status === "rejected" ? "Rejected by" : req?.stage === "department" ? "Waiting for department head" : req?.dept_decided_by_name ? `Endorsed by ${req.dept_decided_by_name}` : "",
       });
     }
   }
@@ -145,7 +145,7 @@ export default function AuditTrailPage() {
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{when(r.authorisedAt)}{r.note && r.state !== "rejected" ? ` · ${r.note}` : ""}</div>
                   </>
                 ) : (
-                  <span style={{ color: "var(--text-muted)" }}>{r.state === "awaiting" ? "Waiting" : r.note || "—"}</span>
+                  <span style={{ color: "var(--text-muted)" }}>{r.state === "awaiting" ? (r.note || "Waiting") : r.note || "—"}</span>
                 )}
               </span>
             </div>

@@ -88,8 +88,15 @@ export type Department = {
   id: string;
   org_id: string;
   name: string;
+  head_user_id: string | null;
   created_at: string;
 };
+
+// The department head signs off a department's requests before they reach the owners/admins.
+export async function setDepartmentHead(departmentId: string, userId: string | null): Promise<void> {
+  const { error } = await createClient().from("departments").update({ head_user_id: userId }).eq("id", departmentId);
+  if (error) throw error;
+}
 
 export async function getDepartments(orgId: string): Promise<Department[]> {
   const supabase = createClient();

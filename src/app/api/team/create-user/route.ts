@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
+  // Bigger organisations run on departments: from the 11th person on, everyone must belong to one,
+  // because requests are signed off by the department head before they reach the owners.
+  const { count: memberCount } = await supabaseAdmin.from("org_users").select("id", { count: "exact", head: true }).eq("org_id", orgId);
+  if ((memberCount ?? 0) >= 10 && !departmentId) {
+    return NextResponse.json({ error: "Choose a department. Organizations with more than ten people need every member in a department so approvals reach the right head." }, { status: 400 });
+  }
+
   // Refuse before creating anything if any requested engine has no seat left —
   // otherwise the account would exist with no license and no way to retry the same email.
   for (const engineId of engineIds ?? []) {

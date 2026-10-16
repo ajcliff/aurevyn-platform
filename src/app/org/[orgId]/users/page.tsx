@@ -15,6 +15,7 @@ import {
   revokeAllLicensesForUser,
   type EngineLicenseOverview,
   type Department,
+  setDepartmentHead,
 } from "@/lib/licensing";
 import EmptyState from "@/components/EmptyState";
 
@@ -98,6 +99,20 @@ export default function UsersPage() {
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
         Create accounts directly — no invite links to send. One user takes one seat per engine they're licensed for.
       </p>
+
+      {!loading && members.length > 10 && (
+        <div style={{ border: `1px solid ${departments.some((d) => !d.head_user_id) || departments.length === 0 ? "#f59e0b" : "var(--border)"}`, background: "rgba(245,158,11,.07)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+          <b>{members.length} people: departments now run approvals.</b> Every request goes to the requester&apos;s department head first, then to the owners and admins.
+          {departments.length === 0 ? (
+            <> Create your departments and name a head for each one.</>
+          ) : departments.some((d) => !d.head_user_id) ? (
+            <> No head set for: <b>{departments.filter((d) => !d.head_user_id).map((d) => d.name).join(", ")}</b>. Requests from those departments skip the head step until you set one.</>
+          ) : (
+            <> Every department has a head.</>
+          )}{" "}
+          <button style={{ ...ghostButton, marginLeft: 6 }} onClick={() => setShowDepts(true)}>Set heads</button>
+        </div>
+      )}
 
       {loading ? (
         "Loading..."
@@ -186,6 +201,7 @@ export default function UsersPage() {
       {showDepts && (
         <DepartmentsModal
           orgId={organization.id}
+          members={members}
           departments={departments}
           overview={overview}
           onClose={() => setShowDepts(false)}
@@ -358,12 +374,14 @@ function CreateUserModal({
 
 function DepartmentsModal({
   orgId,
+  members,
   departments,
   overview,
   onClose,
   onChanged,
 }: {
   orgId: string;
+  members: TeamMember[];
   departments: Department[];
   overview: EngineLicenseOverview[];
   onClose: () => void;
@@ -421,6 +439,15 @@ function DepartmentsModal({
             <div key={d.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</span>
+                <select
+                  aria-label={`Head of ${d.name}`}
+                  value={d.head_user_id ?? ""}
+                  onChange={async (e) => { await setDepartmentHead(d.id, e.target.value || null); onChanged(); }}
+                  style={{ ...fullInput, margin: "0 8px", width: "auto", flex: 1, maxWidth: 200 }}
+                >
+                  <option value="">No head yet</option>
+                  {members.map((m) => <option key={m.user_id} value={m.user_id}>Head: {m.full_name || m.email}</option>)}
+                </select>
                 <button style={ghostButton} onClick={() => (editing === d.id ? setEditing(null) : startEdit(d.id))}>
                   {editing === d.id ? "Close" : "Default engines"}
                 </button>

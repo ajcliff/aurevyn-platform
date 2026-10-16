@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireOrgMember } from "@/lib/server/guards";
 import { sendEmail, escapeHtml } from "@/lib/server/email";
+import { resolveAttachments } from "@/lib/server/attachments";
 import { CATEGORIES, addMessage, type Recipients, orgAdminIds, participantEmails, tooManyMessages, validText, type MailCategory } from "@/lib/server/mail";
 
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (error || !thread) return fail(error?.message ?? "Could not create the message.", 500);
 
     await supabaseAdmin.from("mail_participants").insert([...new Set(participantIds)].map(user_id => ({ thread_id: thread.id, user_id })));
-    const err = await addMessage(thread.id, { id: access.userId, name: myName, fromFounder: false }, body.body, recipients);
+    const err = await addMessage(thread.id, { id: access.userId, name: myName, fromFounder: false }, body.body, recipients, await resolveAttachments(orgId, body.attachmentIds));
     if (err) return fail(err, 500);
 
     if (kind === "support" && FOUNDER_ALERT_EMAIL) {
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     const thread = await requireParticipant(body.threadId);
     if (!thread) return fail("Conversation not found.", 404);
     if (await tooManyMessages(access.userId)) return fail("You're sending messages too quickly. Please wait a while.", 429);
-    const err = await addMessage(thread.id, { id: access.userId, name: myName, fromFounder: false }, body.body);
+    const err = await addMessage(thread.id, { id: access.userId, name: myName, fromFounder: false }, body.body, undefined, await resolveAttachments(orgId, body.attachmentIds));
     if (err) return fail(err, 500);
 
     if (thread.kind === "support" && FOUNDER_ALERT_EMAIL) {

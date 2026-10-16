@@ -22,10 +22,11 @@ export function validText(subject: string | undefined, body: string | undefined)
 // Appends a message and moves the thread to the top, marking it unread for everyone else
 export type Recipients = { to: { userId: string; name: string | null; email: string | null }[]; cc: { userId: string; name: string | null; email: string | null }[] };
 
-export async function addMessage(threadId: string, sender: { id: string | null; name: string; fromFounder: boolean }, body: string, recipients?: Recipients) {
+export async function addMessage(threadId: string, sender: { id: string | null; name: string; fromFounder: boolean }, body: string, recipients?: Recipients, attachments: { documentId: string; name: string }[] = []) {
   const { error } = await supabaseAdmin.from("mail_messages").insert({
     thread_id: threadId, sender_id: sender.id, sender_name: sender.name, from_founder: sender.fromFounder, body: body.trim(),
     ...(recipients ? { recipients } : {}),
+    ...(attachments.length ? { attachments } : {}),
   });
   if (error) return error.message;
   const now = new Date().toISOString();

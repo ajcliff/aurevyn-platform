@@ -20,6 +20,13 @@ export type ApprovalRequest = {
   decided_at: string | null;
   source: string;
   related_id: string | null;
+  // Department-head step (organizations over ten people): "department" until the head endorses, then "final"
+  stage?: "department" | "final";
+  department_id?: string | null;
+  dept_head_user_id?: string | null;
+  dept_decided_by_name?: string | null;
+  dept_decided_at?: string | null;
+  attachments?: { documentId: string; name: string }[] | null;
   created_at: string;
 };
 
@@ -58,6 +65,7 @@ export async function createApprovalRequest(input: {
   amount: number | null;
   source?: string;
   relatedId?: string;
+  attachments?: { documentId: string; name: string }[];
 }): Promise<ApprovalRequest> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -73,6 +81,7 @@ export async function createApprovalRequest(input: {
       status: "pending",
       source: input.source || "manual",
       related_id: input.relatedId || null,
+      attachments: input.attachments ?? [],
     })
     .select()
     .single();
@@ -149,4 +158,28 @@ export async function getPendingApprovalsForOrg(orgId: string): Promise<Approval
 
   if (error) throw error;
   return data || [];
+}
+
+// The department head's step: endorse (sends it on to the owners/admins) or reject (ends it).
+// The database refuses this from anyone who isn't that department's head.
+export async function departmentDecide(r: ApprovalRequest, decision: "endorse" | "reject", headName: string) {
+  const supabase = createClient();
+  const now = new Date().toISOString();
+  const patch = decision === "endorse"
+    ? { stage: "final", dept_decided_by_name: headName, dept_decided_at: now }
+    : { status: "rejected", dept_decided_by_name: headName, dept_decided_at: now, decided_by_name: headName, decided_at: now };
+  const { error } = await supabase.from("approval_requests").update(patch).eq("id", r.id);
+  if (error) throw error;
+
+  fetch("/api/org/approvals/notify", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId: r.org_id, requestId: r.id, event: decision === "endorse" ? "endorsed" : "decided" }),
+  }).catch(() => {});
+
+  await logActivity({
+    icon: decision === "endorse" ? "🖊️" : "❌",
+    title: decision === "endorse" ? "Department head endorsed a request" : "Department head rejected a request",
+    sub: r.title,
+    org_id: r.org_id,
+  });
 }

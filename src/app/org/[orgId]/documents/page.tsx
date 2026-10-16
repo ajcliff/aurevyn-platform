@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import ShareDialog from "@/components/ShareDialog";
+import SendMailButton from "@/components/mail/SendMailButton";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import {
   getDocuments,
@@ -14,6 +15,7 @@ import {
   type DocumentCategory,
 } from "@/lib/documents";
 import { getPendingApprovalsForOrg, type ApprovalRequest } from "@/lib/approvals";
+import { getHubItems, HUB_LABELS, type HubItem, type HubKind } from "@/lib/documentHub";
 
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   receipt: "Receipt",
@@ -38,6 +40,9 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<"all" | DocumentCategory>("all");
   const [pendingCategory, setPendingCategory] = useState<DocumentCategory>("other");
+  const [hub, setHub] = useState<HubItem[]>([]);
+  const [hubFilter, setHubFilter] = useState<"all" | HubKind>("all");
+  const [hubSearch, setHubSearch] = useState("");
 
   useEffect(() => {
     load();
@@ -45,11 +50,13 @@ export default function DocumentsPage() {
 
   async function load() {
     setLoading(true);
-    const [active, archivedDocs, approvals] = await Promise.all([
+    const [active, archivedDocs, approvals, hubItems] = await Promise.all([
       getDocuments(organization.id),
       getArchivedDocuments(organization.id),
       getPendingApprovalsForOrg(organization.id),
+      getHubItems(organization.id, organization.name).catch(() => [] as HubItem[]),
     ]);
+    setHub(hubItems);
     setDocuments(active);
     setArchived(archivedDocs);
     setPendingDeletions(
@@ -213,7 +220,10 @@ export default function DocumentsPage() {
                 View
               </button>
               {view === "active" && (
-                <button onClick={() => setSharingId(doc.id)} style={{ ...ghostButton, textAlign: "center" }}>Share</button>
+                <>
+                  <button onClick={() => setSharingId(doc.id)} style={{ ...ghostButton, textAlign: "center" }}>Share</button>
+                  <SendMailButton orgId={organization.id} subject={`Document: ${doc.name}`} body={`I'm sharing "${doc.name}" (${CATEGORY_LABELS[doc.category]}) with you.`} attachments={[{ documentId: doc.id, name: doc.name }]} label="Send" />
+                </>
               )}
               {view === "active" ? (
                 <button style={dangerBtn} onClick={() => handleRequestDeletion(doc)}>
@@ -236,6 +246,44 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+      {view === "active" && hub.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>Records from AUREVYN</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 12 }}>
+            Purchase orders, sales receipts, payment receipts and invoices are listed here automatically. Open one to print it, or go to where it is managed.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <FilterChip label="All" active={hubFilter === "all"} onClick={() => setHubFilter("all")} />
+            {(Object.keys(HUB_LABELS) as HubKind[]).map((k) => (
+              <FilterChip key={k} label={HUB_LABELS[k]} active={hubFilter === k} onClick={() => setHubFilter(k)} />
+            ))}
+            <input
+              value={hubSearch}
+              onChange={(e) => setHubSearch(e.target.value)}
+              placeholder="Search number, supplier, customer…"
+              style={{ ...selectStyle, minWidth: 220, marginLeft: "auto" }}
+            />
+          </div>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--bg-card)" }}>
+            {hub
+              .filter((h) => (hubFilter === "all" || h.kind === hubFilter) && `${h.title} ${h.subtitle}`.toLowerCase().includes(hubSearch.toLowerCase()))
+              .slice(0, 200)
+              .map((h) => (
+                <div key={h.key} style={{ display: "grid", gridTemplateColumns: "150px 1fr 110px 110px auto", gap: 12, padding: "10px 14px", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{HUB_LABELS[h.kind]}</span>
+                  <span><b>{h.title}</b><div style={{ fontSize: 11, color: "var(--text-muted)" }}>{h.subtitle}</div></span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{new Date(h.date).toLocaleDateString("en-KE")}</span>
+                  <span style={{ fontWeight: 600 }}>{h.amount !== null ? `KES ${Math.round(h.amount).toLocaleString()}` : ""}</span>
+                  <span style={{ display: "flex", gap: 6 }}>
+                    <button style={ghostButton} onClick={() => h.open()}>Open</button>
+                    <SendMailButton orgId={organization.id} subject={`${HUB_LABELS[h.kind]} ${h.title}`} body={`${HUB_LABELS[h.kind]} ${h.title} (${h.subtitle})${h.amount !== null ? ` · KES ${Math.round(h.amount).toLocaleString()}` : ""}\n\nOpen it here: ${typeof window !== "undefined" ? window.location.origin : ""}${h.manageHref}`} label="Send" />
+                    <a href={h.manageHref} style={{ ...ghostButton, textDecoration: "none" }}>Manage</a>
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
       {sharingId && (
         <ShareDialog
           orgId={organization.id}

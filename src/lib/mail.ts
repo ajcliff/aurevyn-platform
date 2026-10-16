@@ -24,6 +24,7 @@ export type MailMessage = {
   from_founder: boolean;
   body: string;
   recipients?: { to: { userId: string; name: string | null; email: string | null }[]; cc: { userId: string; name: string | null; email: string | null }[] } | null;
+  attachments?: { documentId: string; name: string }[] | null;
   created_at: string;
 };
 

@@ -9,6 +9,7 @@ import {
   decideApprovalRequest,
   type ApprovalRequest,
   type ApprovalType,
+  departmentDecide,
 } from "@/lib/approvals";
 import { disburseSalaryAdvance, rejectSalaryAdvance } from "@/lib/salaryAdvances";
 import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
@@ -21,6 +22,8 @@ import jsPDF from "jspdf";
 import EmptyState from "@/components/EmptyState";
 import Drawer from "@/components/Drawer";
 import { canApproveRequests } from "@/lib/permissions";
+import AttachmentPicker from "@/components/AttachmentPicker";
+import { openAttachment, type Attachment } from "@/lib/attachments";
 
 export default function ApprovalsPage() {
   const { organization, membership } = useEngine();
@@ -48,6 +51,7 @@ canApproveRequests(membership);
   const [creatingPo, setCreatingPo] = useState(false);
 const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(null);
   // From the email's Approve / Reject button: pre-selects the choice, but nothing is decided until it is confirmed here
+  const [attachFiles, setAttachFiles] = useState<Attachment[]>([]);
   const [suggested, setSuggested] = useState<"approved" | "rejected" | null>(null);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [advanceRequest, setAdvanceRequest] = useState<ApprovalRequest | null>(null);
@@ -108,7 +112,9 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
         title,
         description,
         amount: amount ? Number(amount) : null,
+        attachments: attachFiles,
       });
+      setAttachFiles([]);
 
       setTitle("");
       setDescription("");
@@ -518,6 +524,9 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
               style={inputStyle}
             />
 
+            <label style={labelStyle}>Supporting documents (optional)</label>
+            <AttachmentPicker orgId={organization.id} uploaderName={requesterName || "You"} value={attachFiles} onChange={setAttachFiles} />
+
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
               <button style={ghostButton} onClick={() => setShowNew(false)}>
                 Cancel
@@ -553,10 +562,40 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
                 <div style={{ fontSize: 14 }}>KES {Number(viewingRequest.amount).toLocaleString()}</div>
               </div>
             )}
+            {viewingRequest.attachments && viewingRequest.attachments.length > 0 && (
+              <div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Attached documents</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {viewingRequest.attachments.map((a) => (
+                    <button key={a.documentId} style={ghostButton} onClick={() => openAttachment(organization.id, { type: "approval", requestId: viewingRequest.id }, a.documentId).catch((e) => alert(e.message))}>📎 {a.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <StatusBadge status={viewingRequest.status} />
+              {viewingRequest.status === "pending" && viewingRequest.stage === "department" && (
+                <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 6 }}>Step 1 of 2: waiting for the department head to endorse.</div>
+              )}
+              {viewingRequest.status === "pending" && viewingRequest.stage === "final" && viewingRequest.dept_decided_by_name && (
+                <div style={{ fontSize: 12, color: "#3dd68c", marginTop: 6 }}>
+                  Endorsed by {viewingRequest.dept_decided_by_name}{viewingRequest.dept_decided_at ? ` on ${new Date(viewingRequest.dept_decided_at).toLocaleDateString("en-KE")}` : ""}. Step 2 of 2: waiting for final approval.
+                </div>
+              )}
             </div>
-            {viewingRequest.status === "pending" && canApprove && (
+            {viewingRequest.status === "pending" && viewingRequest.stage === "department" && membership.userId === viewingRequest.dept_head_user_id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button style={{ ...successBtn, flex: 1, padding: "10px" }}
+                  onClick={async () => { await departmentDecide(viewingRequest, "endorse", await getActorName(organization.id)); setViewingRequest(null); setSuggested(null); load(); }}>
+                  Endorse
+                </button>
+                <button style={{ ...dangerBtn, flex: 1, padding: "10px" }}
+                  onClick={async () => { await departmentDecide(viewingRequest, "reject", await getActorName(organization.id)); setViewingRequest(null); setSuggested(null); load(); }}>
+                  Reject
+                </button>
+              </div>
+            )}
+            {viewingRequest.status === "pending" && viewingRequest.stage !== "department" && canApprove && (
               <>
                 {suggested && (
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
