@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
 
   const { data: org } = await supabaseAdmin.from("organizations").select("name").eq("id", orgId).maybeSingle();
   const link = `${req.nextUrl.origin}/org/${orgId}/approvals?focus=${r.id}`;
+  // Approve / Reject open the request with that choice ready. Nothing is decided from the email itself,
+  // so a forwarded or scanned email can never approve anything: the approver must be signed in and confirm.
+  const btn = (label: string, decision: string, bg: string, fg: string) =>
+    `<a href="${escapeHtml(`${link}&decision=${decision}`)}" style="background:${bg};color:${fg};text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px;display:inline-block;margin-right:8px">${label}</a>`;
+  const actionButtons = `<p style="margin:20px 0 0">${btn("Approve", "approved", "#15803d", "#fff")}${btn("Reject", "rejected", "#b91c1c", "#fff")}</p>`;
   const amount = r.amount ? ` · KES ${Number(r.amount).toLocaleString("en-KE")}` : "";
 
   if (event === "created") {
@@ -30,8 +35,8 @@ export async function POST(req: NextRequest) {
     const sent = await sendEmail(
       to,
       `Approval needed: ${r.title}`,
-      `<h2 style="margin:0 0 8px">${escapeHtml(r.title)}</h2><p><strong>${escapeHtml(r.requested_by_name ?? "A team member")}</strong> asked for your approval in <strong>${escapeHtml(org?.name ?? "your organization")}</strong>${escapeHtml(amount)}.</p>${r.description ? `<p style="color:#555">${escapeHtml(r.description)}</p>` : ""}`,
-      "Review and decide",
+      `<h2 style="margin:0 0 8px">${escapeHtml(r.title)}</h2><p><strong>${escapeHtml(r.requested_by_name ?? "A team member")}</strong> asked for your approval in <strong>${escapeHtml(org?.name ?? "your organization")}</strong>${escapeHtml(amount)}.</p>${r.description ? `<p style="color:#555">${escapeHtml(r.description)}</p>` : ""}${actionButtons}`,
+      "Review details",
       link
     );
     if (sent) await supabaseAdmin.from("approval_requests").update({ approvers_notified_at: new Date().toISOString() }).eq("id", r.id);

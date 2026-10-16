@@ -47,6 +47,8 @@ canApproveRequests(membership);
   const [poUnitCost, setPoUnitCost] = useState("");
   const [creatingPo, setCreatingPo] = useState(false);
 const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(null);
+  // From the email's Approve / Reject button: pre-selects the choice, but nothing is decided until it is confirmed here
+  const [suggested, setSuggested] = useState<"approved" | "rejected" | null>(null);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [advanceRequest, setAdvanceRequest] = useState<ApprovalRequest | null>(null);
   const [advanceFundingAccountId, setAdvanceFundingAccountId] = useState("");
@@ -77,7 +79,11 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
     if (requests.length === 0) return;
     const focus = new URLSearchParams(window.location.search).get("focus");
     const target = focus ? requests.find((r) => r.id === focus) : null;
-    if (target) setViewingRequest(target);
+    const d = new URLSearchParams(window.location.search).get("decision");
+    if (target) {
+      setViewingRequest(target);
+      setSuggested(d === "approved" || d === "rejected" ? d : null);
+    }
   }, [requests]);
 
   const pending = requests.filter((r) => r.status === "pending");
@@ -551,20 +557,27 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
               <StatusBadge status={viewingRequest.status} />
             </div>
             {viewingRequest.status === "pending" && canApprove && (
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button
-                  style={{ ...successBtn, flex: 1, padding: "10px" }}
-                  onClick={() => { handleDecide(viewingRequest, "approved"); setViewingRequest(null); }}
-                >
-                  Approve
-                </button>
-                <button
-                  style={{ ...dangerBtn, flex: 1, padding: "10px" }}
-                  onClick={() => { handleDecide(viewingRequest, "rejected"); setViewingRequest(null); }}
-                >
-                  Reject
-                </button>
-              </div>
+              <>
+                {suggested && (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+                    You chose <b>{suggested === "approved" ? "Approve" : "Reject"}</b> in the email. Check the details, then confirm.
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    style={{ ...successBtn, flex: 1, padding: "10px", outline: suggested === "approved" ? "2px solid var(--gold)" : "none", outlineOffset: 2 }}
+                    onClick={() => { handleDecide(viewingRequest, "approved"); setViewingRequest(null); setSuggested(null); }}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    style={{ ...dangerBtn, flex: 1, padding: "10px", outline: suggested === "rejected" ? "2px solid var(--gold)" : "none", outlineOffset: 2 }}
+                    onClick={() => { handleDecide(viewingRequest, "rejected"); setViewingRequest(null); setSuggested(null); }}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
