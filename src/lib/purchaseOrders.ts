@@ -4,6 +4,7 @@ import { decideApprovalRequest } from "@/lib/approvals";
 import { updateStock } from "@/lib/inventory";
 import { postPurchaseReceiptJournal } from "@/lib/journal";
 import { getOrgSettings } from "@/lib/orgSettings";
+import { withAuthorization } from "@/lib/auditTrail";
 
 export type PurchaseOrderStatus = "approved" | "ordered" | "partially_received" | "received" | "cancelled";
 export type PurchaseOrderOrigin = "approval" | "manual";
@@ -391,4 +392,44 @@ export async function linkPurchaseOrderDocument(id: string, documentId: string) 
     .eq("id", id);
 
   if (error) console.error(error);
+}
+
+// The supplier delivered less than ordered and won't send the rest. Stock already only counts what really
+// arrived, so this fixes the other side: the order shrinks to what was received, so the amount owed to the
+// supplier (and the VAT) drops to match, and the PO closes. Recorded in the audit trail with the reason.
+export async function closePurchaseOrderShort(input: { po: PurchaseOrder; orgId: string; reason: string }): Promise<PurchaseOrder | null> {
+  const { po } = input;
+  const items = po.purchase_order_items ?? [];
+  const short = items.filter((i) => Number(i.received_quantity) < Number(i.quantity));
+  if (short.length === 0) return po;
+
+  const newTotal = items.reduce((sum, i) => sum + Number(i.received_quantity) * Number(i.unit_cost), 0);
+  const anyReceived = items.some((i) => Number(i.received_quantity) > 0);
+  const oldTotal = Number(po.total_cost);
+
+  await withAuthorization(
+    {
+      orgId: input.orgId, action: "po_close_short", entityType: "purchase_order", entityId: po.id,
+      summary: `${po.po_number} closed short: ${input.reason.trim()}`, amount: Math.max(0, oldTotal - newTotal), requiresApproval: false,
+    },
+    async () => {
+      const supabase = createClient();
+      for (const i of short) {
+        const { error } = await supabase.from("purchase_order_items").update({ quantity: Number(i.received_quantity) }).eq("id", i.id);
+        if (error) throw error;
+      }
+      const vatRate = (await getOrgSettings(input.orgId)).default_vat_rate || 0;
+      const vat = vatRate > 0 ? Number((newTotal * (vatRate / (100 + vatRate))).toFixed(2)) : 0;
+      const { error } = await supabase.from("purchase_orders")
+        .update({ total_cost: newTotal, vat_amount: vat, status: anyReceived ? "received" : "cancelled" })
+        .eq("id", po.id);
+      if (error) throw error;
+      await logActivity({
+        icon: "📦", title: "Purchase order closed short",
+        sub: `${po.po_number} · KES ${oldTotal.toLocaleString()} → KES ${newTotal.toLocaleString()} · ${input.reason.trim()}`,
+        org_id: input.orgId,
+      });
+    }
+  );
+  return getPurchaseOrderById(po.id);
 }

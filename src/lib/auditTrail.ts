@@ -37,6 +37,7 @@ export const ACTION_LABELS: Record<string, string> = {
   stock_adjustment: "Stock adjustment",
   credit_limit_change: "Credit limit change",
   petty_cash_spend: "Petty cash spend",
+  po_close_short: "Purchase order closed short",
 };
 
 type Actor = { userId: string | null; name: string; isApprover: boolean; isFounder: boolean };

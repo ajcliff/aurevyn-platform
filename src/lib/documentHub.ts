@@ -60,7 +60,7 @@ function purchaseOrderPdf(po: PurchaseOrder, orgName: string) {
   y += 10;
   pdf.setFontSize(10);
 
-  const items = po.purchase_order_items ?? [];
+  const items = (po.purchase_order_items ?? []).filter((i) => Number(i.quantity) > 0);
   const rows = items.length
     ? items.map((i) => ({ name: i.inventory_products?.name ?? "Item", qty: Number(i.quantity), cost: Number(i.unit_cost) }))
     : [{ name: po.inventory_products?.name ?? "Item", qty: Number(po.quantity ?? 0), cost: Number(po.unit_cost ?? 0) }];

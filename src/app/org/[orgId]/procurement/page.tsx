@@ -11,6 +11,7 @@ import {
   createManualPurchaseOrder,
   updatePurchaseOrderStatus,
   receivePurchaseOrderItems,
+  closePurchaseOrderShort,
   getPurchaseOrderDocumentUrl,
   type PurchaseOrder,
   type PurchaseOrderStatus,
@@ -179,6 +180,24 @@ export default function ProcurementPage() {
   function closeReceive() {
     setReceivingPO(null);
     setReceiveQtys({});
+  }
+
+  async function handleCloseShort() {
+    if (!receivingPO) return;
+    const reason = prompt("Why is the rest not coming? (e.g. supplier out of stock)");
+    if (!reason?.trim()) return;
+    if (!confirm(`Close ${receivingPO.po_number} at what has been received so far? The amount owed to the supplier drops to match, and this can't be undone.`)) return;
+    try {
+      setReceiving(true);
+      await closePurchaseOrderShort({ po: receivingPO, orgId: organization.id, reason });
+      closeReceive();
+      load();
+    } catch (err) {
+      console.error(err);
+      alert("Could not close this order.");
+    } finally {
+      setReceiving(false);
+    }
   }
 
   async function handleConfirmReceive() {
@@ -504,6 +523,12 @@ export default function ProcurementPage() {
             <button style={{ ...buttonGold, width: "100%", marginTop: 8 }} onClick={handleConfirmReceive} disabled={receiving}>
               {receiving ? "Recording..." : "Confirm Receipt"}
             </button>
+            <button style={{ ...ghostButtonSmall, width: "100%", marginTop: 10, padding: 10 }} onClick={handleCloseShort} disabled={receiving}>
+              Supplier won&apos;t send the rest: close short
+            </button>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+              Closing short keeps what you already received, shrinks the order and the amount owed to match, and records why.
+            </p>
           </>
         )}
       </Drawer>
