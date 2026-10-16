@@ -1,3 +1,4 @@
+import { withAuthorization } from "@/lib/auditTrail";
 import { createClient } from "@/lib/supabase";
 import { recordPayment, type PaymentMethod } from "@/lib/payments";
 import { postRefundJournal } from "@/lib/journal";
@@ -23,20 +24,25 @@ export async function createRefund(
     .single();
   if (fetchError) throw fetchError;
 
-  await recordPayment({
-    orgId: returnRecord.org_id,
-    sourceType: "pos_return",
-    sourceId: returnId,
-    details: {
-      method: method as PaymentMethod,
-      amount: -Math.abs(amount),
-    },
-  });
+  await withAuthorization(
+    { orgId: returnRecord.org_id, action: "refund", entityType: "pos_return", entityId: returnId, summary: `Refund of KES ${Math.abs(amount).toLocaleString()} (${method})`, amount: Math.abs(amount) },
+    async () => {
+      await recordPayment({
+        orgId: returnRecord.org_id,
+        sourceType: "pos_return",
+        sourceId: returnId,
+        details: {
+          method: method as PaymentMethod,
+          amount: -Math.abs(amount),
+        },
+      });
 
-  await postRefundJournal({
-    orgId: returnRecord.org_id,
-    returnId,
-    amount: Math.abs(amount),
-    date: new Date().toISOString().slice(0, 10),
-  });
+      await postRefundJournal({
+        orgId: returnRecord.org_id,
+        returnId,
+        amount: Math.abs(amount),
+        date: new Date().toISOString().slice(0, 10),
+      });
+    }
+  );
 }

@@ -1,3 +1,4 @@
+import { withAuthorization } from "@/lib/auditTrail";
 import { createClient } from "@/lib/supabase";
 import { postPayrollJournal } from "@/lib/journal";
 
@@ -260,6 +261,16 @@ export async function runPayroll(orgId: string, periodStart: string, periodEnd: 
 }
 
 export async function updatePayrollRunStatus(id: string, status: PayrollStatus, financeAccountId?: string) {
+  if (status !== "paid") return applyPayrollRunStatus(id, status, financeAccountId);
+  const { data: info, error } = await createClient().from("payroll_runs").select("org_id, period_start, period_end").eq("id", id).single();
+  if (error || !info) throw error ?? new Error("Payroll run not found");
+  return withAuthorization(
+    { orgId: info.org_id, action: "payroll_paid", entityType: "payroll_run", entityId: id, summary: `Payroll ${info.period_start} to ${info.period_end}` },
+    () => applyPayrollRunStatus(id, status, financeAccountId)
+  );
+}
+
+async function applyPayrollRunStatus(id: string, status: PayrollStatus, financeAccountId?: string) {
   const supabase = createClient();
   const patch: Partial<PayrollRun> = { status };
   if (status === "processed") patch.processed_at = new Date().toISOString();

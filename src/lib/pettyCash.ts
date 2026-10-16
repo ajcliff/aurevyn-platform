@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase";
 import { createAccount, type FinanceAccount } from "@/lib/finance";
 import { getOrCreateDefaultAccount, getAssetAccountId, getCashPosition } from "@/lib/journal";
 import { logActivity } from "@/lib/activity";
+import { withAuthorization, PETTY_CASH_APPROVAL_LIMIT } from "@/lib/auditTrail";
 
 // A petty cash float is an ordinary cash finance account tagged category "Petty Cash",
 // so it shows in Cash in Hand and in every account picker, and its balance comes from the ledger.
@@ -118,6 +119,18 @@ export async function spendFromFloat(input: {
   if (input.amount > balance) {
     throw new Error(`INSUFFICIENT_FLOAT: only KES ${balance.toLocaleString()} left in this float`);
   }
+  return withAuthorization(
+    {
+      orgId: input.orgId, action: "petty_cash_spend", entityType: "petty_cash", entityId: `${input.floatId}:${input.amount}`,
+      summary: `${input.description.trim()} (${input.category})`, amount: input.amount, requiresApproval: input.amount > PETTY_CASH_APPROVAL_LIMIT,
+    },
+    () => doSpend(input)
+  );
+}
+
+async function doSpend(input: {
+  orgId: string; floatId: string; amount: number; category: string; payee?: string; description: string; receiptRef?: string; recordedBy?: string;
+}) {
   const supabase = createClient();
   const entryId = await saveEntry({
     org_id: input.orgId, float_id: input.floatId, entry_type: "spend", amount: input.amount, category: input.category,

@@ -1,3 +1,4 @@
+import { withAuthorization } from "@/lib/auditTrail";
 import { createClient } from "./supabase";
 import { getPurchaseOrders, type PurchaseOrder } from "./purchaseOrders";
 import { recordPayment, type PaymentDetailsInput, type Payment } from "./payments";
@@ -78,12 +79,16 @@ export async function recordSupplierPayment(input: {
   recordedByName?: string;
   financeAccountId?: string;
 }): Promise<Payment | null> {
-  return recordPayment({
-    orgId: input.orgId,
-    sourceType: "purchase_order",
-    sourceId: input.poId,
-    details: input.details,
-    recordedByName: input.recordedByName,
-    financeAccountId: input.financeAccountId,
-  });
+  return withAuthorization(
+    { orgId: input.orgId, action: "supplier_payment", entityType: "purchase_order", entityId: input.poId, summary: `Supplier payment for purchase order`, amount: input.details.amount },
+    () =>
+      recordPayment({
+        orgId: input.orgId,
+        sourceType: "purchase_order",
+        sourceId: input.poId,
+        details: input.details,
+        recordedByName: input.recordedByName,
+        financeAccountId: input.financeAccountId,
+      })
+  );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { withAuthorization, ApprovalRequiredError } from "@/lib/auditTrail";
 import { useEffect, useState } from "react";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import { createCustomer, updateCustomer, type Customer } from "@/lib/customers";
@@ -181,13 +182,21 @@ function CustomerForm({ orgId, existing, onClose, onSaved }: { orgId: string; ex
         credit_terms_days: Number(terms) || 30,
         notes: notes.trim() || null,
       };
+      const limitChanged = !!existing?.id && Number(existing.credit_limit ?? 0) !== payload.credit_limit;
       const saved = existing?.id
-        ? await updateCustomer(existing.id, payload)
+        ? await withAuthorization(
+            {
+              orgId, action: "credit_limit_change", entityType: "customer", entityId: `${existing.id}:${payload.credit_limit}`,
+              summary: `${payload.name}: credit limit KES ${Number(existing.credit_limit ?? 0).toLocaleString()} to KES ${payload.credit_limit.toLocaleString()}`,
+              amount: payload.credit_limit, requiresApproval: limitChanged,
+            },
+            () => updateCustomer(existing.id!, payload)
+          )
         : await createCustomer({ org_id: orgId, ...payload });
       onSaved(saved.id);
     } catch (e) {
       console.error(e);
-      setError("Could not save the customer.");
+      setError(e instanceof ApprovalRequiredError ? e.message : "Could not save the customer.");
       setSaving(false);
     }
   }

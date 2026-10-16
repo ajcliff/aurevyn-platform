@@ -1,5 +1,6 @@
 "use client";
 
+import { getActorName } from "@/lib/auditTrail";
 import { useEffect, useState } from "react";
 import { useEngine } from "@/lib/runtime/EngineContext";
 import {
@@ -142,7 +143,7 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
     }
 
     if (r.type === "salary_advance" && status === "rejected") {
-      const deciderName = membership.isFounder ? "Founder" : "Approver";
+      const deciderName = await getActorName(organization.id);
       if (!r.related_id) return;
       await rejectSalaryAdvance({
         advanceId: r.related_id,
@@ -155,7 +156,7 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
       return;
     }
 
-    const deciderName = membership.isFounder ? "Founder" : "Approver";
+    const deciderName = await getActorName(organization.id);
     await decideApprovalRequest(r.id, status, deciderName, organization.id, r.title);
     load();
   }
@@ -164,7 +165,7 @@ const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(nul
     if (!advanceRequest || !advanceRequest.related_id) return;
     setDisbursing(true);
     try {
-      const deciderName = membership.isFounder ? "Founder" : "Approver";
+      const deciderName = await getActorName(organization.id);
       await disburseSalaryAdvance({
         advanceId: advanceRequest.related_id,
         orgId: organization.id,
@@ -278,7 +279,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
       return;
     }
 
-    const deciderName = membership.isFounder ? "Founder" : "Approver";
+    const deciderName = await getActorName(organization.id);
 
     try {
       setCreatingPo(true);
@@ -325,10 +326,13 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>Approvals</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-            Expenses, reimbursements, and purchase requests.
+            Expenses, reimbursements, purchase requests and sensitive actions waiting for a sign-off.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          <a href={`/org/${organization.id}/audit-trail`} style={ghostButton}>
+            Audit Trail →
+          </a>
           <a href={`/org/${organization.id}/inventory/purchase-orders`} style={ghostButton}>
             View Purchase Orders →
           </a>

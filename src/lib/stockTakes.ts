@@ -1,3 +1,4 @@
+import { withAuthorization } from "@/lib/auditTrail";
 import { createClient } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
 import { updateStock } from "@/lib/inventory";
@@ -102,8 +103,24 @@ export async function recordCount(itemId: string, countedQuantity: number): Prom
  * completed. Items never counted are left untouched.
  */
 export async function completeStockTake(stockTakeId: string, orgId: string, warehouseId: string): Promise<{ adjusted: number }> {
-  const supabase = createClient();
   const items = await getStockTakeItems(stockTakeId);
+  const changes = items.filter(
+    (i) => i.counted_quantity !== null && i.counted_quantity !== undefined && i.counted_quantity !== i.expected_quantity
+  ).length;
+  // Correcting stock levels is a sensitive change: it needs an approver unless nothing is being adjusted
+  return withAuthorization(
+    {
+      orgId, action: "stock_adjustment", entityType: "stock_take", entityId: stockTakeId,
+      summary: `Stock take completed, ${changes} item${changes === 1 ? "" : "s"} adjusted`, requiresApproval: changes > 0,
+    },
+    () => applyStockTake(stockTakeId, orgId, warehouseId, items)
+  );
+}
+
+async function applyStockTake(
+  stockTakeId: string, orgId: string, warehouseId: string, items: Awaited<ReturnType<typeof getStockTakeItems>>
+): Promise<{ adjusted: number }> {
+  const supabase = createClient();
   let adjusted = 0;
 
   for (const item of items) {
