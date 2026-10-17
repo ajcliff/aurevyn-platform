@@ -12,7 +12,7 @@ export default function TermsPage() {
         <div className="mkt-eyebrow">Legal</div>
         <h1 className="mkt-h1" style={{ fontSize: "clamp(2rem, 3.6vw, 2.75rem)", marginTop: 14 }}>Terms of Service</h1>
         <p className="mkt-mono mkt-dim" style={{ marginTop: 10, marginBottom: 8, fontSize: "0.8125rem" }}>
-          Last updated: {new Date().toLocaleDateString("en-KE", { year: "numeric", month: "long", day: "numeric" })}
+          Last updated: 17 October 2026
         </p>
 
         <Section title="1. Agreement to Terms">
@@ -22,9 +22,10 @@ export default function TermsPage() {
         </Section>
 
         <Section title="2. The Service">
-          AUREVYN is a business operating platform providing tools including inventory management, point of
-          sale, customer relationship management, human resources, and related business functions
-          ("Engines"), configured according to your selected industry and subscription package.
+          AUREVYN is a business operating platform for Kenyan businesses. It provides tools for point of sale,
+          inventory, finance, procurement, human resources and payroll, customer relationship management,
+          business operations, analytics, automation and AI insights ("Engines"). You use the Engines you
+          subscribe to, with a number of seats for each. Features may be added, changed or retired over time.
         </Section>
 
         <Section title="3. Accounts and Access">
@@ -34,9 +35,11 @@ export default function TermsPage() {
         </Section>
 
         <Section title="4. Subscription and Billing">
-          Access to certain Engines depends on your subscription package. Package pricing, included features,
-          and billing terms are as displayed at the time of purchase and may change with reasonable notice.
-          Subscriptions renew automatically unless cancelled.
+          New organizations get a free trial of 30 days with every Engine switched on and no card required. After
+          the trial you choose which Engines to keep and how many seats each needs. Prices are those shown on our
+          Pricing page when you subscribe and may change with reasonable notice. We issue a numbered invoice each
+          month and a numbered receipt when you pay. You can pay online, by M-Pesa, bank transfer, cash or cheque.
+          Unpaid invoices may lead to your access being limited until they are settled.
         </Section>
 
         <Section title="5. Your Data">
@@ -53,8 +56,9 @@ export default function TermsPage() {
         </Section>
 
         <Section title="7. Third-Party Services">
-          The Platform may integrate with third-party services (such as payment processors) for functions
-          like payment collection. Use of those services may be subject to their own terms.
+          The Platform uses third-party services, such as a payment processor to collect subscription payments
+          and an email provider to send notifications and messages. Use of those services may be subject to their
+          own terms, and we share with them only what is needed to provide the service.
         </Section>
 
         <Section title="8. Availability and Support">
@@ -63,7 +67,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="9. Termination">
-          You may cancel your account at any time. We reserve the right to suspend or terminate accounts that
+          You may stop using AUREVYN at any time by contacting us, and you can ask for a copy of your business data before your account is closed. We reserve the right to suspend or terminate accounts that
           violate these terms or engage in fraudulent or harmful activity.
         </Section>
 
