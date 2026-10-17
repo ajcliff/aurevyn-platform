@@ -357,3 +357,8 @@
     opacity: 0;
   }
 }
+/* Phones: leave room for the "view-only on this screen size" bar, and keep small labels readable */
+@media (max-width: 700px) {
+  .content { padding-top: 4.5rem; }
+}
+.statLabel { color: var(--text-secondary); }
