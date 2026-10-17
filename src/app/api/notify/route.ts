@@ -30,8 +30,16 @@ export async function POST(req: NextRequest) {
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <h2>Welcome aboard, ${payload.ownerName}!</h2>
-            <p><strong>${payload.orgName}</strong> is now live on AUREVYN. You've got full access to every engine for the next 30 days, on us — plenty of time to see what actually fits how your business runs.</p>
-            <p>Log in any time to explore, add your team, and get set up.</p>
+            <p><strong>${payload.orgName}</strong> is live on AUREVYN, with every engine switched on for the next 30 days. No card needed.</p>
+            <p><strong>Four steps to start trading:</strong></p>
+            <ol style="line-height:1.7">
+              <li>Add your products</li>
+              <li>Add a cash or M-Pesa account</li>
+              <li>Make your first sale at the till</li>
+              <li>Invite your team</li>
+            </ol>
+            <p>You will find this as a checklist on your dashboard. It ticks itself off as you go. You can also install the Windows app from the Download page on our website.</p>
+            <p>Stuck on anything? Open Mail inside AUREVYN and write to Support. We read every message.</p>
             <p style="color: #888; font-size: 13px; margin-top: 32px;">— The AUREVYN team</p>
           </div>
         `,

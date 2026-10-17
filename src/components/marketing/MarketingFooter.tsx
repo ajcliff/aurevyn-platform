@@ -12,6 +12,7 @@ const COLUMNS = [
       { href: "/#engines", label: "Engines" },
       { href: "/#industries", label: "Industries" },
       { href: "/pricing", label: "Pricing" },
+      { href: "/download", label: "Download for Windows" },
       { href: "/register", label: "Start free trial" },
     ],
   },
@@ -41,13 +42,8 @@ export default function MarketingFooter() {
         <div className="mkt-footer__brand">
           <Wordmark size="md" />
           <p className="mkt-body" style={{ maxWidth: 280, fontSize: "0.875rem", marginTop: 14 }}>
-            The POS that runs your whole business — built in Africa, for
-            African
-            operations — from the till to the balance sheet.
+            Till, stock, books, payroll and approvals in one system, built in Nairobi for Kenyan businesses.
           </p>
-          <div className="mkt-badge-live" style={{ marginTop: 18 }}>
-            All engines operational
-          </div>
           <div className="mkt-footer__social">
             {/* TODO: replace # with real profile URLs once these accounts exist */}
             <a href="#" className="mkt-footer__social-link" aria-label="X (Twitter)">𝕏</a>
@@ -84,7 +80,7 @@ export default function MarketingFooter() {
 
       <div className="mkt-container mkt-footer__bottom">
         <span className="mkt-mono">© {new Date().getFullYear()} AUREVYN LABS · REG. NAIROBI, KE</span>
-        <span className="mkt-mono mkt-dim">BUILT FOR RETAIL · HEALTHCARE · EDUCATION · DISTRIBUTION</span>
+        <span className="mkt-mono mkt-dim">BUILT IN NAIROBI FOR KENYAN BUSINESSES</span>
       </div>
 
       <style>{`

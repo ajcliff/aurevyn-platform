@@ -36,7 +36,7 @@ export default function IndustriesSection() {
       <div className="mkt-container">
         <div className="mkt-industries__head">
           <div>
-            <div className="mkt-eyebrow mkt-eyebrow--brass">Sheet 02 / Who it is for</div>
+            <div className="mkt-eyebrow mkt-eyebrow--brass">Who it is for</div>
             <h2 className="mkt-h2" style={{ marginTop: 14 }}>
               Built for the way you trade.
             </h2>

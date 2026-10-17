@@ -12,6 +12,7 @@ import { getOutstandingInvoices } from "@/lib/orgInvoices";
 import { getPaymentsSince, methodLabel, type Payment } from "@/lib/payments";
 import { getPurchaseOrders, type PurchaseOrder } from "@/lib/purchaseOrders";
 import type { OrgInvoice } from "@/lib/orgInvoices";
+import SetupChecklist from "@/components/SetupChecklist";
 
 type AttentionItem = {
   id: string;
@@ -160,6 +161,8 @@ export default function OrgOverviewPage() {
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>{organization.name}</h1>
         <p style={{ color: "var(--text-muted)", fontSize: 12 }}>{organization.location}</p>
       </div>
+
+      <SetupChecklist orgId={organization.id} hasEngine={hasEngine} isOwnerOrAdmin={canManageTeam} />
 
       {/* Quick actions */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>

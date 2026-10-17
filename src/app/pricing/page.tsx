@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: "How do payments work?",
-    a: "M-Pesa, bank transfer, cash and cheque payments are recorded in POS and reconciled into Finance. We issue numbered invoices and receipts for your subscription.",
+    a: "Your subscription is invoiced each month. Pay online by card or M-Pesa, or pay by bank transfer, cash or cheque and tell us you have paid. You get a numbered receipt either way. Inside the app, your own sales in M-Pesa, bank, cash and cheque are recorded in POS and reconciled in Finance.",
   },
   {
     q: "What happens after my free trial?",

@@ -78,7 +78,7 @@ export default function PricingPreview() {
     <section className="mkt-section mkt-section--tight">
       <div className="mkt-container">
         <div className="mkt-section-head" style={{ textAlign: "center" }}>
-          <div className="mkt-eyebrow" style={{ justifyContent: "center" }}>Sheet 05 / Pricing</div>
+          <div className="mkt-eyebrow" style={{ justifyContent: "center" }}>Pricing</div>
           <h2 className="mkt-h2" style={{ marginTop: 14 }}>Pay only for the engines you use.</h2>
           <p className="mkt-body-lg" style={{ marginTop: 12, maxWidth: 480, marginInline: "auto" }}>
             Each engine is priced by how many people use it. Start with the ones that run your shop, add the rest when you need them.
