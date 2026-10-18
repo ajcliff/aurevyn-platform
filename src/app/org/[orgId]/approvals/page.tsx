@@ -450,12 +450,21 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
             </select>
 
             <label style={labelStyle}>Supplier</label>
-            <input
-              value={poSupplier}
-              onChange={(e) => setPoSupplier(e.target.value)}
-              style={inputStyle}
-              placeholder="e.g. Benchmark Distributors"
-            />
+            {suppliers.length > 0 ? (
+              <select value={poSupplier} onChange={(e) => setPoSupplier(e.target.value)} style={inputStyle}>
+                <option value="">Choose a supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={poSupplier}
+                onChange={(e) => setPoSupplier(e.target.value)}
+                style={inputStyle}
+                placeholder="No suppliers saved yet. Type the name, or add suppliers under Procurement."
+              />
+            )}
 
             <label style={labelStyle}>Quantity</label>
             <input

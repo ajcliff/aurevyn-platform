@@ -51,6 +51,30 @@ export const BUILTIN_REMINDERS: MessageTemplate[] = [
   },
 ];
 
+export const BUILTIN_MAIL: MessageTemplate[] = [
+  {
+    id: "builtin-mail-stock",
+    builtin: true,
+    name: "Stock request",
+    subject: "Stock request: [item]",
+    body: "Hello,\n\nWe are running low on [item]. Please arrange [quantity] units by [date].\n\nThank you.",
+  },
+  {
+    id: "builtin-mail-meeting",
+    builtin: true,
+    name: "Meeting invite",
+    subject: "Meeting: [topic]",
+    body: "Hello,\n\nPlease join a short meeting about [topic] on [date] at [time], at [place].\n\nPlease reply if you cannot make it.",
+  },
+  {
+    id: "builtin-mail-document",
+    builtin: true,
+    name: "Document for review",
+    subject: "Please review: [document name]",
+    body: "Hello,\n\nI have attached [document name]. Please review it and reply by [date] with any changes.\n\nThank you.",
+  },
+];
+
 export function fillTemplate(text: string, values: Record<string, string>): string {
   return text.replace(/\{(\w+)\}/g, (m, key) => (key in values ? values[key] : m));
 }

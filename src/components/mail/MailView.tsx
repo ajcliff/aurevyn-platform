@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import AttachmentPicker from "@/components/AttachmentPicker";
 import { openAttachment, type Attachment } from "@/lib/attachments";
+import { BUILTIN_MAIL, getTemplates, saveTemplate, type MessageTemplate } from "@/lib/messageTemplates";
 import { CATEGORY_LABEL, getMessages, getMyReads, getThreads, isUnread, mailApi, type MailMessage, type MailThread } from "@/lib/mail";
 
 type Props =
@@ -247,6 +248,29 @@ export function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSen
   const [files, setFiles] = useState<Attachment[]>(initial?.attachments ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<MessageTemplate[]>([]);
+  const [tplId, setTplId] = useState("");
+  const tpls = [...BUILTIN_MAIL, ...saved];
+
+  useEffect(() => {
+    if (!founder && orgId) getTemplates(orgId, "mail").then(setSaved).catch(() => {});
+  }, [founder, orgId]);
+
+  function applyTemplate(id: string) {
+    setTplId(id);
+    const t = tpls.find(x => x.id === id);
+    if (t) { setSubject(t.subject); setBody(t.body); }
+  }
+
+  async function saveAsTemplate() {
+    const name = window.prompt("Name this template (for example: Weekly stock request)");
+    if (!name?.trim() || !orgId) return;
+    try {
+      await saveTemplate(orgId, { name: name.trim(), subject, body }, "mail");
+      setSaved(await getTemplates(orgId, "mail"));
+      setError(null);
+    } catch { setError("Only owners and admins can save templates."); }
+  }
 
   const needsRecipients = !founder && kind === "internal" && picked.length === 0;
   const orgChoice = founder ? (toOrg || orgs[0]?.id || "") : "";
@@ -299,11 +323,19 @@ export function Compose({ founder, endpoint, orgId, people, orgs, onClose, onSen
           </select>
         )}
 
+        {!founder && (
+          <select value={tplId} onChange={e => applyTemplate(e.target.value)} aria-label="Template" style={field}>
+            <option value="">Start from a template (optional)</option>
+            {tpls.map(t => <option key={t.id} value={t.id}>{t.builtin ? t.name : `${t.name} (yours)`}</option>)}
+          </select>
+        )}
         <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" aria-label="Subject" maxLength={200} style={field} />
         <textarea value={body} onChange={e => setBody(e.target.value)} rows={7} placeholder="Write your message" aria-label="Message" style={{ ...field, resize: "vertical" }} />
         {!founder && orgId && <AttachmentPicker orgId={orgId} uploaderName="Mail" value={files} onChange={setFiles} />}
 
+        {!founder && /\[[^\]]+\]/.test(subject + body) && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Replace anything in [square brackets] before sending.</div>}
         {error && <div role="alert" style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
+        {!founder && <button type="button" style={{ ...btn, alignSelf: "flex-start", padding: "4px 10px" }} disabled={!subject.trim() || !body.trim()} onClick={saveAsTemplate}>Save as template</button>}
         <button style={{ ...gold, padding: 10 }} disabled={busy || !subject.trim() || !body.trim() || needsRecipients || (founder && !orgChoice)} onClick={send}>
           {busy ? "Sending…" : "Send"}
         </button>
