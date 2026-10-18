@@ -10,6 +10,7 @@ export type TeamMember = {
   role: TeamRole;
   full_name: string | null;
   email: string | null;
+  username?: string | null;
   allowed_engines: string[] | null;
 };
 

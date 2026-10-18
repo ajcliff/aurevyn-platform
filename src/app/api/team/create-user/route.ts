@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireOrgAdmin } from "@/lib/server/guards";
+import { USERNAME_PATTERN, normalizeUsername, usernameToEmail } from "@/lib/staffLogin";
+import { isValidEmail } from "@/lib/validation";
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -17,7 +19,10 @@ function generateTempPassword(): string {
 // writable from the admin's own client session for a user that doesn't
 // exist yet.
 export async function POST(req: NextRequest) {
-  const { orgId, fullName, email, role, departmentId, engineIds } = await req.json();
+  const { orgId, fullName, email: rawEmail, username: rawUsername, role, departmentId, engineIds } = await req.json();
+  // Someone signs in with a username, an email, or both. With a username, the email is only a contact address (optional).
+  const username: string | null = rawUsername?.trim() ? normalizeUsername(rawUsername) : null;
+  const email: string = (rawEmail ?? "").trim();
 
   const access = orgId ? await requireOrgAdmin(orgId) : null;
   if (!access) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
@@ -25,8 +30,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only an owner can create another owner." }, { status: 403 });
   }
 
-  if (!orgId || !fullName?.trim() || !email?.trim() || !role) {
-    return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+  if (!orgId || !fullName?.trim() || !role || (!username && !email)) {
+    return NextResponse.json({ error: "Enter a name and either a username or an email." }, { status: 400 });
+  }
+  if (username && !USERNAME_PATTERN.test(username)) {
+    return NextResponse.json({ error: "Usernames are 3 to 30 characters: letters, numbers, dots, dashes or underscores." }, { status: 400 });
+  }
+  if (email && !isValidEmail(email)) {
+    return NextResponse.json({ error: "That email address doesn't look right." }, { status: 400 });
+  }
+  if (username) {
+    const { data: taken } = await supabaseAdmin.from("org_users").select("id").ilike("username", username).maybeSingle();
+    if (taken) return NextResponse.json({ error: "That username is taken. Try another." }, { status: 409 });
   }
 
   // Bigger organisations run on departments: from the 11th person on, everyone must belong to one,
@@ -61,14 +76,16 @@ export async function POST(req: NextRequest) {
   const tempPassword = generateTempPassword();
 
   const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    email: email.trim(),
+    email: username ? usernameToEmail(username) : email,
     password: tempPassword,
     email_confirm: true,
+    // They must choose their own password the first time they sign in
+    user_metadata: { must_change_password: true, ...(username ? { username } : {}) },
   });
 
   if (createError) {
     if (createError.message.toLowerCase().includes("already registered")) {
-      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      return NextResponse.json({ error: username ? "That username is taken. Try another." : "An account with this email already exists." }, { status: 409 });
     }
     return NextResponse.json({ error: createError.message }, { status: 400 });
   }
@@ -83,7 +100,8 @@ export async function POST(req: NextRequest) {
     user_id: userId,
     role,
     full_name: fullName,
-    email: email.trim(),
+    email: email || null,
+    username,
   });
   if (memberError) {
     return NextResponse.json({ error: memberError.message }, { status: 500 });
@@ -93,7 +111,7 @@ export async function POST(req: NextRequest) {
     org_id: orgId,
     user_id: userId,
     full_name: fullName,
-    email: email.trim(),
+    email: email || null,
     phone: null,
     role,
     department: departmentName,
@@ -111,5 +129,5 @@ export async function POST(req: NextRequest) {
     if (error) licenseWarnings.push(error.message);
   }
 
-  return NextResponse.json({ ok: true, userId, tempPassword, licenseWarnings });
+  return NextResponse.json({ ok: true, userId, tempPassword, loginName: username ?? email, licenseWarnings });
 }

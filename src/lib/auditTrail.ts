@@ -32,6 +32,7 @@ export class ApprovalRequiredError extends Error {
 
 export const ACTION_LABELS: Record<string, string> = {
   payroll_paid: "Payroll paid",
+  password_reset: "Password reset",
   supplier_payment: "Supplier payment",
   refund: "Refund",
   stock_adjustment: "Stock adjustment",

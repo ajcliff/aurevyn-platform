@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/marketing/AuthShell";
+import { loginIdentifierToEmail } from "@/lib/staffLogin";
 
 function LoginInner() {
   const [email, setEmail] = useState("");
@@ -22,6 +23,14 @@ function LoginInner() {
 
   // Sends a signed-in user to the right place; asks for the 2FA code first when they have it on
   async function routeSignedIn(userId: string, userEmail: string | undefined, fresh: boolean) {
+    // Temporary password from an admin: choose a real one first
+    const { data: { user: current } } = await supabase.auth.getUser();
+    if (current?.user_metadata?.must_change_password) {
+      router.push("/change-password");
+      router.refresh();
+      return;
+    }
+
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
       const { data: f } = await supabase.auth.mfa.listFactors();
@@ -71,19 +80,19 @@ function LoginInner() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+      setError("Please enter your email or username and your password.");
       return;
     }
     setLoading(true);
     setError("");
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginIdentifierToEmail(email),
       password,
     });
 
     if (error || !data.user) {
-      setError(error?.message ?? "Sign in failed.");
+      setError(error?.message === "Invalid login credentials" ? "Wrong email, username or password." : (error?.message ?? "Sign in failed."));
       setLoading(false);
       return;
     }
@@ -201,13 +210,15 @@ function LoginInner() {
         </div>
       )}
 
-      <label className="mkt-field-label">Email</label>
+      <label className="mkt-field-label">Email or username</label>
       <input
-        type="email"
+        type="text"
+        autoCapitalize="none"
+        autoCorrect="off"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-        placeholder="you@company.com"
+        placeholder="you@company.com or your username"
         className="mkt-input"
       />
 
@@ -252,6 +263,9 @@ function LoginInner() {
         <a href="/forgot-password" className="mkt-mono" style={{ color: "var(--mkt-paper-faint)", fontSize: "0.75rem" }}>
           Forgot your password?
         </a>
+        <div style={{ marginTop: 6, fontSize: "0.6875rem", color: "var(--mkt-paper-faint)" }}>
+          Signing in with a username? Ask your admin to reset it.
+        </div>
       </div>
 
       <div style={{ textAlign: "center", marginTop: 10, fontSize: "0.8125rem", color: "var(--mkt-paper-faint)" }}>

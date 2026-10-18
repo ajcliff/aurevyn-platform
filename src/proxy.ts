@@ -52,6 +52,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  // A team member given a temporary password must choose their own before using anything else
+  if (user.user_metadata?.must_change_password && !pathname.startsWith("/api") && !pathname.startsWith("/change-password")) {
+    return NextResponse.redirect(new URL("/change-password", req.url));
+  }
+
   const email = user.email;
   const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
 

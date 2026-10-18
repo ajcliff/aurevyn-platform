@@ -28,6 +28,9 @@ const ROLES: TeamRole[] = ["admin", "manager", "staff"];
 export default function UsersPage() {
   const { organization, membership } = useEngine();
   const canManage = canManageTeam(membership);
+  const myUserId = membership?.userId ?? null;
+  const myRole = membership?.role ?? "staff";
+  const [resetResult, setResetResult] = useState<{ name: string; login: string; tempPassword: string } | null>(null);
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [overview, setOverview] = useState<EngineLicenseOverview[]>([]);
@@ -83,12 +86,43 @@ export default function UsersPage() {
     load();
   }
 
+  async function handleResetPassword(member: TeamMember) {
+    const name = member.full_name || member.username || member.email || "this person";
+    if (!confirm(`Give ${name} a new temporary password? Their current password stops working right away.`)) return;
+    const res = await fetch("/api/team/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orgId: organization.id, memberUserId: member.user_id }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(body.error || "Could not reset the password.");
+      return;
+    }
+    setResetResult({ name, login: member.username || member.email || "", tempPassword: body.tempPassword });
+  }
+
   if (!canManage) {
     return <EmptyState icon="🔒" message="Only owners and admins can manage users." />;
   }
 
   return (
     <div style={{ padding: 24 }}>
+      {resetResult && (
+        <div style={overlayStyle}>
+          <div style={modalStyle}>
+            <h2 style={{ marginBottom: 6 }}>New temporary password</h2>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+              Give this to {resetResult.name} directly. It is only shown once. They will choose their own password when they sign in.
+            </p>
+            <div style={{ padding: 14, borderRadius: 10, background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "monospace", fontSize: 16, textAlign: "center", marginBottom: 12 }}>
+              {resetResult.tempPassword}
+            </div>
+            {resetResult.login && <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Signs in with: <b>{resetResult.login}</b></p>}
+            <button style={{ ...buttonGold, width: "100%", marginTop: 16 }} onClick={() => setResetResult(null)}>Done</button>
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <h1 style={{ fontSize: 20 }}>Users</h1>
         <div style={{ display: "flex", gap: 8 }}>
@@ -137,7 +171,11 @@ export default function UsersPage() {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-                      {m.full_name && <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</div>}
+                      {m.full_name && (m.username || m.email) && (
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {m.username ? `Username: ${m.username}` : m.email}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -159,6 +197,9 @@ export default function UsersPage() {
 
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button style={ghostButton} onClick={() => setOpenId(isOpen ? null : m.id)} aria-expanded={isOpen}>{isOpen ? "Done" : "Manage"}</button>
+                    {m.user_id !== myUserId && (m.role !== "owner" || myRole === "owner") && (
+                      <button style={ghostButton} onClick={() => handleResetPassword(m)}>Reset password</button>
+                    )}
                     {m.role !== "owner" && <button style={ghostButton} onClick={() => handleRemove(m)}>Remove</button>}
                   </div>
                 </div>
@@ -226,6 +267,7 @@ function CreateUserModal({
   onCreated: () => void;
 }) {
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<TeamRole>("staff");
   const [departmentId, setDepartmentId] = useState("");
@@ -251,8 +293,8 @@ function CreateUserModal({
   }
 
   async function submit() {
-    if (!fullName.trim() || !email.trim()) {
-      setError("Name and email are required.");
+    if (!fullName.trim() || (!username.trim() && !email.trim())) {
+      setError("Enter a name and either a username or an email.");
       return;
     }
     setSaving(true);
@@ -264,6 +306,7 @@ function CreateUserModal({
         body: JSON.stringify({
           orgId,
           fullName,
+          username,
           email,
           role,
           departmentId: departmentId || null,
@@ -292,7 +335,7 @@ function CreateUserModal({
           <div style={{ padding: 14, borderRadius: 10, background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "monospace", fontSize: 16, textAlign: "center", marginBottom: 12 }}>
             {result.tempPassword}
           </div>
-          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Login email: {email}</p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Signs in with: <b>{username.trim().toLowerCase() || email}</b>. They will choose their own password the first time they sign in.</p>
           {result.warnings.length > 0 && (
             <p style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>
               Account created, but some licenses couldn't be assigned: {result.warnings.join("; ")}
@@ -312,7 +355,11 @@ function CreateUserModal({
         <label style={labelSmall}>Full name</label>
         <input style={fullInput} value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
-        <label style={labelSmall}>Email (this is their login)</label>
+        <label style={labelSmall}>Username (what they sign in with)</label>
+        <input style={fullInput} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. jane.otieno" autoCapitalize="none" />
+        <div style={{ fontSize: 11, color: "var(--text-muted)", margin: "-6px 0 10px" }}>Letters, numbers, dots, dashes. Must be unique across AUREVYN, so add something like the branch if it is taken.</div>
+
+        <label style={labelSmall}>Email (optional, for notifications{username.trim() ? "" : "; required if no username"})</label>
         <input style={fullInput} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
