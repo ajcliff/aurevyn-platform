@@ -72,13 +72,7 @@ export async function requestSalaryAdvance(input: {
     related_id: advance.id,
   });
 
-  await logActivity({
-    icon: "🪙",
-    title: "Salary advance requested",
-    sub: `${input.employeeName} — KES ${input.amount.toLocaleString()}`,
-    org_id: input.orgId,
-  });
-
+  // Not posted to the organization-wide Activity feed: who asked for money, and how much, is private.
   return advance as SalaryAdvance;
 }
 
@@ -154,5 +148,5 @@ export async function rejectSalaryAdvance(input: {
     .update({ status: "rejected", decided_by_name: input.decidedByName, decided_at: new Date().toISOString() })
     .eq("id", input.approvalRequestId);
 
-  await logActivity({ icon: "❌", title: "Request rejected", sub: input.title, org_id: input.orgId });
+  await logActivity({ icon: "❌", title: "Request rejected", sub: "Salary advance", org_id: input.orgId });
 }

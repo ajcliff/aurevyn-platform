@@ -212,13 +212,8 @@ export default function HrDashboard({ orgId }: { orgId: string }) {
   async function decideLeave(l: LeaveRequest, status: LeaveStatus) {
     const updated = await updateLeaveStatus(l.id, status);
     setLeaves((prev) => prev.map((x) => (x.id === l.id ? updated : x)));
-    const emp = employees.find((e) => e.id === l.employee_id);
-    await logActivity({
-      icon: status === "approved" ? "✅" : "❌",
-      title: `Leave ${status}`,
-      sub: emp?.full_name || "Employee",
-      org_id: orgId,
-    });
+    // Deliberately not posted to the organization-wide Activity feed: whose leave was refused is
+    // private. The person is told through their own notifications.
   }
 
   return (

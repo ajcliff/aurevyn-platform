@@ -19,7 +19,7 @@ import {
 } from "@/lib/licensing";
 import EmptyState from "@/components/EmptyState";
 
-const usersGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(200px, 1.4fr) 110px minmax(200px, 1.6fr) 170px", gap: 16, alignItems: "center" };
+const usersGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(170px, 1.2fr) 110px minmax(170px, 1.3fr) auto", gap: 16, alignItems: "center" };
 const roleBadge: React.CSSProperties = { display: "inline-block", padding: "3px 10px", borderRadius: 14, border: "1px solid var(--border-light)", fontSize: 12, fontWeight: 700 };
 const miniChip: React.CSSProperties = { padding: "2px 8px", borderRadius: 10, fontSize: 11, background: "var(--bg-base)", border: "1px solid var(--border-light)", color: "var(--text-secondary)" };
 
@@ -195,7 +195,7 @@ export default function UsersPage() {
                     {held.length > 3 && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>+{held.length - 3} more</span>}
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
                     <button style={ghostButton} onClick={() => setOpenId(isOpen ? null : m.id)} aria-expanded={isOpen}>{isOpen ? "Done" : "Manage"}</button>
                     {m.user_id !== myUserId && (m.role !== "owner" || myRole === "owner") && (
                       <button style={ghostButton} onClick={() => handleResetPassword(m)}>Reset password</button>
@@ -538,6 +538,6 @@ const labelSmall: React.CSSProperties = { fontSize: 12, color: "var(--text-muted
 const fullInput: React.CSSProperties = { width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-base)", color: "var(--text-primary)", fontSize: 13, marginBottom: 4 };
 const smallInputStyle: React.CSSProperties = { padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-base)", color: "var(--text-primary)", fontSize: 12 };
 const buttonGold: React.CSSProperties = { background: "var(--gold)", color: "var(--gold-contrast)", border: "none", borderRadius: 10, padding: "8px 16px", fontWeight: 700, fontSize: 12, cursor: "pointer" };
-const ghostButton: React.CSSProperties = { padding: "7px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer" };
+const ghostButton: React.CSSProperties = { padding: "7px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "transparent", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" };
 const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 };
 const modalStyle: React.CSSProperties = { width: 480, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, maxHeight: "85vh", overflowY: "auto" };

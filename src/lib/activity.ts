@@ -38,6 +38,10 @@ export async function getOrgActivity(orgId: string, limit = 30): Promise<Activit
     .from("activity")
     .select("*")
     .eq("org_id", orgId)
+    // Personal matters (someone's leave, a salary advance request) are not for the whole organization to see.
+    // This also hides older entries written before they stopped being logged.
+    .not("title", "ilike", "Leave %")
+    .not("title", "eq", "Salary advance requested")
     .order("created_at", { ascending: false })
     .limit(limit);
 
