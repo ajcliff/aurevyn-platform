@@ -14,6 +14,7 @@ import {
 } from "@/lib/customerCredit";
 import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import EmptyState from "@/components/EmptyState";
+import ReminderModal from "@/components/credit/ReminderModal";
 
 const METHODS = [
   { value: "M-Pesa", type: "mobile_money" },
@@ -127,6 +128,7 @@ export default function CreditCustomersPage() {
           ledger={ledger}
           accounts={accounts}
           orgId={orgId}
+          orgName={organization.name}
           onClose={() => setSelected(null)}
           onEdit={() => setShowForm(selected.customer)}
           onChanged={() => refreshOpen(selected.customer.id!)}
@@ -226,11 +228,12 @@ function CustomerForm({ orgId, existing, onClose, onSaved }: { orgId: string; ex
   );
 }
 
-function Drawer({ row, ledger, accounts, orgId, onClose, onEdit, onChanged }: {
-  row: CreditSummary; ledger: CreditEntry[]; accounts: FinanceAccount[]; orgId: string;
+function Drawer({ row, ledger, accounts, orgId, orgName, onClose, onEdit, onChanged }: {
+  row: CreditSummary; ledger: CreditEntry[]; accounts: FinanceAccount[]; orgId: string; orgName: string;
   onClose: () => void; onEdit: () => void; onChanged: () => void;
 }) {
   const c = row.customer;
+  const [reminding, setReminding] = useState(false);
   const [paying, setPaying] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(METHODS[0].value);
@@ -297,6 +300,14 @@ function Drawer({ row, ledger, accounts, orgId, onClose, onEdit, onChanged }: {
           <button style={{ ...goldBtn, flex: 1 }} onClick={() => setPaying((v) => !v)} disabled={row.balance <= 0}>Receive payment</button>
           <button style={ghostBtn} onClick={onEdit}>Edit / change limit</button>
         </div>
+        <button
+          style={{ ...ghostBtn, width: "100%", marginBottom: 16, ...(row.overdue > 0 ? { borderColor: "#ef4444", color: "#ef4444", fontWeight: 700 } : {}) }}
+          onClick={() => setReminding(true)}
+          disabled={row.balance <= 0}
+        >
+          Send reminder
+        </button>
+        {reminding && <ReminderModal orgId={orgId} orgName={orgName} row={row} onClose={() => setReminding(false)} />}
 
         {paying && (
           <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
