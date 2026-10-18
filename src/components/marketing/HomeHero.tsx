@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Wordmark from "../../../wordmark";
+import Wordmark from "@/components/Wordmark";
 
 const FACTS = [
   { value: "10", label: "Engines, all on for 30 days" },
@@ -19,7 +19,7 @@ export default function HomeHero() {
       <div className="mkt-container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 48, alignItems: "center" }}>
         <div>
           <Wordmark size="lg" />
-          <div className="mkt-eyebrow" style={{ marginTop: 20 }}>For Kenyan businesses that sell and keep stock</div>
+          <div className="mkt-eyebrow" style={{ marginTop: 28 }}>For Kenyan businesses that sell and keep stock</div>
           <h1 className="mkt-h1" style={{ marginTop: 18 }}>
             Your till, your stock and your books. In one place.
           </h1>

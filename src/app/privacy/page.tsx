@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
         <Section title="1. Introduction">
           This Privacy Policy explains how AUREVYN collects, uses, and protects information when you use our
-          platform. We're committed to handling your data responsibly and in line with the Kenya Data
+          platform. We&apos;re committed to handling your data responsibly and in line with the Kenya Data
           Protection Act, 2019, and applicable data protection principles.
         </Section>
 
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
         <Section title="3. How We Use Information">
           We use collected information to: provide and maintain the Platform; process transactions; send
           important account and service notifications; respond to support requests; and improve the
-          Platform's features and reliability.
+          Platform&apos;s features and reliability.
         </Section>
 
         <Section title="4. Data Storage and Security">

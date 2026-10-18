@@ -16,22 +16,22 @@ export default function TermsPage() {
         </p>
 
         <Section title="1. Agreement to Terms">
-          By creating an account or using AUREVYN ("the Platform," "we," "us," "our"), you agree to be bound by
-          these Terms of Service. If you're registering on behalf of a business, you confirm you have the
+          By creating an account or using AUREVYN (&quot;the Platform,&quot; &quot;we,&quot; &quot;us,&quot; &quot;our&quot;), you agree to be bound by
+          these Terms of Service. If you&apos;re registering on behalf of a business, you confirm you have the
           authority to bind that business to these terms.
         </Section>
 
         <Section title="2. The Service">
           AUREVYN is a business operating platform for Kenyan businesses. It provides tools for point of sale,
           inventory, finance, procurement, human resources and payroll, customer relationship management,
-          business operations, analytics, automation and AI insights ("Engines"). You use the Engines you
+          business operations, analytics, automation and AI insights (&quot;Engines&quot;). You use the Engines you
           subscribe to, with a number of seats for each. Features may be added, changed or retired over time.
         </Section>
 
         <Section title="3. Accounts and Access">
-          You're responsible for maintaining the confidentiality of your account credentials and for all
+          You&apos;re responsible for maintaining the confidentiality of your account credentials and for all
           activity that occurs under your account. You must provide accurate information when registering.
-          If you invite team members, you're responsible for the access levels you grant them.
+          If you invite team members, you&apos;re responsible for the access levels you grant them.
         </Section>
 
         <Section title="4. Subscription and Billing">
@@ -50,9 +50,9 @@ export default function TermsPage() {
         </Section>
 
         <Section title="6. Acceptable Use">
-          You agree not to use the Platform to: violate any law; infringe on others' rights; upload malicious
-          code; attempt to gain unauthorized access to other organizations' data; or interfere with the
-          Platform's normal operation.
+          You agree not to use the Platform to: violate any law; infringe on others&apos; rights; upload malicious
+          code; attempt to gain unauthorized access to other organizations&apos; data; or interfere with the
+          Platform&apos;s normal operation.
         </Section>
 
         <Section title="7. Third-Party Services">
@@ -80,7 +80,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="11. Limitation of Liability">
-          The Platform is provided "as is." To the fullest extent permitted by law, AUREVYN is not liable for
+          The Platform is provided &quot;as is.&quot; To the fullest extent permitted by law, AUREVYN is not liable for
           indirect, incidental, or consequential damages arising from use of the Platform.
         </Section>
 

@@ -42,7 +42,7 @@ const [activity, setActivity] = useState<Activity[]>([]);
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>Activity</h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-          Everything that's happened in {organization.name}, most recent first.
+          Everything that&apos;s happened in {organization.name}, most recent first.
         </p>
       </div>
 

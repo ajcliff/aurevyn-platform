@@ -81,7 +81,7 @@ export default function StatutoryReportPage() {
     <div style={{ padding: 24 }}>
       <h1 style={{ fontSize: 20, marginBottom: 4 }}>Statutory Remittance</h1>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
-        NSSF, SHIF, and Housing Levy withheld from payroll, plus PAYE — what you owe KRA/NSSF/SHA and what's already been paid.
+        NSSF, SHIF, and Housing Levy withheld from payroll, plus PAYE — what you owe KRA/NSSF/SHA and what&apos;s already been paid.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, maxWidth: 700 }}>

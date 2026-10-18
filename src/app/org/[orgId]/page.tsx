@@ -266,7 +266,7 @@ export default function OrgOverviewPage() {
         )}
 
         <div className="card" style={statTileStyle}>
-          <div style={statLabelStyle}>Today's Cash</div>
+          <div style={statLabelStyle}>Today&apos;s Cash</div>
           <div style={statValueStyle}>KES {todayCashTotal.toLocaleString()}</div>
           {hasEngine("pos") && weekTrend !== null ? (
             <div style={{ fontSize: 10.5, color: weekTrend >= 0 ? "#3dd68c" : "#ef4444" }}>
@@ -306,7 +306,7 @@ export default function OrgOverviewPage() {
       {/* What's selling — compact table rows */}
       {hasEngine("pos") && topProducts.length > 0 && (
         <div className="card" style={{ ...compactCardStyle, width: "fit-content", maxWidth: "100%" }}>
-          <h3 style={compactHeadingStyle}>What's Selling — Last 7 Days</h3>
+          <h3 style={compactHeadingStyle}>What&apos;s Selling — Last 7 Days</h3>
           {topProducts.map((p, i) => (
             <div
               key={p.product_name}

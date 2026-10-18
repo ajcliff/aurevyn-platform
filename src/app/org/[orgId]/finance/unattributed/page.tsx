@@ -52,7 +52,7 @@ export default function UnattributedCashPage() {
       <h1 style={{ fontSize: 20, marginBottom: 4 }}>Unattributed Cash</h1>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20, maxWidth: 640 }}>
         Money that moved but was never tied to a specific bank, cash, or mobile-money account — mostly split-tender
-        POS sales, where one journal entry can't be split across two accounts. Assign each one to a real account to
+        POS sales, where one journal entry can&apos;t be split across two accounts. Assign each one to a real account to
         clean it up; nothing else about that transaction changes.
       </p>
 

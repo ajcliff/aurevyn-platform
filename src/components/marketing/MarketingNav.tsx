@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useScrolled } from "./interactions";
-import Wordmark from "../../../wordmark";
+import Wordmark from "@/components/Wordmark";
 
 const LINKS = [
   { href: "/#engines", label: "Engines" },

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Wordmark from "../../../wordmark";
+import Wordmark from "@/components/Wordmark";
 import MarketingShell from "./MarketingShell";
 
 export default function AuthShell({
@@ -13,7 +13,7 @@ export default function AuthShell({
     <MarketingShell>
       <div className="mkt-auth">
         <div className="mkt-auth__panel" style={{ maxWidth: width }}>
-         <div className="mkt-hero__logo">
+         <div className="mkt-hero__logo" style={{ marginBottom: 24 }}>
                      <Wordmark size="lg" />
                    </div>
 

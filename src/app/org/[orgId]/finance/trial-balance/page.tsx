@@ -56,7 +56,7 @@ export default function TrialBalancePage() {
       </div>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
         Every debit posted to the ledger should equal every credit, in total. This is a structural check, not a
-        business one — if it's out of balance, something posted an unbalanced entry somewhere.
+        business one — if it&apos;s out of balance, something posted an unbalanced entry somewhere.
       </p>
 
       <div style={{ maxWidth: 800 }}>

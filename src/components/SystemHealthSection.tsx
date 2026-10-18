@@ -249,7 +249,7 @@ export default function SystemHealthSection() {
       </div>
 
       <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "4px 0" }}>
-        These are live checks, run every 30 seconds — there's no historical uptime log yet, so only the current status is shown.
+        These are live checks, run every 30 seconds — there&apos;s no historical uptime log yet, so only the current status is shown.
       </div>
     </div>
   );

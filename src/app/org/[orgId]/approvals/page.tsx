@@ -407,7 +407,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
           <div style={modalStyle}>
             <h2 style={{ marginBottom: 6 }}>Disburse Salary Advance</h2>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-              Approving "{advanceRequest.title}" — KES {Number(advanceRequest.amount || 0).toLocaleString()}
+              Approving &quot;{advanceRequest.title}&quot; — KES {Number(advanceRequest.amount || 0).toLocaleString()}
             </p>
 
             <label style={labelStyle}>Paid from</label>
@@ -438,7 +438,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
           <div style={modalStyle}>
             <h2 style={{ marginBottom: 6 }}>Create Purchase Order</h2>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-              Approving "{poRequest.title}" — enter the order details.
+              Approving &quot;{poRequest.title}&quot; — enter the order details.
             </p>
 
             <label style={labelStyle}>Product</label>

@@ -177,7 +177,7 @@ export default function OrgBillingPage() {
       )}
       {payError && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 12 }} role="alert">{payError}</div>}
       <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 16 }}>
-        Press "Pay now" to pay by M-Pesa or card. Your receipt appears here as soon as the payment goes through. If you paid another way (M-Pesa to us directly, bank transfer, cash or cheque), press "I've paid" with your payment reference and your receipt appears once we confirm it.
+        Press &quot;Pay now&quot; to pay by M-Pesa or card. Your receipt appears here as soon as the payment goes through. If you paid another way (M-Pesa to us directly, bank transfer, cash or cheque), press &quot;I&apos;ve paid&quot; with your payment reference and your receipt appears once we confirm it.
       </p>
     </div>
   );

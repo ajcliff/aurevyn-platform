@@ -1,7 +1,7 @@
 import Link from "next/link";
 import RevealOnScroll from "./RevealOnScroll";
 import MarketingShell from "./MarketingShell";
-import Wordmark from "../../../wordmark";
+import Wordmark from "@/components/Wordmark";
 import { SOCIAL_LINKS } from "@/lib/socialLinks";
 
 

@@ -166,7 +166,7 @@ export default function OrgError({
         </div>
 
         <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 14 }}>
-          This was recorded automatically. Tap "Tell AUREVYN" to send a note to support and get a reply in Mail.
+          This was recorded automatically. Tap &quot;Tell AUREVYN&quot; to send a note to support and get a reply in Mail.
         </div>
       </div>
     </div>

@@ -49,7 +49,7 @@ export default function EnginesHubPage() {
 
       {visible.length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-          You haven't been given access to any engines yet. Ask an admin to assign you a license.
+          You haven&apos;t been given access to any engines yet. Ask an admin to assign you a license.
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>

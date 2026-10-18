@@ -226,7 +226,7 @@ export default function PackageSelectionGate({ orgId, orgName, onConfirmed }: Pr
         </button>
 
         <p style={{ textAlign: "center", fontSize: 12, color: "#6b7280", marginTop: 14 }}>
-          We'll send an invoice to your account — no card needed right now. You can change seats any time from Engines.
+          We&apos;ll send an invoice to your account — no card needed right now. You can change seats any time from Engines.
         </p>
       </div>
     </div>

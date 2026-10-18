@@ -282,7 +282,7 @@ export default function OrganizationsPage() {
 
           {drawerTab === "engines" && (
             <div>
-              <p className={f.hint}>Turn engines on or off for this organization. Changes here override the org's licenses, and no payment is involved. Use Licensing to manage seats and offers.</p>
+              <p className={f.hint}>Turn engines on or off for this organization. Changes here override the org&apos;s licenses, and no payment is involved. Use Licensing to manage seats and offers.</p>
               {allEngines.map(engine => {
                 const enabled = orgEngines.find(oe => oe.engine_id === engine.id)?.enabled ?? false;
                 return (

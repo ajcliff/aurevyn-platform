@@ -147,7 +147,7 @@ export default function PaymentMethodForm({ amount, onAmountChange, onChange, on
             onBlur={() => { setTouched(true); emitChange(); }}
           />
 
-          <label className={s.label}>Payer's Phone Number (optional)</label>
+          <label className={s.label}>Payer&apos;s Phone Number (optional)</label>
           <input
             className={s.input}
             type="tel"

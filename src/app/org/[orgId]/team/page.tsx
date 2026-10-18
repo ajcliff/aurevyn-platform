@@ -313,7 +313,7 @@ export default function TeamPage() {
             {lastInviteLink ? (
               <div>
                 <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 13 }}>
-                  Send this link to your teammate — they'll set their own password.
+                  Send this link to your teammate — they&apos;ll set their own password.
                 </p>
                 <input
                   readOnly

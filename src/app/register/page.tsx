@@ -241,7 +241,7 @@ export default function RegisterPage() {
         <div className="mkt-badge-live" style={{ marginBottom: 14 }}>Almost there</div>
         <h1 className="mkt-h3" style={{ fontSize: "1.25rem" }}>Confirm your email</h1>
         <p className="mkt-body" style={{ fontSize: "0.875rem", marginTop: 10 }}>
-          We've sent a confirmation link to <strong style={{ color: "var(--mkt-paper)" }}>{form.email}</strong>.
+          We&apos;ve sent a confirmation link to <strong style={{ color: "var(--mkt-paper)" }}>{form.email}</strong>.
           Your organization <strong style={{ color: "var(--mkt-paper)" }}>{form.companyName}</strong> is set up
           and waiting — click the link in that email to verify your account, then log in.
         </p>

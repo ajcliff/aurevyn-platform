@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
         <>
           <div className="mkt-h3" style={{ fontSize: "1.25rem" }}>Check your email</div>
           <p className="mkt-body" style={{ fontSize: "0.8125rem", marginTop: 10 }}>
-            If an account exists for <strong style={{ color: "var(--mkt-paper)" }}>{email}</strong>, we've sent a
+            If an account exists for <strong style={{ color: "var(--mkt-paper)" }}>{email}</strong>, we&apos;ve sent a
             link to reset your password.
           </p>
           <Link href="/login" className="mkt-mono" style={{ color: "var(--mkt-blueprint)", fontSize: "0.8125rem", marginTop: 18, display: "inline-block" }}>
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
           <div className="mkt-eyebrow" style={{ marginBottom: 6 }}>Reset password</div>
           <h1 className="mkt-h3" style={{ fontSize: "1.25rem" }}>Reset your password</h1>
           <p className="mkt-body" style={{ fontSize: "0.8125rem", marginTop: 6 }}>
-            Enter your email and we'll send you a reset link.
+            Enter your email and we&apos;ll send you a reset link.
           </p>
 
           <label className="mkt-field-label">Email</label>

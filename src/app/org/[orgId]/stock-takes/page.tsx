@@ -112,7 +112,7 @@ export default function StockTakesPage() {
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700 }}>Stock Take — {warehouseName}</h1>
             <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              Enter what's actually on the shelf for each item. Leave blank to skip.
+              Enter what&apos;s actually on the shelf for each item. Leave blank to skip.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>

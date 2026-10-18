@@ -60,7 +60,7 @@ export default function ContactPage() {
             </h1>
             <p className="mkt-body-lg" style={{ marginTop: 14, maxWidth: 360 }}>
               Questions about Aurevyn, a specific engine, or which blueprint
-              fits your business? Send a message and we'll get back to you.
+              fits your business? Send a message and we&apos;ll get back to you.
             </p>
             <div className="mkt-divider" style={{ margin: "28px 0" }} />
             <div className="mkt-tag">Response time</div>
@@ -73,7 +73,7 @@ export default function ContactPage() {
                 <div className="mkt-badge-live" style={{ marginBottom: 14 }}>Message sent</div>
                 <h3 className="mkt-h3">Thanks for reaching out</h3>
                 <p className="mkt-body" style={{ marginTop: 8, fontSize: "0.9375rem" }}>
-                  We'll respond as soon as we can.
+                  We&apos;ll respond as soon as we can.
                 </p>
               </div>
             ) : (

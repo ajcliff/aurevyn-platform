@@ -131,7 +131,7 @@ export default function UsersPage() {
         </div>
       </div>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
-        Create accounts directly — no invite links to send. One user takes one seat per engine they're licensed for.
+        Create accounts directly — no invite links to send. One user takes one seat per engine they&apos;re licensed for.
       </p>
 
       {!loading && members.length > 10 && (
@@ -330,7 +330,7 @@ function CreateUserModal({
         <div style={modalStyle}>
           <h2 style={{ marginBottom: 6 }}>User created</h2>
           <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
-            Share this temporary password with {fullName} directly. It's only shown once — they can change it after signing in.
+            Share this temporary password with {fullName} directly. It&apos;s only shown once — they can change it after signing in.
           </p>
           <div style={{ padding: 14, borderRadius: 10, background: "var(--bg-base)", border: "1px solid var(--border)", fontFamily: "monospace", fontSize: 16, textAlign: "center", marginBottom: 12 }}>
             {result.tempPassword}
@@ -338,7 +338,7 @@ function CreateUserModal({
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Signs in with: <b>{username.trim().toLowerCase() || email}</b>. They will choose their own password the first time they sign in.</p>
           {result.warnings.length > 0 && (
             <p style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>
-              Account created, but some licenses couldn't be assigned: {result.warnings.join("; ")}
+              Account created, but some licenses couldn&apos;t be assigned: {result.warnings.join("; ")}
             </p>
           )}
           <button style={{ ...buttonGold, width: "100%", marginTop: 16 }} onClick={onCreated}>Done</button>
