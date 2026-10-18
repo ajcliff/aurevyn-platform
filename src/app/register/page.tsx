@@ -33,6 +33,7 @@ export default function RegisterPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
@@ -438,6 +439,15 @@ export default function RegisterPage() {
             <div><span className="mkt-dim">Trial</span><span>Every engine unlocked, free. Pay only for the engines and seats you keep.</span></div>
           </div>
 
+          <div className="mkt-alert-box" style={{ marginTop: 14, fontSize: "0.8125rem", lineHeight: 1.55 }}>
+            <strong>Good to know:</strong> AUREVYN is one shared platform that many businesses use, so we can&apos;t change how it works for a single business. We read every suggestion, but a change that needs new code may not be possible, and custom work, where we agree to do it, can carry a fee.
+          </div>
+
+          <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 14, fontSize: "0.8125rem", cursor: "pointer" }}>
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>I understand this, and I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--mkt-blueprint)" }}>Terms of Service</a>.</span>
+          </label>
+
           {error && <div className="mkt-alert-box" style={{ marginTop: 14 }}>{error}</div>}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
@@ -445,7 +455,7 @@ export default function RegisterPage() {
             <button
               className="mkt-btn mkt-btn--primary"
               style={{ flex: 1 }}
-              disabled={loading || !step1Valid || !step2Valid}
+              disabled={loading || !agreed || !step1Valid || !step2Valid}
               onClick={handleRegistration}
             >
               {loading ? "Creating organization…" : "Create organization"}

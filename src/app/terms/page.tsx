@@ -12,7 +12,7 @@ export default function TermsPage() {
         <div className="mkt-eyebrow">Legal</div>
         <h1 className="mkt-h1" style={{ fontSize: "clamp(2rem, 3.6vw, 2.75rem)", marginTop: 14 }}>Terms of Service</h1>
         <p className="mkt-mono mkt-dim" style={{ marginTop: 10, marginBottom: 8, fontSize: "0.8125rem" }}>
-          Last updated: 17 October 2026
+          Last updated: 18 October 2026
         </p>
 
         <Section title="1. Agreement to Terms">
@@ -61,27 +61,35 @@ export default function TermsPage() {
           own terms, and we share with them only what is needed to provide the service.
         </Section>
 
-        <Section title="8. Availability and Support">
+        <Section title="8. Changes to the Platform and Custom Work">
+          AUREVYN is a single platform shared by many businesses. We decide what it does and how it works, and we
+          cannot change it for one business alone. We welcome suggestions and may add them for everyone, but we do
+          not promise that any requested feature or change will be built or by when, and some changes that need
+          new code are not possible. Where we agree to do custom work for your business, it may carry a fee, which
+          we will tell you and you must accept before the work starts.
+        </Section>
+
+        <Section title="9. Availability and Support">
           We aim to keep the Platform available and reliable but do not guarantee uninterrupted access.
           Planned maintenance or unforeseen issues may cause temporary downtime.
         </Section>
 
-        <Section title="9. Termination">
+        <Section title="10. Termination">
           You may stop using AUREVYN at any time by contacting us, and you can ask for a copy of your business data before your account is closed. We reserve the right to suspend or terminate accounts that
           violate these terms or engage in fraudulent or harmful activity.
         </Section>
 
-        <Section title="10. Limitation of Liability">
+        <Section title="11. Limitation of Liability">
           The Platform is provided "as is." To the fullest extent permitted by law, AUREVYN is not liable for
           indirect, incidental, or consequential damages arising from use of the Platform.
         </Section>
 
-        <Section title="11. Changes to These Terms">
+        <Section title="12. Changes to These Terms">
           We may update these Terms from time to time. Continued use of the Platform after changes take
           effect constitutes acceptance of the revised Terms.
         </Section>
 
-        <Section title="12. Contact">
+        <Section title="13. Contact">
           Questions about these Terms can be sent via our <Link href="/contact" style={{ color: "var(--mkt-blueprint)" }}>Contact page</Link>.
         </Section>
       </div>
