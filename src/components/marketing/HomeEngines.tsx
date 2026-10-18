@@ -1,6 +1,6 @@
 // Every engine here exists in the app today. Keep this list in step with the engines table.
 const ENGINES = [
-  { icon: "🛒", name: "Point of Sale", core: true, body: "Barcode sales, split payments, discounts, refunds and receipts. Record cash, M-Pesa, bank and cheque payments. Keeps selling offline and syncs when you reconnect." },
+  { icon: "🛒", name: "Point of Sale", core: true, body: "Barcode sales, split payments, discounts, refunds and receipts. Record cash, M-Pesa, bank and cheque payments. If the internet drops while the till is open, sales are saved on the computer and sync when you reconnect." },
   { icon: "📦", name: "Inventory", core: true, body: "Stock across shops and warehouses, transfers, batches, stock-takes and low-stock alerts, with cost tracked as stock comes in." },
   { icon: "💰", name: "Finance", core: true, body: "Cash, M-Pesa and bank accounts, customer invoices, credit customers, petty cash, reconciliation and a full ledger with VAT." },
   { icon: "📋", name: "Procurement", body: "Suppliers and purchase orders. Receive part of an order, or close it short when a supplier under-delivers." },

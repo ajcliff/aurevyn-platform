@@ -3,7 +3,7 @@ import Wordmark from "../../../wordmark";
 
 const FACTS = [
   { value: "10", label: "Engines, all on for 30 days" },
-  { value: "Offline", label: "Till keeps selling without internet" },
+  { value: "Sync", label: "Sales keep saving if the internet drops" },
   { value: "KE-ready", label: "VAT, PAYE, NSSF and NHIF" },
 ];
 
