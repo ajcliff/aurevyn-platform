@@ -2,6 +2,7 @@ import Link from "next/link";
 import RevealOnScroll from "./RevealOnScroll";
 import MarketingShell from "./MarketingShell";
 import Wordmark from "../../../wordmark";
+import { SOCIAL_LINKS } from "@/lib/socialLinks";
 
 
 const COLUMNS = [
@@ -44,11 +45,15 @@ export default function MarketingFooter() {
           <p className="mkt-body" style={{ maxWidth: 280, fontSize: "0.875rem", marginTop: 14 }}>
             Till, stock, books, payroll and approvals in one system, built in Nairobi for Kenyan businesses.
           </p>
-          <div className="mkt-footer__social">
-            {/* TODO: replace # with real profile URLs once these accounts exist */}
-            <a href="#" className="mkt-footer__social-link" aria-label="X (Twitter)">𝕏</a>
-            <a href="#" className="mkt-footer__social-link" aria-label="LinkedIn">in</a>
-          </div>
+          {SOCIAL_LINKS.some((l) => l.url) && (
+            <div className="mkt-footer__social">
+              {SOCIAL_LINKS.filter((l) => l.url).map((l) => (
+                <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" className="mkt-footer__social-link" aria-label={l.label} title={l.label}>
+                  {l.short}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         <RevealOnScroll stagger={80} variant="up" className="mkt-footer__cols">
@@ -122,6 +127,7 @@ export default function MarketingFooter() {
         }
         .mkt-footer__social {
           display: flex;
+          flex-wrap: wrap;
           gap: 10px;
           margin-top: 16px;
         }
@@ -132,7 +138,7 @@ export default function MarketingFooter() {
           align-items: center;
           justify-content: center;
           border: 1px solid var(--mkt-line-strong);
-          font-size: 0.8125rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: var(--mkt-paper-faint);
           transition: border-color 0.2s ease, color 0.2s ease;
