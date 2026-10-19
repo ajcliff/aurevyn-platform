@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireOrgMember } from "@/lib/server/guards";
+import { sendWelcomeEmail, sendRoleEmail, sendGuideEmail } from "@/lib/server/userEmails";
 
 // organization_engines and notifications are both founder-only tables at the
 // RLS level (a regular org member can read organization_engines but never
@@ -57,6 +58,25 @@ export async function POST(req: NextRequest) {
   });
   if (notifyError) {
     console.error("Failed to create registration notification:", notifyError);
+  }
+
+  // Welcome, role and guide emails for the new owner. Server-side so a closed tab can never skip them.
+  // sendEmail never throws, so a missing email setup cannot break registration.
+  const { data: owner } = await supabaseAdmin
+    .from("org_users")
+    .select("email, full_name")
+    .eq("org_id", orgId)
+    .eq("role", "owner")
+    .limit(1)
+    .maybeSingle();
+  const ownerEmail = owner?.email || access.userEmail;
+  if (ownerEmail) {
+    const origin = req.nextUrl.origin;
+    const name = owner?.full_name ?? "";
+    const orgLabel = orgName ?? "your organization";
+    await sendWelcomeEmail(ownerEmail, name, orgLabel, origin, orgId);
+    await sendRoleEmail({ to: ownerEmail, name, role: "owner", orgId, orgName: orgLabel, origin, slugs: null });
+    await sendGuideEmail(ownerEmail, name, orgId, origin);
   }
 
   return NextResponse.json({ ok: true });

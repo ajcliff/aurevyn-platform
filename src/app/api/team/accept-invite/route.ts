@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { sendNewUserEmails } from "@/lib/server/userEmails";
 
 // Accepting an invite used to do signUp() then immediately insert into
 // org_users as that brand-new user — but supabase.auth.signUp() doesn't
@@ -82,6 +83,12 @@ export async function POST(req: NextRequest) {
   }
 
   await supabaseAdmin.from("team_invites").update({ status: "accepted" }).eq("id", invite.id);
+
+  const { data: org } = await supabaseAdmin.from("organizations").select("name").eq("id", invite.org_id).maybeSingle();
+  await sendNewUserEmails({
+    to: invite.email, name: fullName, role: invite.role, orgId: invite.org_id, orgName: org?.name ?? "your organization",
+    origin: req.nextUrl.origin, slugs: Array.isArray(invite.allowed_engines) ? invite.allowed_engines : null,
+  });
 
   return NextResponse.json({ orgId: invite.org_id, email: invite.email });
 }

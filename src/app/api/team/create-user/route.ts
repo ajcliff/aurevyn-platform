@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { requireOrgAdmin } from "@/lib/server/guards";
 import { USERNAME_PATTERN, normalizeUsername, usernameToEmail } from "@/lib/staffLogin";
 import { isValidEmail } from "@/lib/validation";
+import { sendNewUserEmails } from "@/lib/server/userEmails";
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -127,6 +128,15 @@ export async function POST(req: NextRequest) {
   for (const engineId of engineIds ?? []) {
     const { error } = await supabaseAdmin.from("user_engine_licenses").insert({ org_id: orgId, user_id: userId, engine_id: engineId });
     if (error) licenseWarnings.push(error.message);
+  }
+
+  // Tell them what their role allows. Only possible when an email address was given; the password is never emailed.
+  if (email) {
+    const { data: org } = await supabaseAdmin.from("organizations").select("name").eq("id", orgId).maybeSingle();
+    await sendNewUserEmails({
+      to: email, name: fullName, role, orgId, orgName: org?.name ?? "your organization",
+      origin: req.nextUrl.origin, engineIds: engineIds ?? [], loginName: username ?? email,
+    });
   }
 
   return NextResponse.json({ ok: true, userId, tempPassword, loginName: username ?? email, licenseWarnings });

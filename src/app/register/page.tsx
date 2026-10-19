@@ -206,17 +206,7 @@ export default function RegisterPage() {
         throw new Error(finalizeError);
       }
 
-      fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "welcome",
-          to: form.email.trim(),
-          orgName: form.companyName.trim(),
-          ownerName: form.fullName.trim(),
-        }),
-      }).catch(() => {});
-
+      // The welcome, role and guide emails are sent by /api/register/finalize.
       if (!hasSession) {
         // Organization is set up, but they can't be signed in yet.
         setPendingConfirmation(true);
