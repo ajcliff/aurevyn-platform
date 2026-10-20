@@ -53,7 +53,7 @@ The schema export belongs in `supabase/schema.sql`: tables, row-level security p
 - Department-head routing with 11+ people, mail attachments and the Documents hub have only been tried with small data.
 - Emails only reach the founder until a sending domain is verified with Resend. Once verified, set `EMAIL_FROM_ADDRESS` (e.g. `AUREVYN <hello@yourdomain.com>`) in Vercel and redeploy; every email uses that one setting.
 - M-Pesa at the till is recorded by hand (transaction code and phone); there is no live Safaricom Daraja connection. The `organization_mpesa_configs` table is unused.
-- Invoices in Documents have no printable copy; Documents shows the latest 200 POS receipts.
+- Documents shows the latest 200 POS receipts.
 - About 190 lint warnings (`any` types, effects that set state) are tracked as debt, not errors.
 
 ## Deploying

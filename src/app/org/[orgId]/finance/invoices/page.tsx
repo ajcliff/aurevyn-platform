@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useEngine } from "@/lib/runtime/EngineContext";
-import jsPDF from "jspdf";
+import { downloadOrgInvoicePdf } from "@/lib/orgInvoicePdf";
 import { getCustomers, type Customer } from "@/lib/customers";
 import {
   getInvoices,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/orgInvoices";
 import PaymentMethodForm from "@/components/payments/PaymentMethodForm";
 import { type PaymentDetailsInput } from "@/lib/payments";
-import { getOrgSettings, getOrgLogoUrl, type OrgSettings } from "@/lib/orgSettings";
+import { getOrgSettings, type OrgSettings } from "@/lib/orgSettings";
 import EmptyState from "@/components/EmptyState";
 const STATUS_COLORS: Record<string, string> = {
   draft: "var(--text-muted)",
@@ -73,24 +73,6 @@ async function load() {
     setVatRate(String(settings.default_vat_rate));
     setWhtRate(String(settings.default_wht_rate));
     setLoading(false);
-  }
-
-  // jsPDF needs an embedded image as a data URL, not just a hosted URL —
-  // fetches the logo once and converts it in-browser
-  async function loadImageAsDataUrl(url: string): Promise<string | null> {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (err) {
-      console.error("Failed to load logo for PDF:", err);
-      return null;
-    }
   }
 
   function updateItem(index: number, field: keyof InvoiceItemInput, value: string) {
@@ -186,96 +168,7 @@ async function handleStatusChange(status: "sent" | "cancelled") {
 
 async function handleDownloadPDF() {
     if (!viewing) return;
-
-    const pdf = new jsPDF();
-    let y = 20;
-
-    const businessName = orgSettings?.business_name || organization.name;
-    const logoUrl = getOrgLogoUrl(orgSettings?.logo_path ?? null);
-
-    if (logoUrl) {
-      const dataUrl = await loadImageAsDataUrl(logoUrl);
-      if (dataUrl) {
-        try {
-          pdf.addImage(dataUrl, "PNG", 20, y - 8, 24, 24);
-        } catch (err) {
-          console.error("Could not embed logo in PDF:", err);
-        }
-      }
-    }
-
-    const textX = logoUrl ? 52 : 20;
-
-    pdf.setFontSize(20);
-    pdf.text(businessName, textX, y);
-
-    y += 8;
-    pdf.setFontSize(10);
-    if (orgSettings?.business_address) {
-      pdf.text(orgSettings.business_address, textX, y);
-      y += 5;
-    }
-    if (orgSettings?.business_phone) {
-      pdf.text(`Tel: ${orgSettings.business_phone}`, textX, y);
-      y += 5;
-    }
-
-    y = Math.max(y, 38);
-    y += 8;
-    pdf.setFontSize(14);
-    pdf.text(`INVOICE ${viewing.invoice_number}`, 20, y);
-    
-    y += 10;
-    pdf.setFontSize(10);
-    pdf.text(`Bill To: ${viewing.customers?.name || "Walk-in Customer"}`, 20, y);
-    y += 6;
-    pdf.text(`Issue Date: ${viewing.issue_date}`, 20, y);
-    y += 6;
-    pdf.text(`Due Date: ${viewing.due_date}`, 20, y);
-    y += 6;
-    pdf.text(`Status: ${viewing.status.toUpperCase()}`, 20, y);
-
-    y += 14;
-    pdf.setFontSize(10);
-    pdf.text("Description", 20, y);
-    pdf.text("Qty", 120, y);
-    pdf.text("Unit Price", 145, y);
-    pdf.text("Total", 190, y, { align: "right" });
-    y += 4;
-    pdf.line(20, y, 190, y);
-    y += 8;
-
-    viewing.items.forEach((item) => {
-      pdf.text(item.description, 20, y);
-      pdf.text(String(item.quantity), 120, y);
-      pdf.text(Number(item.unit_price).toLocaleString(), 145, y);
-      pdf.text(Number(item.total).toLocaleString(), 190, y, { align: "right" });
-      y += 8;
-    });
-
-    y += 6;
-    pdf.line(20, y, 190, y);
-    y += 10;
-
-    pdf.text(`Subtotal: KES ${Number(viewing.subtotal).toLocaleString()}`, 190, y, { align: "right" });
-    y += 7;
-    pdf.text(`VAT (${viewing.vat_rate}%): KES ${Number(viewing.vat_amount).toLocaleString()}`, 190, y, { align: "right" });
-    y += 10;
-
-    pdf.setFontSize(14);
-    pdf.text(`TOTAL: KES ${Number(viewing.total).toLocaleString()}`, 190, y, { align: "right" });
-
-    if (viewing.notes) {
-      y += 15;
-      pdf.setFontSize(10);
-      pdf.text(`Notes: ${viewing.notes}`, 20, y);
-    }
-
-    y += 20;
-    pdf.setFontSize(10);
-    pdf.text("Thank you for your business — AUREVYN", 20, y);
-
-    pdf.save(`${viewing.invoice_number}.pdf`);
+    await downloadOrgInvoicePdf(viewing, organization.id, orgSettings?.business_name || organization.name);
   }
 
   if (loading) return <div>Loading invoices...</div>;

@@ -4,6 +4,7 @@ import { getPurchaseOrders, type PurchaseOrder } from "@/lib/purchaseOrders";
 import { getInvoices as getOrgInvoices } from "@/lib/orgInvoices";
 import { getReceipts } from "@/lib/receipts";
 import { downloadReceiptPdf } from "@/lib/billingPdf";
+import { openOrgInvoicePdf } from "@/lib/orgInvoicePdf";
 import type { Invoice } from "@/lib/invoices";
 
 // Everything the business has produced, in one list. Uploaded files live in the "documents" table;
@@ -126,7 +127,8 @@ export async function getHubItems(orgId: string, orgName: string): Promise<HubIt
     items.push({
       key: `inv-${inv.id}`, kind: "invoice", title: inv.invoice_number,
       subtitle: `${inv.customers?.name ?? "Customer"} · ${inv.status}`, date: inv.created_at, amount: Number(inv.total),
-      manageHref: `${base}/finance/invoices`, open: () => { window.location.href = `${base}/finance/invoices`; },
+      manageHref: `${base}/finance/invoices`,
+      open: async () => { if (!(await openOrgInvoicePdf(inv.id, orgId, orgName))) window.location.href = `${base}/finance/invoices`; },
     });
   }
 
