@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: "What is a seat?",
-    a: "One seat is one team member using one engine. Five people on Point of Sale and two on Finance means a 5-seat POS license and a 2-seat Finance license.",
+    a: "One seat is one team member using one engine. Five people on Point of Sale and two on Finance means a 10-seat POS license and a 3-seat Finance license: each size covers up to that many people, so you take the smallest one that fits.",
   },
   {
     q: "Can I change seats later?",
