@@ -7,6 +7,7 @@ import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance";
 import { getCashPosition } from "@/lib/journal";
 import { getReconciliations, recordReconciliation, type Reconciliation } from "@/lib/accountReconciliation";
 import EmptyState from "@/components/EmptyState";
+import { parseStatementCsv, getBookLines, matchStatement, type MatchResult } from "@/lib/statementImport";
 
 const kes = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
 
@@ -45,6 +46,9 @@ export default function ReconcilePage() {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [stmt, setStmt] = useState<(MatchResult & { from: string; to: string; fileName: string }) | null>(null);
+  const [stmtError, setStmtError] = useState("");
+  const [stmtBusy, setStmtBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +74,39 @@ export default function ReconcilePage() {
     setNote("");
     setAdjust(true);
     setError("");
+    setStmt(null);
+    setStmtError("");
     setAsOf(new Date().toISOString().slice(0, 10));
+  }
+
+  // Reads a bank or M-Pesa statement (CSV), fills in the closing balance when the file has one,
+  // and lists what is on the statement but not in AUREVYN, and the other way round. Nothing is saved.
+  async function importStatement(file: File) {
+    if (!active) return;
+    setStmt(null);
+    setStmtError("");
+    setStmtBusy(true);
+    try {
+      const { lines, error: parseError } = parseStatementCsv(await file.text());
+      if (parseError) return setStmtError(parseError);
+      const dates = lines.map((l) => l.date).sort();
+      const from = dates[0];
+      const to = dates[dates.length - 1];
+      const book = await getBookLines(orgId, active.id, from, to);
+      setStmt({ ...matchStatement(lines, book), from, to, fileName: file.name });
+      // Closing balance = the balance on the newest line. Files list oldest-first or newest-first, so check which.
+      const withBalance = lines.filter((l) => l.balance != null);
+      if (withBalance.length) {
+        const oldestFirst = lines[0].date <= lines[lines.length - 1].date;
+        const closing = oldestFirst ? withBalance[withBalance.length - 1] : withBalance[0];
+        setActual(String(closing.balance));
+        setAsOf(to);
+      }
+    } catch {
+      setStmtError("Could not read that file. Save the statement as CSV and try again.");
+    } finally {
+      setStmtBusy(false);
+    }
   }
 
   async function save() {
@@ -138,6 +174,17 @@ export default function ReconcilePage() {
         <div style={{ border: "1px solid var(--border)", background: "var(--bg-card)", borderRadius: 12, padding: 16, marginBottom: 22, maxWidth: 520 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Reconcile {active.name}</div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>AUREVYN says it holds {kes(bookBalance)}.</div>
+          {active.type !== "cash" && (
+            <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px dashed var(--border)", borderRadius: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Import a statement (CSV)</div>
+              <input type="file" accept=".csv,text/csv" disabled={stmtBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) importStatement(f); e.target.value = ""; }} style={{ fontSize: 12 }} />
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                Download the statement from your bank or M-Pesa as CSV. Headings like Date, Description, Amount (or Paid in / Paid out) and Balance are recognised. The file is only read here, not saved.
+              </div>
+              {stmtBusy && <div style={{ fontSize: 12, marginTop: 6 }}>Reading…</div>}
+              {stmtError && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>{stmtError}</div>}
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <label style={{ fontSize: 12, fontWeight: 600 }}>{actualLabel(active)}</label>
             <input style={input} type="number" value={actual} onChange={(e) => setActual(e.target.value)} autoFocus />
@@ -169,6 +216,25 @@ export default function ReconcilePage() {
         </div>
       )}
 
+      {active && stmt && (
+        <div style={{ border: "1px solid var(--border)", background: "var(--bg-card)", borderRadius: 12, padding: 16, marginBottom: 22, maxWidth: 720 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Statement check: {stmt.fileName}</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+            {stmt.from} to {stmt.to}. {stmt.matched.length} line{stmt.matched.length === 1 ? "" : "s"} match what AUREVYN recorded (same amount, dates within 3 days).
+          </div>
+          <StatementList
+            title="On the statement but not in AUREVYN"
+            hint="Money that moved in the bank or M-Pesa and was never recorded. Record each one in Finance, then check again."
+            rows={stmt.statementOnly.map((l) => ({ date: l.date, text: l.description, amount: l.amount }))}
+          />
+          <StatementList
+            title="In AUREVYN but not on the statement"
+            hint="Recorded here but not yet in the bank or M-Pesa. It may be a cheque not yet cleared, a timing difference, or a mistake."
+            rows={stmt.bookOnly.map((l) => ({ date: l.date, text: l.description, amount: l.amount }))}
+          />
+        </div>
+      )}
+
       {history.length > 0 && (
         <>
           <h3 style={{ fontSize: 14, marginBottom: 8 }}>History</h3>
@@ -186,6 +252,31 @@ export default function ReconcilePage() {
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function StatementList({ title, hint, rows }: { title: string; hint: string; rows: { date: string; text: string; amount: number }[] }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{title} ({rows.length})</div>
+      <div style={{ fontSize: 11.5, color: "var(--text-muted)", margin: "2px 0 6px" }}>{hint}</div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#3dd68c" }}>Nothing here.</div>
+      ) : (
+        <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          {rows.slice(0, 100).map((r, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 1fr 110px", gap: 10, padding: "7px 10px", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
+              <span style={{ color: "var(--text-muted)" }}>{r.date}</span>
+              <span>{r.text || "—"}</span>
+              <span style={{ textAlign: "right", fontWeight: 600, color: r.amount < 0 ? "#f59e0b" : "var(--text-primary)" }}>
+                {r.amount < 0 ? "-" : "+"}KES {Math.abs(r.amount).toLocaleString()}
+              </span>
+            </div>
+          ))}
+          {rows.length > 100 && <div style={{ padding: "7px 10px", fontSize: 12, color: "var(--text-muted)" }}>Showing the first 100 of {rows.length}.</div>}
+        </div>
       )}
     </div>
   );
