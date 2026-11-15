@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/marketing/AuthShell";
 import { loginIdentifierToEmail } from "@/lib/staffLogin";
+import { isFounderUser } from "@/lib/founder";
 
 function LoginInner() {
   const [email, setEmail] = useState("");
@@ -44,7 +45,7 @@ function LoginInner() {
 
     const { data: membership } = await supabase.from("org_users").select("org_id").eq("user_id", userId).limit(1).maybeSingle();
 
-    if (userEmail?.trim().toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase()) {
+    if (await isFounderUser(supabase, { id: userId, email: userEmail })) {
       // Founder who also owns a workspace: let them pick which side to enter
       if (membership?.org_id) {
         setChooseOrgId(membership.org_id);

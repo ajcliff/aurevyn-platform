@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isFounderUser } from "@/lib/founder";
 
 const PUBLIC_ROUTES = ["/", "/pricing", "/download", "/login", "/register", "/join", "/forgot-password", "/terms", "/privacy", "/contact", "/api/paystack/webhook", "/api/cron", "/email"];
 function isPublicRoute(pathname: string): boolean {
@@ -57,11 +58,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/change-password", req.url));
   }
 
-  const email = user.email;
-  const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
+  const isFounder = await isFounderUser(supabase, user);
 
   // Two-factor is mandatory for the founder: no founder pages or APIs until the code is entered
-  if (email?.toLowerCase() === founderEmail?.toLowerCase() && !pathname.startsWith("/account/security")) {
+  if (isFounder && !pathname.startsWith("/account/security")) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal && aal.currentLevel !== "aal2") {
       if (pathname.startsWith("/api")) {
@@ -80,7 +80,7 @@ export async function proxy(req: NextRequest) {
   // 1. FOUNDER SPACE RULES
   // =========================
   if (isDashboardRoute) {
-    if (email !== founderEmail) {
+    if (!isFounder) {
       // Not founder → redirect to org space
       const { data: orgUser } = await supabase
         .from("org_users")
@@ -105,7 +105,7 @@ export async function proxy(req: NextRequest) {
     const orgIdFromPath = pathname.split("/")[2];
 
     // Founder can view any org without needing org_users membership
-    if (email === founderEmail) {
+    if (isFounder) {
       return res;
     }
 

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { TeamRole } from "@/lib/team";
 import { canManageTeam } from "@/lib/permissions";
+import { isFounderUser } from "@/lib/founder";
 
 export type OrgAccess = {
   userId: string;
@@ -51,8 +52,7 @@ export async function requireOrgAccess(orgId: string): Promise<OrgAccess | null>
 
   if (!user) return null;
 
-  const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
-  if (user.email === founderEmail) {
+  if (await isFounderUser(supabase, user)) {
     return { userId: user.id, userEmail: user.email ?? null, role: "owner", isFounder: true };
   }
 
