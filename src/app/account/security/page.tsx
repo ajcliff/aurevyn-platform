@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import AuthShell from "@/components/marketing/AuthShell";
+import { isFounderUser } from "@/lib/founder";
 
 function SecurityInner() {
   const supabase = createClient();
@@ -27,7 +28,7 @@ function SecurityInner() {
       router.replace("/login");
       return;
     }
-    setIsFounder(user.email?.toLowerCase() === process.env.NEXT_PUBLIC_FOUNDER_EMAIL?.toLowerCase());
+    setIsFounder(await isFounderUser(supabase, user));
     const { data } = await supabase.auth.mfa.listFactors();
     setActiveFactorId(data?.totp?.[0]?.id ?? null);
     setLoading(false);

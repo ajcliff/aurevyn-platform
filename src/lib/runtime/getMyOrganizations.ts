@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { isFounderUser } from "@/lib/founder";
 import type { Organization } from "./models";
 
 export type MyOrgMembership = {
@@ -11,8 +12,7 @@ export async function getMyOrganizations(): Promise<MyOrgMembership[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
-  if (user.email === founderEmail) {
+  if (await isFounderUser(supabase, user)) {
     // Founder sees every org, not just ones they're an org_user row on
     const { data, error } = await supabase
       .from("organizations")

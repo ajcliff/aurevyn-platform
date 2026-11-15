@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { requireOrgAccess, type OrgAccess } from "@/lib/runtime/requireOrgAccess";
+import { isFounderUser } from "@/lib/founder";
 
 async function sessionUser() {
   const cookieStore = await cookies();
@@ -10,13 +11,13 @@ async function sessionUser() {
     { cookies: { getAll: () => cookieStore.getAll(), setAll() {} } }
   );
   const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  return { supabase, user };
 }
 
-// Platform founder only (email match, same rule as the dashboard gate).
+// Platform founder only (founder_settings row, same rule as the dashboard gate).
 export async function requireFounder(): Promise<{ userId: string; email: string } | null> {
-  const user = await sessionUser();
-  if (!user || !user.email || user.email !== process.env.NEXT_PUBLIC_FOUNDER_EMAIL) return null;
+  const { supabase, user } = await sessionUser();
+  if (!user || !user.email || !(await isFounderUser(supabase, user))) return null;
   return { userId: user.id, email: user.email };
 }
 

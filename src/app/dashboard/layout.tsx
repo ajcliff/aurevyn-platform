@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import MobileViewOnlyBanner from "@/components/MobileViewOnlyBanner";
 import QuickNotesWidget from "@/components/QuickNotesWidget";
 import styles from "@/styles/layout.module.css";
+import { isFounderUser } from "@/lib/founder";
 
 const MOBILE_BREAKPOINT = 900;
 
@@ -63,7 +64,7 @@ export default function DashboardLayout({
   }, [pathname]);
 
   // Founder identity check — this is the actual access gate for the whole dashboard.
-  // Anyone who is NOT this exact email gets turned away before anything else loads.
+  // Anyone without a founder_settings row gets turned away before anything else loads.
   useEffect(() => {
     let active = true;
     async function verifyFounder() {
@@ -79,8 +80,7 @@ export default function DashboardLayout({
           return;
         }
 
-        const founderEmail = process.env.NEXT_PUBLIC_FOUNDER_EMAIL;
-        const verified = !!founderEmail && user.email === founderEmail;
+        const verified = await isFounderUser(supabase, user);
 
         if (!active) return;
 

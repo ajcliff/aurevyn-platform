@@ -2140,10 +2140,10 @@ create policy "Founder full access" on public.commerce_promotions for all to pub
 create policy "Org members manage own commerce promotions" on public.commerce_promotions for all to public using (is_org_member(org_id)) with check (is_org_member(org_id));
 create policy "Founder full access" on public.commerce_rules for all to public using (is_founder()) with check (is_founder());
 create policy "Org members manage own commerce rules" on public.commerce_rules for all to public using (is_org_member(org_id)) with check (is_org_member(org_id));
-create policy founder_only on public.company_documents for all to authenticated using (((auth.jwt() ->> 'email'::text) = 'aurevynstudio@gmail.com'::text)) with check (((auth.jwt() ->> 'email'::text) = 'aurevynstudio@gmail.com'::text));
+create policy "Founder full access" on public.company_documents for all to authenticated using (is_founder()) with check (is_founder());
 create policy "Founder full access" on public.company_expenses for all to public using (is_founder()) with check (is_founder());
 create policy "Founder full access" on public.company_profile for all to public using (is_founder()) with check (is_founder());
-create policy founder_only on public.company_team_members for all to authenticated using (((auth.jwt() ->> 'email'::text) = 'aurevynstudio@gmail.com'::text)) with check (((auth.jwt() ->> 'email'::text) = 'aurevynstudio@gmail.com'::text));
+create policy "Founder full access" on public.company_team_members for all to authenticated using (is_founder()) with check (is_founder());
 create policy "Allow public insert on contact_messages" on public.contact_messages for insert to public with check (true);
 create policy "Founder can read contact messages" on public.contact_messages for select to public using (is_founder());
 create policy "Founder full access" on public.cost_centers for all to public using (is_founder()) with check (is_founder());
