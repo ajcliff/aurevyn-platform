@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { createClient as createVerifierClient } from "@supabase/supabase-js";
 import { getFounderSettings, updateFounderSettings, type FounderSettings } from "@/lib/founderSettings";
 import { getOrganizations } from "@/lib/organizations";
 import { getInvoices } from "@/lib/invoices";
@@ -202,7 +203,15 @@ export default function FounderSettingsPage() {
     setChangingPassword(true);
     try {
       const supabase = createClient();
-      const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+      // Check the current password on a throwaway client. Signing in on the main client would replace
+      // the founder's two-factor (AAL2) session with a password-only one, and Supabase then refuses
+      // the password change ("AAL2 session is required ... when MFA is enabled").
+      const verifier = createVerifierClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+      );
+      const { error: reauthError } = await verifier.auth.signInWithPassword({ email, password: currentPassword });
       if (reauthError) throw new Error("Current password is incorrect.");
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
